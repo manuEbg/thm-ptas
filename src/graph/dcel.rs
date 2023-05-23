@@ -1,6 +1,8 @@
 pub struct Arc {
     src: usize,
+    src_port: Option<usize>,
     dst: usize,
+    dst_port: Option<usize>,
     next: Option<usize>,
     prev: Option<usize>,
     twin: Option<usize>,
@@ -11,7 +13,9 @@ impl Arc {
     pub fn new(src: usize, dst: usize) -> Self {
         Arc {
             src: src,
+            src_port: None,
             dst: dst,
+            dst_port: None,
             next: None,
             prev: None,
             twin: None,
@@ -61,6 +65,14 @@ impl Dcel {
         
         if self.vertices.len() > dst {
             // find and mark twin
+
+            for possibleTwin in self.vertices[dst].arcs {
+                if self.arcs[possibleTwin].dst == src {
+                    self.arcs[self.arcs.len()-1].twin = possibleTwin;
+                    break;
+                } 
+            }
+
         }
     }
 }
