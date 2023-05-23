@@ -3,7 +3,9 @@ use crate::graph::{PlanarGraph, Vertex};
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
-mod graph;
+pub mod graph;
+use graph::Dcel;
+
 
 fn read_graph_file(filename: &str) -> Result<PlanarGraph, String>{
     return if let Ok(mut lines) = read_lines(filename) {
@@ -38,4 +40,9 @@ fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 fn main() {
     let args: Vec<String> = env::args().collect();
     println!("{:?}", read_graph_file(&args[1]))
+
+fn main() {
+    let mut g = Dcel::new();
+    g.push_arc(0, 1);
+    println!("{g:?}");
 }
