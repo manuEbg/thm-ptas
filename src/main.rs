@@ -5,34 +5,25 @@ use std::io::{self, BufRead};
 use std::path::Path;
 mod graph;
 
-fn read_graph_file(filename: &str) -> Result<Vec<PlanarGraph>, String>{
+fn read_graph_file(filename: &str) -> Result<PlanarGraph, String>{
     return if let Ok(mut lines) = read_lines(filename) {
-        let mut result: Vec<PlanarGraph> = Vec::new();
+        let mut recent_graph: PlanarGraph;
         let mut line;
-        loop {
-            line = lines.next();
-
-            if line.is_none() {
-                break;
+        line = lines.next();
+        if let Some(Ok(line)) = line {
+            recent_graph = PlanarGraph::new(line.parse().unwrap());
+            let edge_count: usize = lines.next().unwrap().unwrap().parse().unwrap();
+            for _ in 0..(2 *edge_count) {
+                let edge = lines.next().unwrap().unwrap();
+                let mut edge = edge.split(" ");
+                let u: Vertex = edge.next().unwrap().parse().unwrap();
+                let v: Vertex = edge.next().unwrap().parse().unwrap();
+                recent_graph.add_edge(u, v);
             }
-
-            if let Some(Ok(line)) = line {
-                let mut recent_graph: PlanarGraph = PlanarGraph::new(line.parse().unwrap());
-                let edge_count: usize = lines.next().unwrap().unwrap().parse().unwrap();
-                for _ in 0..edge_count {
-                    let edge = lines.next().unwrap().unwrap();
-                    let mut edge = edge.split(" ");
-                    let u: Vertex = edge.next().unwrap().parse().unwrap();
-                    let v: Vertex = edge.next().unwrap().parse().unwrap();
-                    recent_graph.add_edge(u, v);
-                }
-                result.push(recent_graph);
-            } else {
-                return Err(String::from("Error: Could not read line. "));
-            }
+        } else {
+            return Err(String::from("Error: Could not read line. "));
         }
-
-        Ok(result)
+        Ok(recent_graph)
     } else {
         Err(format!("Could not open file {}", filename))
     }
