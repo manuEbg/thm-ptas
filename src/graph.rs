@@ -2,7 +2,7 @@ pub type Vertex = u32;
 
 #[derive(Debug)]
 pub struct PlanarGraph {
-    adjacency: Vec<Vec<Vertex>>
+    pub adjacency: Vec<Vec<Vertex>>
 }
 
 fn insert_after<T : Eq>(list: &mut Vec<T>, predecessor: T, element: T) {
