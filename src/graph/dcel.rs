@@ -67,7 +67,7 @@ impl Dcel {
             self.vertices.push(Vertex::new());
         }
 
-        self.vertices[src].arcs.push(self.arcs.len()-1);
+        self.vertices[src].arcs.push(current_arc);
 
         if self.vertices.len() > dst {
             // find and mark twin
