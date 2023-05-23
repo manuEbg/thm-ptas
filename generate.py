@@ -5,6 +5,7 @@
 #   NODE_PROBABILITY: probability that a node gets edges associated
 #   EDGE_PROBABILITY: probability that a edge is created
 
+import matplotlib.pyplot as plt
 import networkx as nx
 import random
 import sys
@@ -44,3 +45,6 @@ print(len(embedding.edges()))
 for node, dst_nodes in embedding.get_data().items():
     for dst in dst_nodes:
         print(node, dst)
+
+nx.draw_networkx(embedding, pos=nx.planar_layout(embedding), with_labels=True)
+plt.savefig('graph.pdf', format='pdf', bbox_inches='tight')
