@@ -39,5 +39,6 @@ fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    println!("{:?}", read_graph_file(&args[1]))
+    let dcel = read_graph_file(&args[1]).unwrap();
+    println!("{:?}",dcel.walk_face(2));
 }

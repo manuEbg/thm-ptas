@@ -85,4 +85,16 @@ impl Dcel {
     pub fn push_face(&mut self, f: Face){
         self.faces.push(f);
     }
+
+    pub fn walk_face(&self, face_idx: usize) -> Vec<usize> {
+        let mut arcs = vec![];
+        let start_arc = self.faces[face_idx].start_arc;
+        arcs.push(start_arc);
+        let mut current_arc = self.arcs[start_arc].next;
+        while current_arc != start_arc {
+            arcs.push(current_arc);
+            current_arc = self.arcs[current_arc].next;
+        }
+        arcs
+    }
 }
