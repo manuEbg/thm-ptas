@@ -1,4 +1,5 @@
-use super::{Dcel, dcel};
+use super::Dcel;
+use super::dcel;
 
 #[derive(Debug)]
 
@@ -43,7 +44,7 @@ impl Face {
 
 #[derive(Debug)]
 struct Vertex {
-    arcs: Vec<usize>,
+    arcs: Vec<usize>
 }
 
 impl Vertex {
@@ -107,7 +108,7 @@ impl DcelBuilder {
             dcel.push_vertex(dcel::Vertex::new(&v.arcs));
         }
         for a in &(self.arcs) {
-            dcel.push_arc(dcel::Arc::new(a.src, a.src_port.unwrap(), a.dst, a.dst_port.unwrap(), a.next.unwrap(), a.prev.unwrap(), a.twin.unwrap(), a.face.unwrap()))
+            dcel.push_arc(dcel::Arc::new(a.src, a.dst, a.next.unwrap(), a.prev.unwrap(), a.twin.unwrap(), a.face.unwrap()))
         }
         for f in &(self.faces) {
             dcel.push_face(dcel::Face::new(f.start_arc))

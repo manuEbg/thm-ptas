@@ -4,12 +4,13 @@ use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
 use graph::{Dcel,DcelBuilder};
+use graph::dcel_file_writer::DcelWriter;
 
 
 fn read_graph_file(filename: &str) -> Result<Dcel, String>{
     return if let Ok(mut lines) = read_lines(filename) {
         let mut dcel_builder: DcelBuilder;
-        let mut line;
+        let line;
         line = lines.next();
         if let Some(Ok(line)) = line {
             dcel_builder = DcelBuilder::new();
@@ -37,8 +38,14 @@ fn read_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
     Ok(io::BufReader::new(file).lines())
 }
 
+fn  write_web_file(filename: &str, dcel: &Dcel) {
+    let mut writer = DcelWriter::new(filename, dcel);
+    writer.write_dcel()
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let dcel = read_graph_file(&args[1]).unwrap();
+    write_web_file("test.js", &dcel);
     println!("{:?}",dcel.walk_face(2));
 }
