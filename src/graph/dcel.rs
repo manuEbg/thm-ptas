@@ -10,6 +10,17 @@ impl Face {
             start_arc
         }
     }
+    pub fn walk_face(&self, dcel: &Dcel) -> Vec<usize> {
+
+        let mut arcs = vec![];
+        arcs.push(self.start_arc);
+        let mut current_arc = dcel.get_arc(self.start_arc).next();
+        while current_arc != self.start_arc {
+            arcs.push(current_arc);
+            current_arc = dcel.get_arc(current_arc).next();
+        }
+        arcs
+    }
 }
 
 
@@ -92,15 +103,7 @@ impl Dcel {
     }
 
     pub fn walk_face(&self, face_idx: usize) -> Vec<usize> {
-        let mut arcs = vec![];
-        let start_arc = self.faces[face_idx].start_arc;
-        arcs.push(start_arc);
-        let mut current_arc = self.arcs[start_arc].next();
-        while current_arc != start_arc {
-            arcs.push(current_arc);
-            current_arc = self.arcs[current_arc].next();
-        }
-        arcs
+        self.faces[face_idx].walk_face(self)
     }
 
     pub fn get_arcs(&self) -> &Vec<Arc> {
@@ -109,6 +112,10 @@ impl Dcel {
 
     pub fn get_arc(&self, idx: usize) -> &Arc {
         &self.arcs[idx]
+    }
+
+    pub fn get_faces(&self) -> &Vec<Face> {
+        &self.faces
     }
 
     pub fn get_vertices(&self) -> &Vec<Vertex> {
@@ -125,5 +132,9 @@ impl Dcel {
 
     pub fn num_vertices(&self) -> usize {
         self.vertices.len()
+    }
+
+    pub fn num_faces(&self) -> usize {
+        self.faces.len()
     }
 }
