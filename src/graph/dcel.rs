@@ -1,27 +1,35 @@
 #[derive(Debug)]
 pub struct Arc {
     src: usize,
-    src_port: Option<usize>,
+    src_port: usize,
     dst: usize,
-    dst_port: Option<usize>,
-    next: Option<usize>,
-    prev: Option<usize>,
-    twin: Option<usize>,
-    face: Option<usize>,
+    dst_port: usize,
+    next: usize,
+    prev: usize,
+    twin: usize,
+    face: usize,
 }
 
 impl Arc {
-    pub fn new(src: usize, dst: usize) -> Self {
+    pub fn new(
+        src: usize, 
+        src_port: usize, 
+        dst: usize,
+        dst_port: usize,
+        next: usize,
+        prev: usize,
+        twin: usize,
+        face: usize
+    ) -> Self {
         Arc {
             src,
-            src_port: None,
+            src_port,
             dst,
-            dst_port: None,
-            next: None,
-            prev: None,
-            twin: None,
-            face: None,
-        }
+            dst_port,
+            next,
+            prev,
+            twin,
+            face}
     }
 }
 
@@ -59,25 +67,4 @@ impl Dcel {
         }
     }
 
-    pub fn push_arc(&mut self, src: usize, dst: usize) {
-        self.arcs.push(Arc::new(src, dst));
-        let current_arc = self.arcs.len() - 1;
-
-        while self.vertices.len() <= src {
-            self.vertices.push(Vertex::new());
-        }
-
-        self.vertices[src].arcs.push(current_arc);
-
-        if self.vertices.len() > dst {
-            // find and mark twin
-
-            for possible_twin in self.vertices[dst].arcs.iter() {
-                if self.arcs[*possible_twin].dst == src {
-                    self.arcs[current_arc].twin = Some(*possible_twin);
-                    break;
-                }
-            }
-        }
-    }
 }

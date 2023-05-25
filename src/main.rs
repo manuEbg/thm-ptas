@@ -3,16 +3,16 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
-use graph::Dcel;
+use graph::DcelBuilder;
 
 
-fn read_graph_file(filename: &str) -> Result<Dcel, String>{
+fn read_graph_file(filename: &str) -> Result<DcelBuilder, String>{
     return if let Ok(mut lines) = read_lines(filename) {
-        let mut recent_graph: Dcel;
+        let mut recent_graph: DcelBuilder;
         let mut line;
         line = lines.next();
         if let Some(Ok(line)) = line {
-            recent_graph = Dcel::new();
+            recent_graph = DcelBuilder::new();
             let edge_count: usize = lines.next().unwrap().unwrap().parse().unwrap();
             for _ in 0..(2 *edge_count) {
                 let edge = lines.next().unwrap().unwrap();
