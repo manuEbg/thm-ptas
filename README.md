@@ -29,3 +29,7 @@ It is important, that the embedding contains both directions for each arc of the
 Also the arcs have to be in counterclockwise order for each source vertex.
 
 If you want more information about this format or more graphs, you can find both [here](http://www.inf.udec.cl/~jfuentess/datasets/graphs.php).
+
+## The Visualization
+
+After successfully running the program you can inspect your results by opening `web/index.html` with a browser.
