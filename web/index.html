@@ -19,13 +19,12 @@
     <div id="graph">
 
     </div>
+    <button type="button" onclick="g.highlightNextFace()">Next face</button>
     <!-- Load application code at the end to ensure DOM is loaded -->
-
+    
     <script>
         let g = new Graph("graph", data, 100);
         g.draw();
-        layout.run();
-        g.highlightPath();
     </script>
 </body>
 

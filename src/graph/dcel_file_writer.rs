@@ -23,17 +23,17 @@ impl WebFileWriter for Arc {
 
 impl WebFileWriter for Face {
     fn write_to_file(&self, file: &mut File, id: usize, dcel: &Dcel) -> std::io::Result<()> {
-        write!(*file, "\t\t{{\"face\": [")?;
+        write!(*file, "\t\t[")?;
         let arcs = self.walk_face(dcel); 
         let mut i = 0;
         for a in &arcs {
-            write!(*file, "\"{}\"", *a)?;
+            write!(*file, "\"a{}\"", *a)?;
             i += 1;
             if i < arcs.len(){
                 write!(*file,",")?;
             }
         }
-        write!(*file, "] }}")
+        write!(*file, "]")
     }
 }
 
