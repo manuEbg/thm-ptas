@@ -38,15 +38,23 @@ pub struct Face {
     start_arc: usize,
 }
 
+impl Face {
+    pub fn new(start_arc: usize) -> Self {
+        Face{
+            start_arc
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Vertex {
     arcs: Vec<usize>,
 }
 
 impl Vertex {
-    pub fn new() -> Self {
+    pub fn new(arcs: &Vec<usize>) -> Self {
         Vertex{
-            arcs: vec![]
+            arcs: arcs.clone()
         }
     }
 }
@@ -66,5 +74,15 @@ impl Dcel {
             faces: vec![],
         }
     }
+    pub fn push_vertex(&mut self, v: Vertex){
+        self.vertices.push(v);
+    }
 
+    pub fn push_arc(&mut self, a: Arc){
+        self.arcs.push(a);
+    }
+
+    pub fn push_face(&mut self, f: Face){
+        self.faces.push(f);
+    }
 }
