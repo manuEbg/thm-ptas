@@ -90,8 +90,11 @@ impl DcelBuilder {
     }
 
     fn set_dest_ports(&mut self){
-        for a in &self.arcs {
-            self.arcs[(a).twin.unwrap()].dst_port = a.src_port;
+        for i in 0..self.arcs.len() {
+            let twin = self.arcs[i].twin.unwrap();
+            let src_port = self.arcs[i].src_port;
+
+            self.arcs[twin].dst_port = src_port;
         }
     }
     
