@@ -47,5 +47,4 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let dcel = read_graph_file(&args[1]).unwrap();
     write_web_file("data/test.js", &dcel);
-    println!("{:?}",dcel.walk_face(2));
 }
