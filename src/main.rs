@@ -4,6 +4,7 @@ use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
 use graph::dcel_file_writer::DcelWriter;
+use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
 
 fn read_graph_file(filename: &str) -> Result<Dcel, String> {
@@ -46,4 +47,8 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let dcel = read_graph_file(&args[1]).unwrap();
     write_web_file("data/test.js", &dcel);
+
+    for a in BfsIter::new(&dcel,0) {
+        print!("{:?}", a);
+    }
 }

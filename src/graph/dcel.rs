@@ -129,4 +129,13 @@ impl Dcel {
     pub fn num_faces(&self) -> usize {
         self.faces.len()
     }
+
+    pub fn neighbors(&self, v: usize) -> Vec<usize> {
+        let mut neighbors: Vec<usize> = vec![];
+        for a in self.get_vertex(v).arcs.iter() {
+            let n = self.get_arc(*a).dst();
+            neighbors.push(n);
+        }
+        neighbors
+    }
 }
