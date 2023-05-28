@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub struct Face {
     start_arc: usize,
@@ -6,12 +5,10 @@ pub struct Face {
 
 impl Face {
     pub fn new(start_arc: usize) -> Self {
-        Face{
-            start_arc
-        }
+        Face { start_arc }
     }
-    pub fn walk_face(&self, dcel: &Dcel) -> Vec<usize> {
 
+    pub fn walk_face(&self, dcel: &Dcel) -> Vec<usize> {
         let mut arcs = vec![];
         arcs.push(self.start_arc);
         let mut current_arc = dcel.get_arc(self.start_arc).next();
@@ -23,9 +20,8 @@ impl Face {
     }
 }
 
-
 #[derive(Debug)]
-pub struct Arc { 
+pub struct Arc {
     src: usize,
     dst: usize,
     next: usize,
@@ -35,28 +31,25 @@ pub struct Arc {
 }
 
 impl Arc {
-    pub fn new(
-        src: usize, 
-        dst: usize,
-        next: usize,
-        prev: usize,
-        twin: usize,
-        face: usize
-    ) -> Self {
+    pub fn new(src: usize, dst: usize, next: usize, prev: usize, twin: usize, face: usize) -> Self {
         Arc {
             src,
             dst,
             next,
             prev,
             twin,
-            face}
+            face,
+        }
     }
+
     pub fn next(&self) -> usize {
         self.next
     }
+
     pub fn src(&self) -> usize {
         self.src
     }
+
     pub fn dst(&self) -> usize {
         self.dst
     }
@@ -69,9 +62,7 @@ pub struct Vertex {
 
 impl Vertex {
     pub fn new(arcs: &Vec<usize>) -> Self {
-        Vertex{
-            arcs: arcs.clone()
-        }
+        Vertex { arcs: arcs.clone() }
     }
 }
 
@@ -90,15 +81,16 @@ impl Dcel {
             faces: vec![],
         }
     }
-    pub fn push_vertex(&mut self, v: Vertex){
+
+    pub fn push_vertex(&mut self, v: Vertex) {
         self.vertices.push(v);
     }
 
-    pub fn push_arc(&mut self, a: Arc){
+    pub fn push_arc(&mut self, a: Arc) {
         self.arcs.push(a);
     }
 
-    pub fn push_face(&mut self, f: Face){
+    pub fn push_face(&mut self, f: Face) {
         self.faces.push(f);
     }
 
@@ -122,7 +114,7 @@ impl Dcel {
         &self.vertices
     }
 
-    pub fn get_vertex(&self, idx:usize) -> &Vertex {
+    pub fn get_vertex(&self, idx: usize) -> &Vertex {
         &self.vertices[idx]
     }
 
