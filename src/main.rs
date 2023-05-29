@@ -3,7 +3,9 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
+use graph::dcel::SpanningTree;
 use graph::dcel_file_writer::DcelWriter;
+use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
 
@@ -51,4 +53,12 @@ fn main() {
     for a in BfsIter::new(&dcel,0) {
         print!("{:?}", a);
     }
+
+    let mut st =  SpanningTree::new(&dcel);
+    st.build(0);
+
+    let mut dg = DualGraph::new(&st);
+    dg.build();
+    
+    println!("{:?}", dg);
 }
