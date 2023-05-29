@@ -20,8 +20,8 @@ impl WebFileWriter for Arc {
             *file,
             "\t\t{{\"data\": {{ \"id\": \"a{}\", \"source\": {}, \"target\": {} }} }}",
             id,
-            self.src(),
-            self.dst()
+            self.get_src(),
+            self.get_dst()
         )
     }
 }
@@ -45,7 +45,7 @@ impl<'a> WebFileWriter for SpanningTree<'a> {
     fn write_to_file(&self, file: &mut File, _id: usize, _dcel: &Dcel) -> std::io::Result<()> {
 
         write!(*file, "\t\"spantree\": [")?;
-        for (i, a) in self.arcs().iter().enumerate() {
+        for (i, a) in self.get_arcs().iter().enumerate() {
             write!(*file,"\"a{}\"", a)?;
             if i < self.num_arcs() - 1 {
                 write!(*file, ", ")?;

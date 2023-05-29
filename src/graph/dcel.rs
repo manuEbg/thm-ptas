@@ -13,10 +13,10 @@ impl Face {
     pub fn walk_face(&self, dcel: &Dcel) -> Vec<usize> {
         let mut arcs = vec![];
         arcs.push(self.start_arc);
-        let mut current_arc = dcel.get_arc(self.start_arc).next();
+        let mut current_arc = dcel.get_arc(self.start_arc).get_next();
         while current_arc != self.start_arc {
             arcs.push(current_arc);
-            current_arc = dcel.get_arc(current_arc).next();
+            current_arc = dcel.get_arc(current_arc).get_next();
         }
         arcs
     }
@@ -44,16 +44,24 @@ impl Arc {
         }
     }
 
-    pub fn next(&self) -> usize {
+    pub fn get_next(&self) -> usize {
         self.next
     }
 
-    pub fn src(&self) -> usize {
+    pub fn get_src(&self) -> usize {
         self.src
     }
 
-    pub fn dst(&self) -> usize {
+    pub fn get_dst(&self) -> usize {
         self.dst
+    }
+
+    pub fn get_twin(&self) -> usize {
+        self.twin
+    }
+
+    pub fn get_face(&self) -> usize {
+        self.face
     }
 }
 
@@ -62,6 +70,7 @@ pub struct Vertex {
     arcs: Vec<usize>,
 }
 
+#[derive(Debug)]
 pub struct SpanningTree<'a> {
     dcel: &'a Dcel,
     contains_arc : Vec<bool>,
@@ -90,7 +99,11 @@ impl<'a> SpanningTree<'a> {
         }
     }
 
-    pub fn arcs(&self) -> &Vec<usize> {
+    pub fn get_dcel(&self) -> &Dcel {
+        self.dcel
+    }
+
+    pub fn get_arcs(&self) -> &Vec<usize> {
        &self.arcs
     }
 
@@ -180,7 +193,7 @@ impl Dcel {
     pub fn neighbors(&self, v: usize) -> Vec<usize> {
         let mut neighbors: Vec<usize> = vec![];
         for a in self.get_vertex(v).arcs.iter() {
-            let n = self.get_arc(*a).dst();
+            let n = self.get_arc(*a).get_dst();
             neighbors.push(n);
         }
         neighbors
@@ -190,5 +203,10 @@ impl Dcel {
         let mut tree = SpanningTree::new(&self);
         tree.build(start);
         tree
+    }
+    
+    pub fn get_twin(&self, arc: usize) -> &Arc {
+        let twin = self.get_arc(arc).twin;
+        self.get_arc(twin)
     }
 }
