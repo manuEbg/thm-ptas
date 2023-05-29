@@ -40,14 +40,14 @@ impl WebFileWriter for Face {
     }
 }
 
-impl WebFileWriter for SpanningTree {
+impl<'a> WebFileWriter for SpanningTree<'a> {
 
     fn write_to_file(&self, file: &mut File, _id: usize, _dcel: &Dcel) -> std::io::Result<()> {
 
         write!(*file, "\t\"spantree\": [")?;
-        for (i, a) in self.iter().enumerate() {
+        for (i, a) in self.arcs().iter().enumerate() {
             write!(*file,"\"a{}\"", a)?;
-            if i < self.len() - 1 {
+            if i < self.num_arcs() - 1 {
                 write!(*file, ", ")?;
             }
         }

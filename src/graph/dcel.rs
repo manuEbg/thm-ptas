@@ -62,7 +62,46 @@ pub struct Vertex {
     arcs: Vec<usize>,
 }
 
-pub type SpanningTree = Vec<usize>;
+pub struct SpanningTree<'a> {
+    dcel: &'a Dcel,
+    contains_arc : Vec<bool>,
+    arcs : Vec<usize>,
+}
+
+impl<'a> SpanningTree<'a> {
+    pub fn new(dcel: &'a Dcel) -> Self {
+        Self {
+            dcel,
+            contains_arc: vec![false; dcel.num_arcs()],
+            arcs: vec![],
+        }
+    }
+
+    pub fn build(&mut self, start: usize) {
+        let mut iterator = BfsIter::new(self.dcel, start);
+        while let Some(it) = iterator.next()  {
+            if let Some(a) = it.arc {
+                let twin = self.dcel.get_arc(a).twin;
+                self.contains_arc[a] = true;
+                self.contains_arc[twin] = true;
+                self.arcs.push(a);
+                self.arcs.push(twin);
+            }
+        }
+    }
+
+    pub fn arcs(&self) -> &Vec<usize> {
+       &self.arcs
+    }
+
+    pub fn num_arcs(&self) -> usize {
+        self.arcs.len()
+    }
+
+    pub fn contains_arc(&self, arc: usize) -> bool {
+        self.contains_arc[arc]
+    }
+}
 
 impl Vertex {
     pub fn new(arcs: &Vec<usize>) -> Self {
@@ -148,16 +187,8 @@ impl Dcel {
     }
 
     pub fn spanning_tree(&self, start: usize) -> SpanningTree {
-        let mut arcs = vec![];
-
-        let mut iterator = BfsIter::new(self, start);
-        while let Some(it) = iterator.next()  {
-            if let Some(a) = it.arc {
-                arcs.push(a);
-                arcs.push(self.get_arc(a).twin);
-            }
-        }
-
-        arcs as SpanningTree
+        let mut tree = SpanningTree::new(&self);
+        tree.build(start);
+        tree
     }
 }
