@@ -32,11 +32,26 @@ impl WebFileWriter for Face {
         let arcs = self.walk_face(dcel);
         for (i, a) in arcs.iter().enumerate() {
             write!(*file, "\"a{}\"", *a)?;
-            if i < arcs.len() {
+            if i < arcs.len() - 1 {
                 write!(*file, ",")?;
             }
         }
         write!(*file, "]")
+    }
+}
+
+impl WebFileWriter for SpanningTree {
+
+    fn write_to_file(&self, file: &mut File, _id: usize, _dcel: &Dcel) -> std::io::Result<()> {
+
+        write!(*file, "\t\"spantree\": [")?;
+        for (i, a) in self.iter().enumerate() {
+            write!(*file,"\"a{}\"", a)?;
+            if i < self.len() - 1 {
+                write!(*file, ", ")?;
+            }
+        }
+        write!(*file, "],\n")
     }
 }
 
@@ -62,6 +77,7 @@ impl<'a> DcelWriter<'a> {
         self.append_vertices().unwrap();
         self.append_arcs().unwrap();
         self.append_faces().unwrap();
+        self.dcel.spanning_tree(0).write_to_file(&mut self.file, 0, self.dcel).unwrap();
         self.end().unwrap();
     }
 
@@ -74,13 +90,13 @@ impl<'a> DcelWriter<'a> {
         write!(self.file, "\t\"faces\": [\n")?;
         for (i, f) in self.dcel.get_faces().iter().enumerate() {
             f.write_to_file(&mut self.file, i, self.dcel)?;
-            if i < self.dcel.num_faces() {
+            if i < self.dcel.num_faces() - 1 {
                 write!(self.file, ",\n")?;
             } else {
                 write!(self.file, "\n")?;
             }
         }
-        write!(self.file, "],\n")
+        write!(self.file, "\t],\n")
     }
 
     fn append_vertices(&mut self) -> std::io::Result<()> {
@@ -96,7 +112,7 @@ impl<'a> DcelWriter<'a> {
             }
         }
 
-        write!(self.file, "],\n")?;
+        write!(self.file, "\t],\n")?;
 
         Ok(())
     }
@@ -105,7 +121,7 @@ impl<'a> DcelWriter<'a> {
         write!(self.file, "\t\"arcs\": [\n")?;
         for (i, a) in self.dcel.get_arcs().iter().enumerate() {
             a.write_to_file(&mut self.file, i, self.dcel)?;
-            if i < self.dcel.num_arcs() {
+            if i < self.dcel.num_arcs() - 1 {
                 write!(self.file, ",\n")?;
             } else {
                 write!(self.file, "\n")?;
