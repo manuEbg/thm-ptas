@@ -24,13 +24,14 @@ def create_random_planar_graph(n, node_prob, edge_prob):
     return G
 
 
-if len(sys.argv) < 4:
-    print("Usage: ", sys.argv[0], " NUMBER_NODES NODE_PROBABILITY EDGE_PROBABILITY")
+if len(sys.argv) < 5:
+    print("Usage: ", sys.argv[0], " NUMBER_NODES NODE_PROBABILITY EDGE_PROBABILITY OUTFILE")
     exit(1)
 
 number_nodes = int(sys.argv[1])
 node_prob = float(sys.argv[2])
 edge_prob = float(sys.argv[3])
+outfile = sys.argv[4]
 
 G = create_random_planar_graph(number_nodes, node_prob, edge_prob)
 
@@ -40,8 +41,6 @@ is_planar, embedding = nx.check_planarity(G)
 assert is_planar
 
 data = embedding.get_data()
-
-print(number_nodes)
 
 # We assume that dividing by two always gives the correct amount of undirected
 # edges because we add all edges that do not violate planarity in our
@@ -53,11 +52,15 @@ print(number_nodes)
 
 # Sanity check for 2m edges.
 assert len(embedding.edges()) % 2 == 0
-print(int(len(embedding.edges()) / 2))
 
-for node, dst_nodes in embedding.get_data().items():
-    for dst in dst_nodes:
-        print(node, dst)
+with open(outfile, "w", encoding="utf-8") as f:
+    f.write(f"{number_nodes}\n{int(len(embedding.edges()) / 2)}\n")
+    for node, dest_nodes in embedding.get_data().items():
+        for dest in dest_nodes:
+            f.write(f"{node} {dest}\n")
+
+print(f"Edges: {int(len(embedding.edges()) / 2)}")
+print(f"Output in '{outfile}'.")
 
 nx.draw_networkx(embedding, pos=nx.planar_layout(embedding), with_labels=True)
 plt.savefig('graph.pdf', format='pdf', bbox_inches='tight')
