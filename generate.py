@@ -17,11 +17,12 @@ def create_random_planar_graph(n, node_prob, edge_prob):
         for j in random.sample(range(n), k=int(n * edge_prob)):
             if i == j:
                 continue
-            
+
             G.add_edge(i, j)
             if not nx.is_planar(G):
                 G.remove_edge(i, j)
     return G
+
 
 if len(sys.argv) < 4:
     print("Usage: ", sys.argv[0], " NUMBER_NODES NODE_PROBABILITY EDGE_PROBABILITY")
@@ -40,7 +41,19 @@ assert is_planar
 
 data = embedding.get_data()
 
-print(len(embedding.edges()))
+print(number_nodes)
+
+# We assume that dividing by two always gives the correct amount of undirected
+# edges because we add all edges that do not violate planarity in our
+# generation algorithm. Adding a back-edge to another edge does not violate
+# planarity because if it would, the already existing edge would've been
+# incorrect. Thus, we add all back-edges and have 2m directed edges and m
+# undirected edges.
+# That also means dividing by two always produces an integer.
+
+# Sanity check for 2m edges.
+assert len(embedding.edges()) % 2 == 0
+print(int(len(embedding.edges()) / 2))
 
 for node, dst_nodes in embedding.get_data().items():
     for dst in dst_nodes:
