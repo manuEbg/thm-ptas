@@ -6,14 +6,17 @@ pub struct BfsIter<'a> {
     dcel: &'a  Dcel,
     queue: VecDeque<usize>,
     discovered: Vec<bool>,
+    discovered_arc: Vec<Option<usize>>,
     visited: Vec<bool>,
     level: Vec<usize>,
 }
 
 #[derive(Debug)]
 pub struct BfsItem {
-    vertex: usize,
-    level: usize,
+    pub vertex: usize,
+    pub level: usize,
+    //the arc used to discover the current vertex
+    pub arc: Option<usize>,
 }
 
 impl<'a> BfsIter<'a> {
@@ -23,7 +26,8 @@ impl<'a> BfsIter<'a> {
             dcel, 
             queue: VecDeque::from([start]),
             visited: vec![false; dcel.num_vertices()], 
-            discovered: vec![false; dcel.num_vertices()], 
+            discovered: vec![false; dcel.num_vertices()],
+            discovered_arc: vec![None; dcel.num_vertices()],
             level: vec![0; dcel.num_vertices()] 
         };
         iter.discovered[start] = true;
@@ -39,10 +43,15 @@ impl<'a> Iterator for BfsIter<'a> {
             let it = Self::Item {
                 vertex, 
                 level: self.level[vertex],
+                arc: self.discovered_arc[vertex],
             };
 
-            for n in self.dcel.neighbors(vertex) {
+            for a in self.dcel.get_vertex(vertex).get_arcs() {
+                let n = self.dcel.get_arc(*a).dst();
+                
                 if self.discovered[n] { continue }
+                
+                self.discovered_arc[n] = Some(*a);
                 self.discovered[n] = true;
                 self.level[n] = self.level[vertex] + 1;
                 self.queue.push_back(n);

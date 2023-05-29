@@ -1,3 +1,5 @@
+use super::iterators::bfs::BfsIter;
+
 #[derive(Debug)]
 pub struct Face {
     start_arc: usize,
@@ -60,9 +62,15 @@ pub struct Vertex {
     arcs: Vec<usize>,
 }
 
+pub type SpanningTree = Vec<usize>;
+
 impl Vertex {
     pub fn new(arcs: &Vec<usize>) -> Self {
         Vertex { arcs: arcs.clone() }
+    }
+
+    pub fn get_arcs(&self) -> &Vec<usize> {
+        &self.arcs
     }
 }
 
@@ -137,5 +145,19 @@ impl Dcel {
             neighbors.push(n);
         }
         neighbors
+    }
+
+    pub fn spanning_tree(&self, start: usize) -> SpanningTree {
+        let mut arcs = vec![];
+
+        let mut iterator = BfsIter::new(self, start);
+        while let Some(it) = iterator.next()  {
+            if let Some(a) = it.arc {
+                arcs.push(a);
+                arcs.push(self.get_arc(a).twin);
+            }
+        }
+
+        arcs as SpanningTree
     }
 }
