@@ -11,10 +11,19 @@ body {
   border-color: black;
   border: solid;
 }
-button {
-  width: 10%;
-  height: 10%;
+
+.button-container {
+  width: 15%;
+  height: 85%;
   position: absolute;
-  margin-left: 87%;
+  margin-left: 85%;
+}
+
+button {
+  width: 90%;
+  height: 10%;
+  position: relative;
+  margin-left: 3%;
+  margin-top: 5%;
   z-index:100;
 }
