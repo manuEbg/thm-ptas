@@ -5,6 +5,8 @@ class Graph {
     this.vertices = obj.vertices;
     this.arcs = obj.arcs;
     this.faces = obj.faces;
+    this.spanningTree = obj.spantree;
+    this.spanningTreeVisible = false;
     this.id = id;
     this.timeout = timeout;
     this.nextFace = 0;
@@ -32,6 +34,14 @@ class Graph {
             'width': 4,
             'line-color': '#ddd',
             'target-arrow-color': '#ddd'
+          })
+        .selector('.spanning-tree')
+          .style({
+            'background-color' : '#000000',
+            'line-color' : '#000000',
+            'target-arrow-color' : '#000000',
+            'transition-property': 'background-color, line-color, target-arrow-color',
+            'transition-duration': '0.5s'
           })
         .selector('.highlighted')
           .style({ 
@@ -81,6 +91,28 @@ class Graph {
   lowlightFace(idx){
     let self = this;
     self.faces[idx].forEach(function(el){self.lowlight(el)});
+  }
+
+  showSpanningTree(){
+    let self = this;
+    self.spanningTree.forEach(el => {
+      this.cy.getElementById(el).addClass('spanning-tree');
+    });
+    self.spanningTreeVisible = true;
+  }
+
+  hideSpanningTree(){
+    let self = this;
+    self.spanningTree.forEach(el => {
+      this.cy.getElementById(el).removeClass('spanning-tree');
+    });
+    self.spanningTreeVisible = false;
+  }
+
+  toggleSpanningTree(){
+    let self = this;
+    if(self.spanningTreeVisible) self.hideSpanningTree();
+    else self.showSpanningTree();
   }
 
 
