@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<!-- This code is for demonstration purposes only.  You should not hotlink to Github, Rawgit, or files from the Cytoscape.js documentation in your production apps. -->
+<html>
+<head>
+
+    <link href="style.css" rel="stylesheet" />
+    
+    <meta charset=utf-8 />
+    <meta name="viewport" content="user-scalable=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, minimal-ui">
+    
+    <title>Rust Graph Visualizer</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.24.0/cytoscape.min.js" integrity="sha512-RNg7R9mgoEi0QKVP6HktZpG8CwaojI4YVO9UiI+GXnfC2Bif3/7vcJDim9NZ3ZZuhFGEwuGzmnHwXMOAzjM2qw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="graph.js"></script>
+    <script src="../data/test.js"></script>
+</head>
+
+<body>
+    <div id="graph">
+
+    </div>
+    <button type="button" onclick="g.highlightNextFace()">Next face</button>
+    <!-- Load application code at the end to ensure DOM is loaded -->
+    
+    <script>
+        let g = new Graph("graph", data, 100);
+        g.draw();
+    </script>
+</body>
+
+</html>
