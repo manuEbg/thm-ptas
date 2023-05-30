@@ -16,11 +16,12 @@
 </head>
 
 <body>
-    <div id="graph">
-
+    <div id="graph"></div>
+    
+    <div class="button-container">
+      <button type="button" onclick="g.highlightNextFace()">Next face</button>
+      <button type="button" onclick="g.toggleSpanningTree()">Spanning tree</button>
     </div>
-    <button type="button" onclick="g.highlightNextFace()">Next face</button>
-    <!-- Load application code at the end to ensure DOM is loaded -->
     
     <script>
         let g = new Graph("graph", data, 100);
