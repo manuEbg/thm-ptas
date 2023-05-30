@@ -23,6 +23,7 @@ The embedding should be provided as a text-file and follow this specification:
 <Source vertex> <Target vertex>
 <Source vertex> <Target vertex>
 <Source vertex> <Target vertex>
+...
 ```
 
 It is important, that the embedding contains both directions for each arc of the graph.
