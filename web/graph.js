@@ -1,11 +1,21 @@
+class Arc{
+    constructor(a) {
+      this.data = new Object();
+      this.data.id = "a" + a.data.id;
+      this.data.source = "v" + a.data.source;
+      this.data.target = "v" + a.data.target;
+    } 
+}
+
 class Graph {
 
   constructor(id, data, timeout) {
     var obj = data;
     this.vertices = obj.vertices;
-    this.arcs = obj.arcs;
-    this.faces = obj.faces;
-    this.spanningTree = obj.spantree;
+    this.vertices.map(v => v.data.id = "v" + v.data.id);
+    this.arcs = obj.arcs.map(a => new Arc(a));
+    this.faces = obj.faces.map(f => f.map(a => "a" + a));
+    this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
     this.id = id;
     this.timeout = timeout;
