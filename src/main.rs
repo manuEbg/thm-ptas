@@ -8,6 +8,7 @@ use graph::dcel_file_writer::JsDataWriter;
 use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
+use arboretum_td::tree_decomposition::TreeDecomposition;
 
 fn read_graph_file(filename: &str) -> Result<Dcel, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -48,6 +49,8 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let dcel = read_graph_file(&args[1]).unwrap();
+    let tree_decomposition = TreeDecomposition::from(&dcel);
+    println!("{tree_decomposition:?}");
     write_web_file("data/test.js", &dcel);
 
     for a in BfsIter::new(&dcel,0) {
