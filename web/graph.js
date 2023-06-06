@@ -6,6 +6,48 @@ class Arc{
       this.data.target = "v" + a.data.target;
     } 
 }
+let defaults = {
+  fit: true, // whether to fit to viewport
+  padding: 30, // fit padding
+  boundingBox: undefined, // constrain layout bounds; { x1, y1, x2, y2 } or { x1, y1, w, h }
+  animate: false, // whether to transition the node positions
+  animationDuration: 500, // duration of animation in ms if enabled
+  animationEasing: undefined, // easing of animation if enabled
+  animateFilter: function ( node, i ){ return true; }, // a function that determines whether the node should be animated.  All nodes animated by default on animate enabled.  Non-animated nodes are positioned immediately when the layout starts
+  ready: undefined, // callback on layoutready
+  stop: undefined, // callback on layoutstop
+  transform: function (node, position ){ return position; }, // transform a given node position. Useful for changing flow direction in discrete layouts 
+};
+
+function DefLayout( options ){
+  var opts = this.options = {};
+  for( var i in defaults ){ opts[i] = defaults[i]; }
+  for( var i in options ){ opts[i] = options[i]; }
+  // this.run = function() { this.runn() }; 
+}
+
+DefLayout.prototype.run = function(){
+  let options = this.options;
+  let cy = options.cy;
+  let eles = options.eles;
+
+
+
+  let getPos = function( node, i ){
+    return {
+      x: i*100,
+      y: -i*300
+      };
+  };
+
+  eles.nodes().layoutPositions( this, options, getPos );
+
+  return this; // chaining
+};
+
+function laout(options){
+  return new Layout(options);
+}
 
 class Graph {
 
@@ -21,11 +63,12 @@ class Graph {
     this.timeout = timeout;
     this.nextFace = 0;
     this.prevFace = 0;
+
   }
 
   draw() {
     let self = this;
-    
+    cytoscape( 'layout', 'test', DefLayout ); 
     self.cy = cytoscape({
       container: document.getElementById("graph"),
     
@@ -67,14 +110,9 @@ class Graph {
     
           edges: self.arcs
         },
+
+      layout: {name: 'test'}
     
-      layout: {
-        name: 'random',
-        animate: true,
-        directed: true,
-        roots: '#0',
-        padding: 10
-      }
     });
   }
 
