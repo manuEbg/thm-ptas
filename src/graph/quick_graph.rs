@@ -1,9 +1,9 @@
 #[derive(Debug)]
 pub struct QuickGraph {
-    adjacency: Vec<Vec<usize>>,
-    edge_count: usize
+    pub adjacency: Vec<Vec<usize>>,
+    pub edge_count: usize
 }
-
+global_allocator!()
 impl QuickGraph {
     pub fn new(vertex_count: usize) -> QuickGraph {
         let adjacency: Vec<Vec<usize>> = vec![Vec::new(); vertex_count];
@@ -18,14 +18,6 @@ impl QuickGraph {
 
     pub fn add_vertex(&mut self) {
         self.adjacency.push(Vec::new())
-    }
-
-    pub fn add_edge(&mut self, u: usize, v: usize) {
-        if !self.are_adjacent(u, v) {
-            self.adjacency[u].push(v);
-            self.adjacency[v].push(u);
-            self.edge_count += 1;
-        }
     }
 
     pub fn remove_edge(&mut self, u: usize, v:usize) {

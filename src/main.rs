@@ -13,13 +13,13 @@ fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String
         let mut graph: QuickGraph;
         let vertex_count: usize = lines.next().unwrap().unwrap().parse().unwrap();
         graph = QuickGraph::new(vertex_count);
-        let edge_count: usize = lines.next().unwrap().unwrap().parse().unwrap();
-        for _ in 0..edge_count {
+        graph.edge_count = lines.next().unwrap().unwrap().parse().unwrap();
+        for _ in 0..(2 *graph.edge_count) {
             let edge = lines.next().unwrap().unwrap();
             let mut edge = edge.split(" ");
             let u: usize = edge.next().unwrap().parse().unwrap();
             let v: usize = edge.next().unwrap().parse().unwrap();
-            graph.add_edge(u, v);
+            graph.adjacency[u].push(v);
         }
         Ok(graph)
     } else {
