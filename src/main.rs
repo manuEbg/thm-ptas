@@ -6,6 +6,7 @@ pub mod graph;
 use graph::dcel_file_writer::DcelWriter;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
+use crate::graph::quick_graph::QuickGraph;
 
 fn read_graph_file(filename: &str) -> Result<Dcel, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -44,11 +45,14 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    let dcel = read_graph_file(&args[1]).unwrap();
-    write_web_file("data/test.js", &dcel);
+    let mut graph = QuickGraph::new(6);
+    graph.add_edge(0, 1);
+    graph.add_edge(1, 2);
+    graph.add_edge(1, 3);
+    graph.add_edge(2, 4);
+    graph.add_edge(3, 4);
+    graph.add_edge(4, 5);
 
-    for a in BfsIter::new(&dcel,0) {
-        print!("{:?}", a);
-    }
+    graph.contract_edge(3, 4);
+    println!("{:?}", graph);
 }
