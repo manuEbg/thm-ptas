@@ -3,7 +3,7 @@ pub struct QuickGraph {
     pub adjacency: Vec<Vec<usize>>,
     pub edge_count: usize
 }
-global_allocator!()
+
 impl QuickGraph {
     pub fn new(vertex_count: usize) -> QuickGraph {
         let adjacency: Vec<Vec<usize>> = vec![Vec::new(); vertex_count];
@@ -27,8 +27,10 @@ impl QuickGraph {
             self.edge_count -= 1;
         }
     }
+}
 
-    pub fn remove_vertex(&mut self, u: usize) {
+impl Reducible for QuickGraph {
+     fn remove_vertex(&mut self, u: usize) {
         self.edge_count -= self.adjacency[u].len();
         self.adjacency.remove(u);
         self.adjacency = self.adjacency
@@ -41,7 +43,7 @@ impl QuickGraph {
             }).collect();
     }
 
-    pub fn contract_edge(&mut self, u: usize, v: usize) {
+    fn contract_edge(&mut self, u: usize, v: usize) {
         if self.adjacency[u].contains(&v) {
             let mut combined_neighbors: Vec<usize> = Vec::new();
             combined_neighbors.extend(self.adjacency[u].iter().take_while(|&&x| x != v));
