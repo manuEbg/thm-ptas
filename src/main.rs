@@ -4,7 +4,7 @@ use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
 use graph::dcel::SpanningTree;
-use graph::dcel_file_writer::DcelWriter;
+use graph::dcel_file_writer::JsDataWriter;
 use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
@@ -41,8 +41,8 @@ where
 }
 
 fn write_web_file(filename: &str, dcel: &Dcel) {
-    let mut writer = DcelWriter::new(filename, dcel);
-    writer.write_dcel()
+    let mut writer = JsDataWriter::new(filename, dcel);
+    writer.write_data()
 }
 
 fn main() {
