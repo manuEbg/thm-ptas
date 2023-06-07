@@ -1,11 +1,36 @@
 class Arc{
     constructor(a) {
       this.data = new Object();
-      this.data.id = "a" + a.data.id;
-      this.data.source = "v" + a.data.source;
-      this.data.target = "v" + a.data.target;
+      this.data.id = "a" + a.id;
+      this.data.source = "v" + a.source;
+      this.data.target = "v" + a.target;
     } 
 }
+
+class Vertex{
+  constructor(v) {
+    this.data = new Object();
+    this.data.id = "v" + v.id;
+  }
+}
+
+
+class DualVertex{
+  constructor(v) {
+    this.data = new Object();
+    this.data.id = "dv" + v.id;
+  }
+}
+
+class DualArc {
+  constructor(a) {
+    this.data = new Object();
+    this.data.id = "da" + a.id;
+    this.data.source = "dv" + a.source;
+    this.data.target = "dv" + a.target;
+  }
+}
+
 let defaults = {
   fit: true, // whether to fit to viewport
   padding: 30, // fit padding
@@ -45,18 +70,19 @@ DefLayout.prototype.run = function(){
   return this; // chaining
 };
 
-function laout(options){
-  return new Layout(options);
-}
 
 class Graph {
 
   constructor(id, data, timeout) {
     var obj = data;
-    this.vertices = obj.vertices;
-    this.vertices.map(v => v.data.id = "v" + v.data.id);
+    this.vertices = obj.vertices.map(v => new Vertex(v));
     this.arcs = obj.arcs.map(a => new Arc(a));
+    this.dualgraph = new Object();
+    this.dualgraph.vertices = obj.dualgraph.vertices.map(v => new DualVertex(v));
+    this.dualgraph.arcs = obj.dualgraph.arcs.map(a => new DualArc(a))
+
     this.faces = obj.faces.map(f => f.map(a => "a" + a));
+
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
     this.id = id;
@@ -64,6 +90,16 @@ class Graph {
     this.nextFace = 0;
     this.prevFace = 0;
 
+  }
+
+  get_nodes(){
+    let self = this;
+    return self.vertices.concat(self.dualgraph.vertices);
+  }
+
+  get_arcs(){
+    let self = this;
+    return self.arcs.concat(self.dualgraph.arcs);
   }
 
   draw() {
@@ -106,9 +142,9 @@ class Graph {
           }),
     
       elements: {
-          nodes: self.vertices,
+          nodes: self.get_nodes(),
     
-          edges: self.arcs
+          edges: self.get_arcs()
         },
 
       layout: {name: 'test'}
@@ -134,10 +170,12 @@ class Graph {
   
   highlightFace(idx){
     let self = this;
+    self.highlight(self.dualgraph.vertices[idx].data.id);
     self.faces[idx].forEach(function(el){self.highlight(el)});
   }
   lowlightFace(idx){
     let self = this;
+    self.lowlight(self.dualgraph.vertices[idx].data.id);
     self.faces[idx].forEach(function(el){self.lowlight(el)});
   }
 
