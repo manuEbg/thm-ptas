@@ -45,28 +45,43 @@ let defaults = {
 };
 
 function DefLayout( options ){
+  this.iteration = 1;
   var opts = this.options = {};
   for( var i in defaults ){ opts[i] = defaults[i]; }
   for( var i in options ){ opts[i] = options[i]; }
-  // this.run = function() { this.runn() }; 
 }
 
 DefLayout.prototype.run = function(){
+  let layout = this;
   let options = this.options;
   let cy = options.cy;
   let eles = options.eles;
+  let factor = this.iteration * 10;
+  layout.emit( { type: 'layoutstart', layout: layout } );
 
+  let getPos = function( factor ){
 
-
-  let getPos = function( node, i ){
-    return {
-      x: i*100,
-      y: -i*300
-      };
+    return function(node, i){
+      let sign_x = (i % 2 == 0) ? -1 : +1;
+      let sign_y = (i % 4 == 0 || (i-1)%4 == 0) ? -1 : 1;
+      let p = i - (i % 4) + 1;
+      return {
+        x: p*factor * sign_x  ,
+        y: p*factor * sign_y
+        };
+      }
   };
 
-  eles.nodes().layoutPositions( this, options, getPos );
+  let frame = function(){};
+  while(this.iteration < 1000) {
+    eles.nodes().layoutPositions( this, options, getPos(this.iteration*0.1) );
+    requestAnimationFrame(frame);
+    this.iteration++; 
+  }
+  layout.one('layoutstop', options.stop);
+      layout.emit({ type: 'layoutstop', layout: layout });
 
+  // eles.nodes().forEach(n => n.renderedPosition({x: 100 , y: 100}));
   return this; // chaining
 };
 
@@ -81,7 +96,13 @@ class Graph {
     this.dualgraph.vertices = obj.dualgraph.vertices.map(v => new DualVertex(v));
     this.dualgraph.arcs = obj.dualgraph.arcs.map(a => new DualArc(a))
 
-    this.faces = obj.faces.map(f => f.map(a => "a" + a));
+    this.faces = obj.faces;
+    this.faces.forEach(f => {
+      f.id = "f" + f.id;
+      f.arcs = f.arcs.map(a => "a" + a);
+      f.vertices = f.vertices.map(v => "v"+v);
+    });
+
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
@@ -171,12 +192,14 @@ class Graph {
   highlightFace(idx){
     let self = this;
     self.highlight(self.dualgraph.vertices[idx].data.id);
-    self.faces[idx].forEach(function(el){self.highlight(el)});
+    self.faces[idx].arcs.forEach(function(a){ self.highlight(a)});
+    self.faces[idx].vertices.forEach(v => self.highlight(v));
   }
   lowlightFace(idx){
     let self = this;
     self.lowlight(self.dualgraph.vertices[idx].data.id);
-    self.faces[idx].forEach(function(el){self.lowlight(el)});
+    self.faces[idx].arcs.forEach(function(el){self.lowlight(el)});
+    self.faces[idx].vertices.forEach(v => self.lowlight(v));
   }
 
   showSpanningTree(){

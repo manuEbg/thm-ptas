@@ -35,6 +35,18 @@ impl<'a, T: WebFileWriter> JsArray<'a, T> {
     }
 }
 
+struct JsFace {
+    id: usize,
+    arcs: Vec<usize>,
+    vertices: Vec<usize>,
+}
+
+impl JsFace {
+    fn new(id: usize, arcs: Vec<usize>, vertices: Vec<usize>) -> Self {
+        Self { id, arcs, vertices }
+    }
+}
+
 struct JsVertex {
     id: usize,
 }
@@ -151,6 +163,18 @@ impl WebFileWriter for JsVertex {
     }
 }
 
+impl WebFileWriter for JsFace {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        self.tab(file, level)?;
+        JsObject::new(&JsValues::new(vec![
+            JsValue::new("id", &self.id),
+            JsValue::new("arcs", &JsArray::new(&self.arcs)),
+            JsValue::new("vertices", &JsArray::new(&self.vertices)),
+        ]))
+        .write_to_file(file, id, level)
+    }
+}
+
 impl WebFileWriter for JsArc {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         self.tab(file, level)?;
@@ -221,16 +245,27 @@ impl WebFileWriter for Dcel {
             .enumerate()
             .map(|(i, a)| JsArc::new(i, a.get_src(), a.get_dst()))
             .collect();
-        let f = self.get_faces();
-        let faces: Vec<Vec<usize>> = f.iter().map(|face| face.walk_face(self)).collect();
-        let ff = faces.iter().map(|f| JsArray::new(&f)).collect();
+        let faces = self.get_faces();
+        let arcs_per_faces: Vec<Vec<usize>> = faces.iter().map(|face| face.walk_face(self)).collect();
+        let verts_per_face: Vec<Vec<usize>> = arcs_per_faces
+            .iter()
+            .map(|arcs| {
+                arcs.iter()
+                    .map(|arc| self.get_arc(*arc).get_src())
+                    .collect()
+            })
+            .collect();
+        let mut js_faces = vec![];
+        for (i, _) in faces.iter().enumerate() {
+           js_faces.push(JsFace::new(i, arcs_per_faces[i].clone(), verts_per_face[i].clone()));
+        }
         file.write_all(b"let data = ")?;
         JsObject {
             item: &JsValues {
                 values: vec![
                     JsValue::new("vertices", &JsArray::new(&v)),
                     JsValue::new("arcs", &JsArray::new(&a)),
-                    JsValue::new("faces", &JsArray::new(&ff)),
+                    JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &dual_graph),
                 ],
