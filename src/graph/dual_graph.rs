@@ -3,6 +3,8 @@ use super::{
     Dcel,
 };
 
+// TODO: Maybe just walk the faces only once.
+// Right now, we walk them in DualGraph::add_face and in TreeDecomposition::from().
 #[derive(Debug)]
 pub struct DualGraph<'a> {
     spanning_tree: &'a SpanningTree<'a>,
@@ -51,5 +53,9 @@ impl<'a> DualGraph<'a> {
 
     pub fn num_vertices(&self) -> usize {
         self.adjacent.len()
+    }
+
+    pub fn get_dcel(&self) -> &Dcel {
+        self.dcel
     }
 }

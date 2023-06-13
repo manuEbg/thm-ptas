@@ -49,7 +49,11 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 fn main() {
     let args: Vec<String> = env::args().collect();
     let dcel = read_graph_file(&args[1]).unwrap();
-    let tree_decomposition = TreeDecomposition::from(&dcel);
+    let mut spanning_tree = SpanningTree::new(&dcel);
+    spanning_tree.build(0);
+    let mut dual_graph = DualGraph::new(&spanning_tree);
+    dual_graph.build();
+    let tree_decomposition = TreeDecomposition::from(&dual_graph);
     println!("{tree_decomposition:?}");
     write_web_file("data/test.js", &dcel);
 
@@ -62,6 +66,6 @@ fn main() {
 
     let mut dg = DualGraph::new(&st);
     dg.build();
-    
+
     println!("{:?}", dg);
 }
