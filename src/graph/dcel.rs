@@ -73,8 +73,9 @@ pub struct Vertex {
 #[derive(Debug)]
 pub struct SpanningTree<'a> {
     dcel: &'a Dcel,
-    contains_arc : Vec<bool>,
-    arcs : Vec<usize>,
+    contains_arc: Vec<bool>,
+    vertex_level: Vec<usize>,
+    arcs: Vec<usize>,
 }
 
 impl<'a> SpanningTree<'a> {
@@ -83,18 +84,20 @@ impl<'a> SpanningTree<'a> {
             dcel,
             contains_arc: vec![false; dcel.num_arcs()],
             arcs: vec![],
+            vertex_level: vec![0; dcel.num_vertices()],
         }
     }
 
     pub fn build(&mut self, start: usize) {
         let mut iterator = BfsIter::new(self.dcel, start);
-        while let Some(it) = iterator.next()  {
+        while let Some(it) = iterator.next() {
             if let Some(a) = it.arc {
                 let twin = self.dcel.get_arc(a).twin;
                 self.contains_arc[a] = true;
                 self.contains_arc[twin] = true;
                 self.arcs.push(a);
                 self.arcs.push(twin);
+                self.vertex_level[it.vertex] = it.level;
             }
         }
     }
@@ -104,7 +107,7 @@ impl<'a> SpanningTree<'a> {
     }
 
     pub fn get_arcs(&self) -> &Vec<usize> {
-       &self.arcs
+        &self.arcs
     }
 
     pub fn num_arcs(&self) -> usize {
@@ -204,7 +207,7 @@ impl Dcel {
         tree.build(start);
         tree
     }
-    
+
     pub fn get_twin(&self, arc: usize) -> &Arc {
         let twin = self.get_arc(arc).twin;
         self.get_arc(twin)
