@@ -7,6 +7,7 @@ use graph::dcel_file_writer::DcelWriter;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
 use crate::graph::quick_graph::QuickGraph;
+use graph::reducible::Reducible;
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -64,6 +65,12 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 }
 
 fn main() {
-    let graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
+    let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
+    println!("{:?}", graph);
+    graph.merge_vertices(2, 0);
+    println!("{:?}", graph);
+    graph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
+    println!("{:?}", graph);
+    graph.merge_vertices(0, 1);
     println!("{:?}", graph);
 }

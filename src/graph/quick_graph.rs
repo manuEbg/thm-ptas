@@ -1,3 +1,6 @@
+use crate::graph::reducible::Reducible;
+use std::collections::{HashSet};
+
 #[derive(Debug)]
 pub struct QuickGraph {
     pub adjacency: Vec<Vec<usize>>,
@@ -38,30 +41,33 @@ impl Reducible for QuickGraph {
             .map(|neighborhood| {
                 neighborhood
                     .iter()
-                    .map(|neighbor| if *neighbor > u {neighbor - 1} else {*neighbor} )
+                    .filter(|&&neighbor| neighbor != u)
+                    .map(|&neighbor| if neighbor > u {neighbor - 1} else {neighbor} )
                     .collect()
             }).collect();
     }
 
-    fn contract_edge(&mut self, u: usize, v: usize) {
-        if self.adjacency[u].contains(&v) {
-            let mut combined_neighbors: Vec<usize> = Vec::new();
-            combined_neighbors.extend(self.adjacency[u].iter().take_while(|&&x| x != v));
-            combined_neighbors.extend(self.adjacency[v].
-                iter().filter(|&&x| x != u));
-            combined_neighbors.extend(self.adjacency[u].iter().skip_while(|&&x| x != v).skip(1));
-            self.adjacency[u] = combined_neighbors;
-            for vertex in 0..self.adjacency.len() {
-                if self.adjacency[vertex].contains(&v) {
-                    if !self.adjacency[vertex].contains(&u) {
-                        self.adjacency[vertex] = self.adjacency[vertex].iter()
-                            .map(|&x| if x == v {u} else {x}).collect();
-                    }
-                }
+    fn merge_vertices(&mut self, u: usize, v: usize) {
+        let mut new_neighborhood: HashSet<usize> = HashSet::new();
+        for &neighbor in &self.adjacency[u] {
+            if neighbor != v {
+                new_neighborhood.insert(neighbor);
             }
-            self.remove_vertex(v);
-            let double_edge_count: usize = self.adjacency.iter().map(|neighborhood| neighborhood.len()).sum() ;
-            self.edge_count = double_edge_count / 2;
         }
+        for &neighbor in &self.adjacency[v] {
+            if neighbor != u {
+                new_neighborhood.insert(neighbor);
+            }
+        }
+
+        self.adjacency[u] = new_neighborhood.into_iter().collect();
+        for neighborhood in &mut self.adjacency {
+            if neighborhood.contains(&v) && !neighborhood.contains(&u) {
+                neighborhood.push(u);
+            }
+        }
+        self.remove_vertex(v);
+        self.edge_count = self.adjacency.iter()
+            .map(|neighborhood| neighborhood.len()).sum::<usize>() / 2;
     }
 }
