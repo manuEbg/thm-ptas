@@ -1,4 +1,5 @@
 use super::dcel::*;
+use super::dcel::spanning_tree::SpanningTree;
 use super::dual_graph::DualGraph;
 use super::Dcel;
 use std::fs::File;

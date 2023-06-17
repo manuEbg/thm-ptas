@@ -1,144 +1,13 @@
+pub mod face;
+pub mod arc;
+pub mod vertex;
+pub mod spanning_tree;
+    
+use crate::graph::dcel::spanning_tree::SpanningTree;
+use face::{Face,FaceId};
+use vertex::{VertexId, Vertex};
+use arc::{ArcId, Arc};
 use super::iterators::bfs::BfsIter;
-
-pub type FaceId = usize;
-pub type ArcId = usize; 
-pub type VertexId = usize;
-
-#[derive(Debug)]
-pub struct Face {
-    start_arc: ArcId,
-}
-
-
-impl Face {
-    pub fn new(start_arc: ArcId) -> Self {
-        Face { start_arc }
-    }
-
-    pub fn walk_face(&self, dcel: &Dcel) -> Vec<ArcId> {
-        let mut arcs = vec![];
-        arcs.push(self.start_arc);
-        let mut current_arc = dcel.get_arc(self.start_arc).get_next();
-        while current_arc != self.start_arc {
-            arcs.push(current_arc);
-            current_arc = dcel.get_arc(current_arc).get_next();
-        }
-        arcs
-    }
-}
-
-#[derive(Debug)]
-pub struct Arc {
-    src: VertexId,
-    dst: VertexId,
-    next: ArcId,
-    prev: ArcId,
-    twin: ArcId,
-    face: FaceId,
-}
-
-
-impl Arc {
-    pub fn new(src: VertexId, dst: VertexId, next: ArcId, prev: ArcId, twin: ArcId, face: FaceId) -> Self {
-        Arc {
-            src,
-            dst,
-            next,
-            prev,
-            twin,
-            face,
-        }
-    }
-
-    pub fn get_next(&self) -> ArcId {
-        self.next
-    }
-
-    pub fn get_src(&self) -> VertexId {
-        self.src
-    }
-
-    pub fn get_dst(&self) -> VertexId {
-        self.dst
-    }
-
-    pub fn get_twin(&self) -> ArcId {
-        self.twin
-    }
-
-    pub fn get_face(&self) -> FaceId {
-        self.face
-    }
-
-    pub fn set_face(&mut self, f: FaceId) {
-        self.face = f;
-    }
-}
-
-#[derive(Debug)]
-pub struct Vertex {
-    arcs: Vec<ArcId>,
-}
-
-
-#[derive(Debug)]
-pub struct SpanningTree<'a> {
-    dcel: &'a Dcel,
-    contains_arc: Vec<bool>,
-    vertex_level: Vec<usize>,
-    arcs: Vec<ArcId>,
-}
-
-impl<'a> SpanningTree<'a> {
-    pub fn new(dcel: &'a Dcel) -> Self {
-        Self {
-            dcel,
-            contains_arc: vec![false; dcel.num_arcs()],
-            arcs: vec![],
-            vertex_level: vec![0; dcel.num_vertices()],
-        }
-    }
-
-    pub fn build(&mut self, start: VertexId) {
-        let mut iterator = BfsIter::new(self.dcel, start);
-        while let Some(it) = iterator.next() {
-            if let Some(a) = it.arc {
-                let twin = self.dcel.get_arc(a).twin;
-                self.contains_arc[a] = true;
-                self.contains_arc[twin] = true;
-                self.arcs.push(a);
-                self.arcs.push(twin);
-                self.vertex_level[it.vertex] = it.level;
-            }
-        }
-    }
-
-    pub fn get_dcel(&self) -> &Dcel {
-        self.dcel
-    }
-
-    pub fn get_arcs(&self) -> &Vec<ArcId> {
-        &self.arcs
-    }
-
-    pub fn num_arcs(&self) -> usize {
-        self.arcs.len()
-    }
-
-    pub fn contains_arc(&self, arc: ArcId) -> bool {
-        self.contains_arc[arc]
-    }
-}
-
-impl Vertex {
-    pub fn new(arcs: &Vec<ArcId>) -> Self {
-        Vertex { arcs: arcs.clone() }
-    }
-
-    pub fn get_arcs(&self) -> &Vec<ArcId> {
-        &self.arcs
-    }
-}
 
 #[derive(Debug)]
 pub struct Dcel {
@@ -206,7 +75,7 @@ impl Dcel {
 
     pub fn neighbors(&self, v: VertexId) -> Vec<VertexId> {
         let mut neighbors: Vec<usize> = vec![];
-        for a in self.get_vertex(v).arcs.iter() {
+        for a in self.get_vertex(v).get_arcs().iter() {
             let n = self.get_arc(*a).get_dst();
             neighbors.push(n);
         }
@@ -220,11 +89,13 @@ impl Dcel {
     }
 
     pub fn get_twin(&self, arc: ArcId) -> &Arc {
-        let twin = self.get_arc(arc).twin;
+        let twin = self.get_arc(arc).get_twin();
         self.get_arc(twin)
     }
 
     pub fn add_edge(from: VertexId, to: VertexId, prev: ArcId, next: ArcId, face: FaceId) {
         todo!()
     }
+        
+
 }
