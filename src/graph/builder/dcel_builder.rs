@@ -1,59 +1,6 @@
-use super::Dcel;
+use super::dcel::Dcel;
 use super::dcel;
-
-#[derive(Debug)]
-
-struct Arc {
-    src: usize,
-    src_port: Option<usize>,
-    dst: usize,
-    dst_port: Option<usize>,
-    next: Option<usize>,
-    prev: Option<usize>,
-    twin: Option<usize>,
-    face: Option<usize>,
-}
-
-impl Arc {
-    pub fn new(src: usize, dst: usize) -> Self {
-        Arc {
-            src,
-            src_port: None,
-            dst,
-            dst_port: None,
-            next: None,
-            prev: None,
-            twin: None,
-            face: None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Face {
-    start_arc: usize,
-}
-
-impl Face {
-    pub fn new(start_arc : usize) -> Self {
-        Face{
-            start_arc
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Vertex {
-    arcs: Vec<usize>
-}
-
-impl Vertex {
-    pub fn new() -> Self {
-        Vertex{
-            arcs: vec![]
-        }
-    }
-}
+use super::types::*;
 
 #[derive(Debug)]
 pub struct DcelBuilder {

@@ -40,7 +40,7 @@ impl<'a> DualGraph<'a> {
     pub fn get_neighbors(&self, idx: usize) -> Vec<usize> {
         self.adjacent[idx].clone()
     }
-
+ 
     pub fn get_vertices(&self) -> Vec<usize> {
         (0..self.adjacent.len()).collect()
     }
