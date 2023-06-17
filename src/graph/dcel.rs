@@ -1,19 +1,21 @@
 use super::iterators::bfs::BfsIter;
 
+pub type FaceId = usize;
+pub type ArcId = usize; 
+pub type VertexId = usize;
 
 #[derive(Debug)]
 pub struct Face {
-    start_arc: usize,
+    start_arc: ArcId,
 }
 
-pub type FaceId = usize;
 
 impl Face {
-    pub fn new(start_arc: usize) -> Self {
+    pub fn new(start_arc: ArcId) -> Self {
         Face { start_arc }
     }
 
-    pub fn walk_face(&self, dcel: &Dcel) -> Vec<usize> {
+    pub fn walk_face(&self, dcel: &Dcel) -> Vec<ArcId> {
         let mut arcs = vec![];
         arcs.push(self.start_arc);
         let mut current_arc = dcel.get_arc(self.start_arc).get_next();
@@ -35,7 +37,6 @@ pub struct Arc {
     face: FaceId,
 }
 
-pub type ArcId = usize; 
 
 impl Arc {
     pub fn new(src: VertexId, dst: VertexId, next: ArcId, prev: ArcId, twin: ArcId, face: FaceId) -> Self {
@@ -79,7 +80,6 @@ pub struct Vertex {
     arcs: Vec<ArcId>,
 }
 
-pub type VertexId = usize;
 
 #[derive(Debug)]
 pub struct SpanningTree<'a> {
