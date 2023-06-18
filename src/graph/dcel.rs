@@ -1,13 +1,13 @@
-pub mod face;
 pub mod arc;
-pub mod vertex;
+pub mod face;
 pub mod spanning_tree;
-    
-use crate::graph::dcel::spanning_tree::SpanningTree;
-use face::{Face,FaceId};
-use vertex::{VertexId, Vertex};
-use arc::{ArcId, Arc};
+pub mod vertex;
+
 use super::iterators::bfs::BfsIter;
+use crate::graph::dcel::spanning_tree::SpanningTree;
+use arc::{Arc, ArcId};
+use face::{Face, FaceId};
+use vertex::{Vertex, VertexId};
 
 #[derive(Debug)]
 pub struct Dcel {
@@ -39,6 +39,10 @@ impl Dcel {
 
     pub fn walk_face(&self, face: FaceId) -> Vec<ArcId> {
         self.faces[face].walk_face(self)
+    }
+
+    pub fn face(&self, idx: FaceId) -> &Face {
+        &self.faces[idx]
     }
 
     pub fn get_arcs(&self) -> &Vec<Arc> {
