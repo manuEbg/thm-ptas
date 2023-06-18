@@ -5,4 +5,3 @@ pub mod dual_graph;
 pub mod iterators;
 pub use dcel::Dcel;
 pub use dcel_builder::DcelBuilder;
-

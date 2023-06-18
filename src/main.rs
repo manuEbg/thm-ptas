@@ -59,6 +59,6 @@ fn main() {
 
     let mut dg = DualGraph::new(&st);
     dg.build();
-    
+
     println!("{:?}", dg);
 }
