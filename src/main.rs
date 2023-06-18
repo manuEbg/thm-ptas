@@ -47,18 +47,20 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let dcel = read_graph_file(&args[1]).unwrap();
-    write_web_file("data/test.js", &dcel);
+    let mut dcel = read_graph_file(&args[1]).unwrap();
 
     for a in BfsIter::new(&dcel,0) {
         print!("{:?}", a);
     }
 
-    let mut st =  SpanningTree::new(&dcel);
-    st.build(0);
+    //let mut st =  SpanningTree::new(&dcel);
+    // st.build(0);
 
-    let mut dg = DualGraph::new(&st);
-    dg.build();
+    dcel.triangulate();
+
+    write_web_file("data/test.js", &dcel);
+    // let mut dg = DualGraph::new(&st);
+    // dg.build();
     
-    println!("{:?}", dg);
+    println!("{:?}", dcel);
 }
