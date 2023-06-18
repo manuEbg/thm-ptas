@@ -14,4 +14,8 @@ impl Vertex {
     pub fn arcs(&self) -> &Vec<ArcId> {
         &self.arcs
     }
+
+    pub fn push_arc(&mut self, a: ArcId) {
+        self.arcs.push(a);
+    }
 }

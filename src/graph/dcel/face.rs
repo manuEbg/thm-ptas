@@ -27,6 +27,10 @@ impl<'a> Face {
     pub fn start_arc(&self) -> ArcId {
         self.start_arc
     }
+
+    pub fn set_start_arc(&mut self, start_arc: ArcId) {
+        self.start_arc = start_arc;
+    }
 }
 
 pub struct FaceIterator<'a> {

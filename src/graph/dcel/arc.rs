@@ -1,7 +1,7 @@
 use super::{FaceId, VertexId};
 pub type ArcId = usize;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Arc {
     src: VertexId,
     dst: VertexId,
@@ -34,6 +34,10 @@ impl Arc {
         self.next
     }
 
+    pub fn prev(&self) -> ArcId {
+        self.prev
+    }
+
     pub fn src(&self) -> VertexId {
         self.src
     }
@@ -52,5 +56,13 @@ impl Arc {
 
     pub fn set_face(&mut self, f: FaceId) {
         self.face = f;
+    }
+
+    pub fn set_next(&mut self, n: ArcId) {
+        self.next = n;
+    }
+
+    pub fn set_prev(&mut self, p: ArcId) {
+        self.prev = p;
     }
 }
