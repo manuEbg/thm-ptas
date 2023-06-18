@@ -195,7 +195,7 @@ impl WebFileWriter for JsArc {
 impl<'a> WebFileWriter for SpanningTree<'a> {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         self.tab(file, level)?;
-        JsValue::new("spantree", &JsArray::new(self.get_arcs())).write_to_file(file, id, level)
+        JsValue::new("spantree", &JsArray::new(self.arcs())).write_to_file(file, id, level)
     }
 }
 
@@ -231,7 +231,7 @@ impl<'a> WebFileWriter for DualGraph<'a> {
 impl WebFileWriter for Dcel {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         let v = self
-            .get_vertices()
+            .vertices()
             .iter()
             .enumerate()
             .map(|(i, _v)| JsVertex::new(i))
@@ -239,20 +239,20 @@ impl WebFileWriter for Dcel {
         let st = self.spanning_tree(0);
         let mut dual_graph = DualGraph::new(&st);
         dual_graph.build();
-        let s = st.get_arcs();
+        let s = st.arcs();
         let a = self
-            .get_arcs()
+            .arcs()
             .iter()
             .enumerate()
-            .map(|(i, a)| JsArc::new(i, a.get_src(), a.get_dst()))
+            .map(|(i, a)| JsArc::new(i, a.src(), a.dst()))
             .collect();
-        let faces = self.get_faces();
+        let faces = self.faces();
         let arcs_per_faces: Vec<Vec<usize>> = faces.iter().map(|face| face.walk_face(self)).collect();
         let verts_per_face: Vec<Vec<usize>> = arcs_per_faces
             .iter()
             .map(|arcs| {
                 arcs.iter()
-                    .map(|arc| self.get_arc(*arc).get_src())
+                    .map(|arc| self.arc(*arc).src())
                     .collect()
             })
             .collect();

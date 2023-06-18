@@ -23,7 +23,7 @@ impl<'a> SpanningTree<'a> {
         let mut iterator = BfsIter::new(self.dcel, start);
         while let Some(it) = iterator.next() {
             if let Some(a) = it.arc {
-                let twin = self.dcel.get_arc(a).get_twin();
+                let twin = self.dcel.arc(a).twin();
                 self.contains_arc[a] = true;
                 self.contains_arc[twin] = true;
                 self.arcs.push(a);
@@ -33,11 +33,11 @@ impl<'a> SpanningTree<'a> {
         }
     }
 
-    pub fn get_dcel(&self) -> &Dcel {
+    pub fn dcel(&self) -> &Dcel {
         self.dcel
     }
 
-    pub fn get_arcs(&self) -> &Vec<ArcId> {
+    pub fn arcs(&self) -> &Vec<ArcId> {
         &self.arcs
     }
 

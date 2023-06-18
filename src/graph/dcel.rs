@@ -45,23 +45,23 @@ impl Dcel {
         &self.faces[idx]
     }
 
-    pub fn get_arcs(&self) -> &Vec<Arc> {
+    pub fn arcs(&self) -> &Vec<Arc> {
         &self.arcs
     }
 
-    pub fn get_arc(&self, idx: ArcId) -> &Arc {
+    pub fn arc(&self, idx: ArcId) -> &Arc {
         &self.arcs[idx]
     }
 
-    pub fn get_faces(&self) -> &Vec<Face> {
+    pub fn faces(&self) -> &Vec<Face> {
         &self.faces
     }
 
-    pub fn get_vertices(&self) -> &Vec<Vertex> {
+    pub fn vertices(&self) -> &Vec<Vertex> {
         &self.vertices
     }
 
-    pub fn get_vertex(&self, idx: VertexId) -> &Vertex {
+    pub fn vertex(&self, idx: VertexId) -> &Vertex {
         &self.vertices[idx]
     }
 
@@ -79,8 +79,8 @@ impl Dcel {
 
     pub fn neighbors(&self, v: VertexId) -> Vec<VertexId> {
         let mut neighbors: Vec<usize> = vec![];
-        for a in self.get_vertex(v).get_arcs().iter() {
-            let n = self.get_arc(*a).get_dst();
+        for a in self.vertex(v).arcs().iter() {
+            let n = self.arc(*a).dst();
             neighbors.push(n);
         }
         neighbors
@@ -92,14 +92,8 @@ impl Dcel {
         tree
     }
 
-    pub fn get_twin(&self, arc: ArcId) -> &Arc {
-        let twin = self.get_arc(arc).get_twin();
-        self.get_arc(twin)
+    pub fn twin(&self, arc: ArcId) -> &Arc {
+        let twin = self.arc(arc).twin();
+        self.arc(twin)
     }
-
-    pub fn add_edge(from: VertexId, to: VertexId, prev: ArcId, next: ArcId, face: FaceId) {
-        todo!()
-    }
-        
-
 }

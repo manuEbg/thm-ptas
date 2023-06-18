@@ -11,7 +11,7 @@ impl Vertex {
         Vertex { arcs: arcs.clone() }
     }
 
-    pub fn get_arcs(&self) -> &Vec<ArcId> {
+    pub fn arcs(&self) -> &Vec<ArcId> {
         &self.arcs
     }
 }

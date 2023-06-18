@@ -30,23 +30,23 @@ impl Arc {
         }
     }
 
-    pub fn get_next(&self) -> ArcId {
+    pub fn next(&self) -> ArcId {
         self.next
     }
 
-    pub fn get_src(&self) -> VertexId {
+    pub fn src(&self) -> VertexId {
         self.src
     }
 
-    pub fn get_dst(&self) -> VertexId {
+    pub fn dst(&self) -> VertexId {
         self.dst
     }
 
-    pub fn get_twin(&self) -> ArcId {
+    pub fn twin(&self) -> ArcId {
         self.twin
     }
 
-    pub fn get_face(&self) -> FaceId {
+    pub fn face(&self) -> FaceId {
         self.face
     }
 

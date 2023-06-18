@@ -40,8 +40,8 @@ impl<'a> Iterator for FaceIterator<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(a_id) = self.next_arc {
-            let arc = self.dcel.get_arc(a_id);
-            let next = arc.get_next();
+            let arc = self.dcel.arc(a_id);
+            let next = arc.next();
             let item = Some((a_id, arc));
 
             if next != self.start {

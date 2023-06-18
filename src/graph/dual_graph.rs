@@ -9,17 +9,17 @@ pub struct DualGraph<'a> {
 
 impl<'a> DualGraph<'a> {
     pub fn new(spanning_tree: &'a SpanningTree) -> Self {
-        let adjacent = vec![Vec::new(); spanning_tree.get_dcel().num_faces()];
+        let adjacent = vec![Vec::new(); spanning_tree.dcel().num_faces()];
 
         Self {
             spanning_tree,
-            dcel: spanning_tree.get_dcel(),
+            dcel: spanning_tree.dcel(),
             adjacent,
         }
     }
 
     pub fn build(&mut self) {
-        for (i, f) in self.dcel.get_faces().iter().enumerate() {
+        for (i, f) in self.dcel.faces().iter().enumerate() {
             self.add_face(f, i);
         }
     }
@@ -29,8 +29,8 @@ impl<'a> DualGraph<'a> {
             if self.spanning_tree.contains_arc(a) {
                 continue;
             }
-            let twin = self.dcel.get_twin(a);
-            self.adjacent[idx].push(twin.get_face());
+            let twin = self.dcel.twin(a);
+            self.adjacent[idx].push(twin.face());
         }
     }
 
