@@ -1,59 +1,6 @@
-use super::Dcel;
+use super::dcel::Dcel;
 use super::dcel;
-
-#[derive(Debug)]
-
-struct Arc {
-    src: usize,
-    src_port: Option<usize>,
-    dst: usize,
-    dst_port: Option<usize>,
-    next: Option<usize>,
-    prev: Option<usize>,
-    twin: Option<usize>,
-    face: Option<usize>,
-}
-
-impl Arc {
-    pub fn new(src: usize, dst: usize) -> Self {
-        Arc {
-            src,
-            src_port: None,
-            dst,
-            dst_port: None,
-            next: None,
-            prev: None,
-            twin: None,
-            face: None,
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Face {
-    start_arc: usize,
-}
-
-impl Face {
-    pub fn new(start_arc : usize) -> Self {
-        Face{
-            start_arc
-        }
-    }
-}
-
-#[derive(Debug)]
-struct Vertex {
-    arcs: Vec<usize>
-}
-
-impl Vertex {
-    pub fn new() -> Self {
-        Vertex{
-            arcs: vec![]
-        }
-    }
-}
+use super::types::*;
 
 #[derive(Debug)]
 pub struct DcelBuilder {
@@ -105,13 +52,13 @@ impl DcelBuilder {
         self.build_faces();
         let mut dcel = Dcel::new();
         for v in &(self.vertices) {
-            dcel.push_vertex(dcel::Vertex::new(&v.arcs));
+            dcel.push_vertex(dcel::vertex::Vertex::new(&v.arcs));
         }
         for a in &(self.arcs) {
-            dcel.push_arc(dcel::Arc::new(a.src, a.dst, a.next.unwrap(), a.prev.unwrap(), a.twin.unwrap(), a.face.unwrap()))
+            dcel.push_arc(dcel::arc::Arc::new(a.src, a.dst, a.next.unwrap(), a.prev.unwrap(), a.twin.unwrap(), a.face.unwrap()))
         }
         for f in &(self.faces) {
-            dcel.push_face(dcel::Face::new(f.start_arc))
+            dcel.push_face(dcel::face::Face::new(f.start_arc))
         }
         dcel
     }
