@@ -7,7 +7,8 @@ use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel_file_writer::JsDataWriter;
 use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
-use graph::{Dcel, DcelBuilder};
+use graph::{Dcel};
+use graph::DcelBuilder;
 
 fn read_graph_file(filename: &str) -> Result<Dcel, String> {
     return if let Ok(mut lines) = read_lines(filename) {
