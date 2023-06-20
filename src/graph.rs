@@ -5,5 +5,4 @@ pub mod iterators;
 pub mod builder;
 
 pub use dcel::Dcel;
-pub use builder::dcel_builder::DcelBuilder;
-
+pub use dcel_builder::DcelBuilder;
