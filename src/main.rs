@@ -68,7 +68,10 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 fn main() {
     let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
     println!("{:?}", graph);
-    let removed: Vec<(usize, usize, usize)> = do_vertex_fold_reductions(&mut graph);
+    let mut reductions: Vec<MergeReduction> = do_vertice_fold_reduction(&mut graph);
+    println!("{:?}", reductions);
     println!("{:?}", graph);
-    println!("{:?}", removed);
+    let mut independence_set: Vec<usize> = vec![1, 2, 3];
+    independence_set = transfer_independence_set(independence_set, &mut reductions);
+    println!("{:?}", independence_set);
 }
