@@ -126,7 +126,7 @@ impl Dcel {
         match whatever {
             Some((mut a1, mut arc1)) => {
                 let mut a3 = 0;
-                while let Some((a2, arc2)) = face_iter.next() {
+                for (a2, arc2) in face_iter {
                     match self.triangle(arc1, arc2) {
                         Some(result) => {
                             if result {
@@ -142,7 +142,7 @@ impl Dcel {
                     a1 = a2;
                 }
                 self.close_triangle(a1, a3);
-                return true;
+                true
             }
             None => {
                 panic!("FACE IS EMPTY!")
@@ -192,7 +192,7 @@ impl Dcel {
     }
 
     fn add_arc(&mut self, arc: &Arc, id: ArcId) {
-        self.push_arc((*arc).clone());
+        self.push_arc(*arc);
         self.arcs[arc.next()].set_prev(id);
         self.arcs[arc.prev()].set_next(id);
         self.vertices[arc.src()].push_arc(id);
