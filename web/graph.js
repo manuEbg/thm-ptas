@@ -88,7 +88,6 @@ DefLayout.prototype.run = function(){
 
 
 class Graph {
-
   constructor(id, data, timeout) {
     var obj = data;
     this.vertices = obj.vertices.map(v => new Vertex(v));
@@ -97,6 +96,7 @@ class Graph {
     this.dualgraph.vertices = obj.dualgraph.vertices.map(v => new DualVertex(v));
     this.dualgraph.arcs = obj.dualgraph.arcs.map(a => new DualArc(a))
 
+
     this.faces = obj.faces;
     this.faces.forEach(f => {
       f.id = "f" + f.id;
@@ -104,6 +104,12 @@ class Graph {
       f.vertices = f.vertices.map(v => "v"+v);
     });
 
+    this.ringArcs = []
+    this.ringArcs.push(obj.ring_arcs_1.map(a => "a" + a))
+    this.ringArcs.push(obj.ring_arcs_2.map(a => "a" + a))
+    this.ringArcs.push(obj.ring_arcs_3.map(a => "a" + a))
+    this.ringArcs.push(obj.ring_arcs_4.map(a => "a" + a))
+    this.ringArcs.push(obj.ring_arcs_5.map(a => "a" + a))
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
@@ -112,6 +118,7 @@ class Graph {
     this.nextFace = 0;
     this.prevFace = 0;
 
+    this.currentRing = -1;
   }
 
   get_nodes(){
@@ -223,6 +230,25 @@ class Graph {
     let self = this;
     if(self.spanningTreeVisible) self.hideSpanningTree();
     else self.showSpanningTree();
+  }
+
+  highlightRing(lvl){
+    let self = this;
+
+    if(this.currentRing != -1) {
+      self.ringArcs[this.currentRing].forEach(el => {
+        this.cy.getElementById(el).removeClass('highlighted');
+      })
+    }
+
+    if (lvl == this.currentRing) {
+      this.currentRing = -1;
+      return;
+    }
+    this.currentRing = lvl;
+    self.ringArcs[lvl].forEach(el => {
+      this.cy.getElementById(el).addClass('highlighted');
+    })
   }
 
 

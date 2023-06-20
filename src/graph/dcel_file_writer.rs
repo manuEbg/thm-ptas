@@ -260,6 +260,20 @@ impl WebFileWriter for Dcel {
         for (i, _) in faces.iter().enumerate() {
            js_faces.push(JsFace::new(i, arcs_per_faces[i].clone(), verts_per_face[i].clone()));
         }
+
+        let rings = &self.cut_rings(5).unwrap();
+
+        let ring_array = rings
+            .iter()
+            .map(|ring| ring
+                    .sub
+                    .get_arcs()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
+                    .collect::<Vec<_>>()
+            ).collect::<Vec<_>>();
+
         file.write_all(b"let data = ")?;
         JsObject {
             item: &JsValues {
@@ -269,6 +283,11 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &dual_graph),
+                    JsValue::new("ring_arcs_1", &JsArray::new(&ring_array[0])),
+                    JsValue::new("ring_arcs_2", &JsArray::new(&ring_array[1])),
+                    JsValue::new("ring_arcs_3", &JsArray::new(&ring_array[2])),
+                    JsValue::new("ring_arcs_4", &JsArray::new(&ring_array[3])),
+                    JsValue::new("ring_arcs_5", &JsArray::new(&ring_array[4])),
                 ],
             },
         }

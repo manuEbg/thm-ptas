@@ -3,15 +3,35 @@ pub mod face;
 pub mod spanning_tree;
 pub mod vertex;
 
+
 use std::collections::HashSet;
 
 use self::face::FaceIterator;
-
 use super::iterators::bfs::BfsIter;
 use crate::graph::dcel::spanning_tree::SpanningTree;
 use arc::{Arc, ArcId};
 use face::{Face, FaceId};
 use vertex::{Vertex, VertexId};
+
+
+
+#[derive(Debug)]
+pub struct SubDcel<'a> {
+    pub dcel: &'a Dcel,
+    pub sub: Dcel,
+    mapping: Vec<usize>,
+}
+
+impl<'a> SubDcel<'a> {
+    pub fn new(dcel: &'a Dcel, sub: Dcel, mapping: Vec<usize>) -> Self {
+        Self { dcel, sub, mapping }
+    }
+
+    pub fn get_original_arc(&self, a: usize) -> Option<&usize> {
+        self.mapping.get(a)
+    }
+}
+
 
 #[derive(Debug)]
 pub struct Dcel {
@@ -196,5 +216,53 @@ impl Dcel {
         self.arcs[arc.next()].set_prev(id);
         self.arcs[arc.prev()].set_next(id);
         self.vertices[arc.src()].push_arc(id);
+    }
+
+
+    pub fn cut_rings(&self, k: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
+        let mut result = vec![];
+        let spanning_tree = self.spanning_tree(0);
+
+        for n in 1..(k+1) {
+            let mut visited = vec![false; self.vertices.len()];
+
+            //let mut ring_dcel = self.clone();
+            let mut ring_dcel = DcelBuilder::new();
+            for spanning_arc in &spanning_tree.arcs {
+                let arc = self.get_arc(*spanning_arc);
+                let src_level = spanning_tree.vertex_level[arc.get_src()];
+
+                /* Is this vertex part of the ring? */
+                if src_level == n && !visited[arc.get_src()] {
+                    visited[arc.get_src()] = true;
+                    let outgoing_arcs = self.get_arcs().iter().filter(|a| a.get_src() == arc.get_src()).collect::<Vec<_>>();
+                    for outgoing_arc in outgoing_arcs {
+                        /* Add only vertices with depth equal or less than the ring depth */
+                        let dst_level = spanning_tree.vertex_level[outgoing_arc.get_dst()];
+                        if dst_level <= n && !visited[outgoing_arc.get_dst()] {
+                            //println!("{:?} {:?}", arc.get_src(), outgoing_arc.get_dst());
+                            ring_dcel.push_arc(arc.get_src(), outgoing_arc.get_dst());
+                            ring_dcel.push_arc(outgoing_arc.get_dst(), arc.get_src());
+                        }
+                    }
+                }
+            }
+
+            let dcel = ring_dcel.build();
+            /* Create an arc mapping */
+            let mut mapping = vec![0; dcel.num_arcs()];
+            /* This probably very slow */
+            for (sub_arc_idx, sub_arc) in dcel.arcs.iter().enumerate() {
+                for (main_arc_idx, main_arc) in self.arcs.iter().enumerate() {
+                    if sub_arc.get_src() == main_arc.get_src() && sub_arc.get_dst() == main_arc.get_dst() {
+                        mapping[sub_arc_idx] = main_arc_idx;
+                    }
+                }
+            }
+            println!("{:?}", mapping);
+            result.push(SubDcel::new(self, dcel, mapping));
+        }
+
+        Ok(result)
     }
 }
