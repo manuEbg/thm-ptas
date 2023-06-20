@@ -42,6 +42,7 @@ let defaults = {
   ready: undefined, // callback on layoutready
   stop: undefined, // callback on layoutstop
   transform: function (node, position ){ return position; }, // transform a given node position. Useful for changing flow direction in discrete layouts 
+  faces: [],
 };
 
 function DefLayout( options ){

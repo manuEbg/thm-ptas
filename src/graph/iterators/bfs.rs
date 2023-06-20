@@ -46,8 +46,8 @@ impl<'a> Iterator for BfsIter<'a> {
                 arc: self.discovered_arc[vertex],
             };
 
-            for a in self.dcel.get_vertex(vertex).get_arcs() {
-                let n = self.dcel.get_arc(*a).get_dst();
+            for a in self.dcel.vertex(vertex).arcs() {
+                let n = self.dcel.arc(*a).dst();
                 
                 if self.discovered[n] { continue }
                 

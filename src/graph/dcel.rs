@@ -1,125 +1,18 @@
-use std::error::Error;
+pub mod arc;
+pub mod face;
+pub mod spanning_tree;
+pub mod vertex;
 
-use super::{iterators::bfs::BfsIter, DcelBuilder};
 
-#[derive(Debug)]
-pub struct Face {
-    start_arc: usize,
-}
+use std::{collections::HashSet, error::Error};
 
-impl Face {
-    pub fn new(start_arc: usize) -> Self {
-        Face { start_arc }
-    }
+use self::face::FaceIterator;
+use super::iterators::bfs::BfsIter;
+use crate::graph::{dcel::spanning_tree::SpanningTree, builder::dcel_builder::DcelBuilder};
+use arc::{Arc, ArcId};
+use face::{Face, FaceId};
+use vertex::{Vertex, VertexId};
 
-    pub fn walk_face(&self, dcel: &Dcel) -> Vec<usize> {
-        let mut arcs = vec![];
-        arcs.push(self.start_arc);
-        let mut current_arc = dcel.get_arc(self.start_arc).get_next();
-        while current_arc != self.start_arc {
-            arcs.push(current_arc);
-            current_arc = dcel.get_arc(current_arc).get_next();
-        }
-        arcs
-    }
-}
-
-#[derive(Debug)]
-pub struct Arc {
-    src: usize,
-    dst: usize,
-    next: usize,
-    prev: usize,
-    twin: usize,
-    face: usize,
-}
-
-impl Arc {
-    pub fn new(src: usize, dst: usize, next: usize, prev: usize, twin: usize, face: usize) -> Self {
-        Arc {
-            src,
-            dst,
-            next,
-            prev,
-            twin,
-            face,
-        }
-    }
-
-    pub fn get_next(&self) -> usize {
-        self.next
-    }
-
-    pub fn get_src(&self) -> usize {
-        self.src
-    }
-
-    pub fn get_dst(&self) -> usize {
-        self.dst
-    }
-
-    pub fn get_twin(&self) -> usize {
-        self.twin
-    }
-
-    pub fn get_face(&self) -> usize {
-        self.face
-    }
-}
-
-#[derive(Debug)]
-pub struct Vertex {
-    arcs: Vec<usize>,
-}
-
-#[derive(Debug)]
-pub struct SpanningTree<'a> {
-    dcel: &'a Dcel,
-    contains_arc: Vec<bool>,
-    vertex_level: Vec<usize>,
-    arcs: Vec<usize>,
-}
-
-impl<'a> SpanningTree<'a> {
-    pub fn new(dcel: &'a Dcel) -> Self {
-        Self {
-            dcel,
-            contains_arc: vec![false; dcel.num_arcs()],
-            arcs: vec![],
-            vertex_level: vec![0; dcel.num_vertices()],
-        }
-    }
-
-    pub fn build(&mut self, start: usize) {
-        let mut iterator = BfsIter::new(self.dcel, start);
-        while let Some(it) = iterator.next() {
-            if let Some(a) = it.arc {
-                let twin = self.dcel.get_arc(a).twin;
-                self.contains_arc[a] = true;
-                self.contains_arc[twin] = true;
-                self.arcs.push(a);
-                self.arcs.push(twin);
-                self.vertex_level[it.vertex] = it.level;
-            }
-        }
-    }
-
-    pub fn get_dcel(&self) -> &Dcel {
-        self.dcel
-    }
-
-    pub fn get_arcs(&self) -> &Vec<usize> {
-        &self.arcs
-    }
-
-    pub fn num_arcs(&self) -> usize {
-        self.arcs.len()
-    }
-
-    pub fn contains_arc(&self, arc: usize) -> bool {
-        self.contains_arc[arc]
-    }
-}
 
 
 #[derive(Debug)]
@@ -139,21 +32,13 @@ impl<'a> SubDcel<'a> {
     }
 }
 
-impl Vertex {
-    pub fn new(arcs: &Vec<usize>) -> Self {
-        Vertex { arcs: arcs.clone() }
-    }
-
-    pub fn get_arcs(&self) -> &Vec<usize> {
-        &self.arcs
-    }
-}
 
 #[derive(Debug)]
 pub struct Dcel {
     vertices: Vec<Vertex>,
     arcs: Vec<Arc>,
     faces: Vec<Face>,
+    arc_set: HashSet<String>,
 }
 
 impl Dcel {
@@ -162,6 +47,7 @@ impl Dcel {
             vertices: vec![],
             arcs: vec![],
             faces: vec![],
+            arc_set: HashSet::new(),
         }
     }
 
@@ -170,6 +56,8 @@ impl Dcel {
     }
 
     pub fn push_arc(&mut self, a: Arc) {
+        self.arc_set
+            .insert([a.src().to_string(), a.dst().to_string()].join(" "));
         self.arcs.push(a);
     }
 
@@ -177,27 +65,31 @@ impl Dcel {
         self.faces.push(f);
     }
 
-    pub fn walk_face(&self, face_idx: usize) -> Vec<usize> {
-        self.faces[face_idx].walk_face(self)
+    pub fn walk_face(&self, face: FaceId) -> Vec<ArcId> {
+        self.faces[face].walk_face(self)
     }
 
-    pub fn get_arcs(&self) -> &Vec<Arc> {
+    pub fn face(&self, idx: FaceId) -> &Face {
+        &self.faces[idx]
+    }
+
+    pub fn arcs(&self) -> &Vec<Arc> {
         &self.arcs
     }
 
-    pub fn get_arc(&self, idx: usize) -> &Arc {
+    pub fn arc(&self, idx: ArcId) -> &Arc {
         &self.arcs[idx]
     }
 
-    pub fn get_faces(&self) -> &Vec<Face> {
+    pub fn faces(&self) -> &Vec<Face> {
         &self.faces
     }
 
-    pub fn get_vertices(&self) -> &Vec<Vertex> {
+    pub fn vertices(&self) -> &Vec<Vertex> {
         &self.vertices
     }
 
-    pub fn get_vertex(&self, idx: usize) -> &Vertex {
+    pub fn vertex(&self, idx: VertexId) -> &Vertex {
         &self.vertices[idx]
     }
 
@@ -213,24 +105,117 @@ impl Dcel {
         self.faces.len()
     }
 
-    pub fn neighbors(&self, v: usize) -> Vec<usize> {
+    pub fn neighbors(&self, v: VertexId) -> Vec<VertexId> {
         let mut neighbors: Vec<usize> = vec![];
-        for a in self.get_vertex(v).arcs.iter() {
-            let n = self.get_arc(*a).get_dst();
+        for a in self.vertex(v).arcs().iter() {
+            let n = self.arc(*a).dst();
             neighbors.push(n);
         }
         neighbors
     }
 
-    pub fn spanning_tree(&self, start: usize) -> SpanningTree {
-        let mut tree = SpanningTree::new(&self);
+    pub fn spanning_tree(&self, start: VertexId) -> SpanningTree {
+        let mut tree = SpanningTree::new(self);
         tree.build(start);
         tree
     }
 
-    pub fn get_twin(&self, arc: usize) -> &Arc {
-        let twin = self.get_arc(arc).twin;
-        self.get_arc(twin)
+    pub fn has_arc(&self, u: VertexId, v: VertexId) -> bool {
+        self.arc_set
+            .contains(&[u.to_string(), v.to_string()].join(" "))
+    }
+
+    pub fn twin(&self, arc: ArcId) -> &Arc {
+        let twin = self.arc(arc).twin();
+        self.arc(twin)
+    }
+
+    pub fn triangulate(&mut self) {
+        let count = self.num_faces();
+        for f in 0..count {
+            while self.triangulate_face(f) {}
+        }
+    }
+
+    fn triangulate_face(&mut self, f: FaceId) -> bool {
+        let face = self.face(f);
+
+        let mut face_iter = FaceIterator::new(self, face.start_arc());
+
+        let whatever = face_iter.next();
+        match whatever {
+            Some((mut a1, mut arc1)) => {
+                let mut a3 = 0;
+                for (a2, arc2) in face_iter {
+                    match self.triangle(arc1, arc2) {
+                        Some(result) => {
+                            if result {
+                                a3 = a2;
+                                break;
+                            }
+                        }
+                        None => {
+                            return false;
+                        }
+                    }
+                    arc1 = arc2;
+                    a1 = a2;
+                }
+                self.close_triangle(a1, a3);
+                true
+            }
+            None => {
+                panic!("FACE IS EMPTY!")
+            }
+        }
+    }
+
+    fn triangle(&self, a1: &Arc, a2: &Arc) -> Option<bool> {
+        let a = a1.src();
+        let b = a1.dst();
+        let c = a2.dst();
+        let d = self.arc(a2.next()).dst();
+
+        if a == d {
+            return None;
+        }
+
+        if self.has_arc(a, c) || a == c {
+            //check next arc
+            return Some(false);
+        }
+        Some(true)
+    }
+
+    fn close_triangle(&mut self, a1: ArcId, a2: ArcId) {
+        let arc1 = &self.arcs[a1];
+        let arc2 = &self.arcs[a2];
+        let old_f = arc1.face();
+        let new_f = self.num_faces();
+
+        let u = arc1.src();
+        let v = arc2.dst();
+        let arc3_idx = self.num_arcs();
+        let arc3_twin_idx = arc3_idx + 1;
+
+        let arc3 = Arc::new(v, u, a1, a2, arc3_twin_idx, new_f);
+        let arc3_twin = Arc::new(u, v, arc2.next(), arc1.prev(), arc3_idx, old_f);
+        let new_face = Face::new(arc3_idx);
+
+        self.arcs[a1].set_face(new_f);
+        self.arcs[a2].set_face(new_f);
+        self.faces[old_f].set_start_arc(arc3_twin_idx);
+        self.faces.push(new_face);
+
+        self.add_arc(&arc3, arc3_idx);
+        self.add_arc(&arc3_twin, arc3_twin_idx);
+    }
+
+    fn add_arc(&mut self, arc: &Arc, id: ArcId) {
+        self.push_arc(*arc);
+        self.arcs[arc.next()].set_prev(id);
+        self.arcs[arc.prev()].set_next(id);
+        self.vertices[arc.src()].push_arc(id);
     }
 
 
@@ -243,21 +228,21 @@ impl Dcel {
 
             //let mut ring_dcel = self.clone();
             let mut ring_dcel = DcelBuilder::new();
-            for spanning_arc in &spanning_tree.arcs {
-                let arc = self.get_arc(*spanning_arc);
-                let src_level = spanning_tree.vertex_level[arc.get_src()];
+            for spanning_arc in spanning_tree.arcs() {
+                let arc = self.arc(*spanning_arc);
+                let src_level = spanning_tree.vertex_level()[arc.src()];
 
                 /* Is this vertex part of the ring? */
-                if src_level == n && !visited[arc.get_src()] {
-                    visited[arc.get_src()] = true;
-                    let outgoing_arcs = self.get_arcs().iter().filter(|a| a.get_src() == arc.get_src()).collect::<Vec<_>>();
+                if src_level == n && !visited[arc.src()] {
+                    visited[arc.src()] = true;
+                    let outgoing_arcs = self.arcs().iter().filter(|a| a.src() == arc.src()).collect::<Vec<_>>();
                     for outgoing_arc in outgoing_arcs {
                         /* Add only vertices with depth equal or less than the ring depth */
-                        let dst_level = spanning_tree.vertex_level[outgoing_arc.get_dst()];
-                        if dst_level <= n && !visited[outgoing_arc.get_dst()] {
+                        let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
+                        if dst_level <= n && !visited[outgoing_arc.dst()] {
                             //println!("{:?} {:?}", arc.get_src(), outgoing_arc.get_dst());
-                            ring_dcel.push_arc(arc.get_src(), outgoing_arc.get_dst());
-                            ring_dcel.push_arc(outgoing_arc.get_dst(), arc.get_src());
+                            ring_dcel.push_arc(arc.src(), outgoing_arc.dst());
+                            ring_dcel.push_arc(outgoing_arc.dst(), arc.src());
                         }
                     }
                 }
@@ -269,7 +254,7 @@ impl Dcel {
             /* This probably very slow */
             for (sub_arc_idx, sub_arc) in dcel.arcs.iter().enumerate() {
                 for (main_arc_idx, main_arc) in self.arcs.iter().enumerate() {
-                    if sub_arc.get_src() == main_arc.get_src() && sub_arc.get_dst() == main_arc.get_dst() {
+                    if sub_arc.src() == main_arc.src() && sub_arc.dst() == main_arc.dst() {
                         mapping[sub_arc_idx] = main_arc_idx;
                     }
                 }
