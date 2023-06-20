@@ -58,19 +58,14 @@ fn main() {
     println!("{tree_decomposition:?}");
 
     let nice_td = tree_decomposition.make_nice();
-    // let nice_td = td_make_nice(&tree_decomposition);
 
     let mut found = vec![false; 18];
 
     for bag in nice_td.bags.iter() {
         found[bag.id] = true;
-        assert_eq!(true, nice_td.bags.iter().any(|bag| {
-            bag.id == 0
-        }));
         println!("{:?}", bag);
     }
 
-    println!("Found = {found:?}");
     assert!(found.iter().all(|f| *f == true));
 
     write_web_file("data/test.js", &dcel);
