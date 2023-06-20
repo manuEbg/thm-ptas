@@ -4,11 +4,11 @@ pub mod spanning_tree;
 pub mod vertex;
 
 
-use std::collections::HashSet;
+use std::{collections::HashSet, error::Error};
 
 use self::face::FaceIterator;
 use super::iterators::bfs::BfsIter;
-use crate::graph::dcel::spanning_tree::SpanningTree;
+use crate::graph::{dcel::spanning_tree::SpanningTree, builder::dcel_builder::DcelBuilder};
 use arc::{Arc, ArcId};
 use face::{Face, FaceId};
 use vertex::{Vertex, VertexId};
@@ -228,21 +228,21 @@ impl Dcel {
 
             //let mut ring_dcel = self.clone();
             let mut ring_dcel = DcelBuilder::new();
-            for spanning_arc in &spanning_tree.arcs {
-                let arc = self.get_arc(*spanning_arc);
-                let src_level = spanning_tree.vertex_level[arc.get_src()];
+            for spanning_arc in spanning_tree.arcs() {
+                let arc = self.arc(*spanning_arc);
+                let src_level = spanning_tree.vertex_level()[arc.src()];
 
                 /* Is this vertex part of the ring? */
-                if src_level == n && !visited[arc.get_src()] {
-                    visited[arc.get_src()] = true;
-                    let outgoing_arcs = self.get_arcs().iter().filter(|a| a.get_src() == arc.get_src()).collect::<Vec<_>>();
+                if src_level == n && !visited[arc.src()] {
+                    visited[arc.src()] = true;
+                    let outgoing_arcs = self.arcs().iter().filter(|a| a.src() == arc.src()).collect::<Vec<_>>();
                     for outgoing_arc in outgoing_arcs {
                         /* Add only vertices with depth equal or less than the ring depth */
-                        let dst_level = spanning_tree.vertex_level[outgoing_arc.get_dst()];
-                        if dst_level <= n && !visited[outgoing_arc.get_dst()] {
+                        let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
+                        if dst_level <= n && !visited[outgoing_arc.dst()] {
                             //println!("{:?} {:?}", arc.get_src(), outgoing_arc.get_dst());
-                            ring_dcel.push_arc(arc.get_src(), outgoing_arc.get_dst());
-                            ring_dcel.push_arc(outgoing_arc.get_dst(), arc.get_src());
+                            ring_dcel.push_arc(arc.src(), outgoing_arc.dst());
+                            ring_dcel.push_arc(outgoing_arc.dst(), arc.src());
                         }
                     }
                 }
@@ -254,7 +254,7 @@ impl Dcel {
             /* This probably very slow */
             for (sub_arc_idx, sub_arc) in dcel.arcs.iter().enumerate() {
                 for (main_arc_idx, main_arc) in self.arcs.iter().enumerate() {
-                    if sub_arc.get_src() == main_arc.get_src() && sub_arc.get_dst() == main_arc.get_dst() {
+                    if sub_arc.src() == main_arc.src() && sub_arc.dst() == main_arc.dst() {
                         mapping[sub_arc_idx] = main_arc_idx;
                     }
                 }

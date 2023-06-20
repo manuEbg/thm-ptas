@@ -48,4 +48,8 @@ impl<'a> SpanningTree<'a> {
     pub fn contains_arc(&self, arc: ArcId) -> bool {
         self.contains_arc[arc]
     }
+
+    pub fn vertex_level(&self) -> &[usize] {
+        self.vertex_level.as_ref()
+    }
 }

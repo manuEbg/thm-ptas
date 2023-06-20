@@ -267,7 +267,7 @@ impl WebFileWriter for Dcel {
             .iter()
             .map(|ring| ring
                     .sub
-                    .get_arcs()
+                    .arcs()
                     .iter()
                     .enumerate()
                     .map(|(i, _)| *ring.get_original_arc(i).unwrap())
