@@ -9,6 +9,7 @@ use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
 use arboretum_td::tree_decomposition::TreeDecomposition;
+use graph::tree_decomposition::{NiceTreeDecomposition, td_make_nice};
 
 fn read_graph_file(filename: &str) -> Result<Dcel, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -55,6 +56,23 @@ fn main() {
     dual_graph.build();
     let tree_decomposition = TreeDecomposition::from(&dual_graph);
     println!("{tree_decomposition:?}");
+
+    let nice_td = tree_decomposition.make_nice();
+    // let nice_td = td_make_nice(&tree_decomposition);
+
+    let mut found = vec![false; 18];
+
+    for bag in nice_td.bags.iter() {
+        found[bag.id] = true;
+        assert_eq!(true, nice_td.bags.iter().any(|bag| {
+            bag.id == 0
+        }));
+        println!("{:?}", bag);
+    }
+
+    println!("Found = {found:?}");
+    assert!(found.iter().all(|f| *f == true));
+
     write_web_file("data/test.js", &dcel);
 
     for a in BfsIter::new(&dcel,0) {

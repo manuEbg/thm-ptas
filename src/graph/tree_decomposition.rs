@@ -35,3 +35,60 @@ impl From<&DualGraph<'_>> for TreeDecomposition {
         result
     }
 }
+
+pub trait NiceTreeDecomposition {
+    fn make_nice(&self) -> TreeDecomposition;
+}
+
+impl NiceTreeDecomposition for TreeDecomposition {
+    fn make_nice(&self) -> TreeDecomposition {
+        let mut result = self.clone();
+        assert_eq!(self.bags.len(), result.bags.len());
+
+        for bag in result.bags.iter() {
+            println!("{bag:?}");
+        }
+
+        println!("---");
+
+        for bag in self.bags.iter() {
+            let mut pred_id = bag.id;
+            let vertices = bag.vertex_set.iter().map(|v| *v).collect::<Vec<usize>>();
+
+            for i in (0..bag.vertex_set.len()).rev() {
+                let mut vs: FxHashSet<usize> = FxHashSet::default();
+                for v2 in vertices[0..i].iter() {
+                    vs.insert(*v2);
+                }
+                let new_id = result.add_bag(vs);
+                result.add_edge(pred_id, new_id);
+                pred_id = new_id;
+                println!("Created {:?}", result.bags[new_id]);
+            }
+        }
+
+        result
+    }
+}
+
+pub fn td_make_nice(td: &TreeDecomposition) -> TreeDecomposition {
+    let mut result = td.clone();
+
+    for bag in td.bags.iter() {
+        let mut pred_id = bag.id;
+        let vertices = bag.vertex_set.iter().map(|v| *v).collect::<Vec<usize>>();
+
+        for i in (0..bag.vertex_set.len()).rev() {
+            let vs_slice = &vertices[0..i];
+            let mut vs: FxHashSet<usize> = FxHashSet::default();
+            for j in 0..i {
+                vs.insert(vs_slice[j]);
+            }
+            let new_id = result.add_bag(vs);
+            result.add_edge(pred_id, new_id);
+            pred_id = new_id;
+        }
+    }
+
+    result
+}
