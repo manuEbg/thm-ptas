@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.24.0/cytoscape.min.js" integrity="sha512-RNg7R9mgoEi0QKVP6HktZpG8CwaojI4YVO9UiI+GXnfC2Bif3/7vcJDim9NZ3ZZuhFGEwuGzmnHwXMOAzjM2qw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="graph.js"></script>
     <script src="../data/test.js"></script>
+    <script src="../data/layout.js"></script>
 </head>
 
 <body>
@@ -29,7 +30,7 @@
     </div>
     
     <script>
-        let g = new Graph("graph", data, 100);
+        let g = new Graph("graph", data, layout, 100);
         g.draw();
     </script>
 </body>
