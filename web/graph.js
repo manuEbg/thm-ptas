@@ -104,12 +104,7 @@ class Graph {
       f.vertices = f.vertices.map(v => "v"+v);
     });
 
-    this.ringArcs = []
-    this.ringArcs.push(obj.ring_arcs_1.map(a => "a" + a))
-    this.ringArcs.push(obj.ring_arcs_2.map(a => "a" + a))
-    this.ringArcs.push(obj.ring_arcs_3.map(a => "a" + a))
-    this.ringArcs.push(obj.ring_arcs_4.map(a => "a" + a))
-    this.ringArcs.push(obj.ring_arcs_5.map(a => "a" + a))
+    this.ringArcs = obj.rings.map(r => r.map(a=> "a" + a));
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;

@@ -283,12 +283,9 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &dual_graph),
-                    JsValue::new("ring_arcs_1", &JsArray::new(&ring_array[0])),
-                    JsValue::new("ring_arcs_2", &JsArray::new(&ring_array[1])),
-                    JsValue::new("ring_arcs_3", &JsArray::new(&ring_array[2])),
-                    JsValue::new("ring_arcs_4", &JsArray::new(&ring_array[3])),
-                    JsValue::new("ring_arcs_5", &JsArray::new(&ring_array[4])),
+                    JsValue::new("rings", &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()))
                 ],
+                
             },
         }
         .write_to_file(file, id, level)
