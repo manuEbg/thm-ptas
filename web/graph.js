@@ -88,7 +88,7 @@ DefLayout.prototype.run = function(){
 
 
 class Graph {
-  constructor(id, data, timeout) {
+  constructor(id, data, layout, timeout) {
     var obj = data;
     this.vertices = obj.vertices.map(v => new Vertex(v));
     this.arcs = obj.arcs.map(a => new Arc(a));
@@ -114,6 +114,17 @@ class Graph {
     this.prevFace = 0;
 
     this.currentRing = -1;
+
+    this.layout = layout;
+
+    const SCALING = 1000;
+
+    this.layout.forEach((v) => {
+      this.vertices[v.id].position = {
+        x: v.x * SCALING,
+        y: -v.y * SCALING,
+      }
+    })
   }
 
   get_nodes(){
@@ -128,7 +139,7 @@ class Graph {
 
   draw() {
     let self = this;
-    cytoscape( 'layout', 'test', DefLayout ); 
+    //cytoscape( 'layout', 'test', DefLayout );
     self.cy = cytoscape({
       container: document.getElementById("graph"),
     
@@ -171,7 +182,7 @@ class Graph {
           edges: self.get_arcs()
         },
 
-      layout: {name: 'test'}
+      layout: {name: 'preset'}
     
     });
   }
