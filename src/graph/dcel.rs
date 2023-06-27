@@ -19,19 +19,81 @@ use vertex::{Vertex, VertexId};
 pub struct SubDcel<'a> {
     pub dcel: &'a Dcel,
     pub sub: Dcel,
-    mapping: Vec<usize>,
+    pub arc_mapping: Vec<arc::ArcId>,
+    pub vertex_mapping: Vec<vertex::VertexId>,
 }
 
 impl<'a> SubDcel<'a> {
-    pub fn new(dcel: &'a Dcel, sub: Dcel, mapping: Vec<usize>) -> Self {
-        Self { dcel, sub, mapping }
+    pub fn new(dcel: &'a Dcel, sub: Dcel, arc_mapping: Vec<arc::ArcId>, vertex_mapping: Vec<vertex::VertexId>) -> Self {
+        Self { dcel, sub, arc_mapping, vertex_mapping }
     }
 
-    pub fn get_original_arc(&self, a: usize) -> Option<&usize> {
-        self.mapping.get(a)
+    pub fn get_original_arc(&self, a: arc::ArcId) -> Option<&arc::ArcId> {
+        self.arc_mapping.get(a)
+    }
+
+    pub fn get_original_vertex(&self, v: vertex::VertexId) -> Option<&vertex::VertexId> {
+        self.vertex_mapping.get(v)
+    }
+
+    pub fn get_vertices(&self) -> &Vec<vertex::Vertex> {
+        return self.sub.vertices();
     }
 }
 
+#[derive(Debug)]
+pub struct SubDcelBuilder<'a> {
+    pub dcel: &'a Dcel,
+    pub dcel_builder: DcelBuilder,
+    pub vertex_mapping: Vec<vertex::VertexId>,
+    pub arc_mapping: Vec<arc::ArcId>,
+    pub last_vertex_id: vertex::VertexId
+}
+
+impl<'a> SubDcelBuilder<'a> {
+    pub fn new(dcel: &'a Dcel) -> Self {
+        Self { dcel, dcel_builder: DcelBuilder::new(), vertex_mapping: vec![], arc_mapping: vec![], last_vertex_id: 0 }
+    }
+
+    /* Returns the mapped vertex id */
+    pub fn push_vertex(&mut self, v: vertex::VertexId) -> vertex::VertexId {
+        /* Is already mapped? */
+        for (idx, vertex) in self.vertex_mapping.iter().enumerate() {
+            if *vertex == v {
+                return idx;
+            }
+        }
+
+        /* Add this vertex */
+        //self.vertex_mapping[self.last_vertex_id] = v;
+        self.vertex_mapping.push(v);
+        self.last_vertex_id += 1;
+
+        return self.last_vertex_id-1;
+    }
+
+    pub fn push_arc(&mut self, a: &arc::Arc) {
+        let src = self.push_vertex(a.src());
+        let dst = self.push_vertex(a.dst());
+        self.dcel_builder.push_arc(src, dst);
+        self.dcel_builder.push_arc(dst, src);
+    }
+
+    // pub fn build(&mut self) -> Result<SubDcel, Box<dyn Error>> {
+    //     let final_dcel = self.dcel_builder.build();
+    //     let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
+    //     /* This probably very slow */
+    //     for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
+    //         for (main_arc_idx, main_arc) in self.dcel.arcs.iter().enumerate() {
+    //             if self.vertex_mapping[sub_arc.src()] == main_arc.src() && self.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
+    //                 arc_mapping[sub_arc_idx] = main_arc_idx;
+    //             }
+    //         }
+    //     }
+
+    //     Ok(SubDcel { dcel: &self.dcel, sub: final_dcel, arc_mapping, vertex_mapping: self.vertex_mapping.clone() })
+    // }
+}
 
 #[derive(Debug)]
 pub struct Dcel {
@@ -226,8 +288,8 @@ impl Dcel {
         for n in 1..(k+1) {
             let mut visited = vec![false; self.vertices.len()];
 
-            //let mut ring_dcel = self.clone();
-            let mut ring_dcel = DcelBuilder::new();
+            let mut builder = SubDcelBuilder::new(self);
+
             for spanning_arc in spanning_tree.arcs() {
                 let arc = self.arc(*spanning_arc);
                 let src_level = spanning_tree.vertex_level()[arc.src()];
@@ -235,32 +297,35 @@ impl Dcel {
                 /* Is this vertex part of the ring? */
                 if src_level == n && !visited[arc.src()] {
                     visited[arc.src()] = true;
+
                     let outgoing_arcs = self.arcs().iter().filter(|a| a.src() == arc.src()).collect::<Vec<_>>();
                     for outgoing_arc in outgoing_arcs {
-                        /* Add only vertices with depth equal or less than the ring depth */
+
+                        /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
-                        if dst_level <= n && !visited[outgoing_arc.dst()] {
+                        if dst_level == n && !visited[outgoing_arc.dst()] {
                             //println!("{:?} {:?}", arc.get_src(), outgoing_arc.get_dst());
-                            ring_dcel.push_arc(arc.src(), outgoing_arc.dst());
-                            ring_dcel.push_arc(outgoing_arc.dst(), arc.src());
+                            // builder.push_arc(arc.src(), outgoing_arc.dst());
+                            // builder.push_arc(outgoing_arc.dst(), arc.src());
+
+                            builder.push_arc(outgoing_arc);
                         }
                     }
                 }
             }
 
-            let dcel = ring_dcel.build();
-            /* Create an arc mapping */
-            let mut mapping = vec![0; dcel.num_arcs()];
+            let final_dcel = builder.dcel_builder.build();
+            let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
             /* This probably very slow */
-            for (sub_arc_idx, sub_arc) in dcel.arcs.iter().enumerate() {
+            for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
                 for (main_arc_idx, main_arc) in self.arcs.iter().enumerate() {
-                    if sub_arc.src() == main_arc.src() && sub_arc.dst() == main_arc.dst() {
-                        mapping[sub_arc_idx] = main_arc_idx;
+                    if builder.vertex_mapping[sub_arc.src()] == main_arc.src() && builder.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
+                        arc_mapping[sub_arc_idx] = main_arc_idx;
                     }
                 }
             }
-            println!("{:?}", mapping);
-            result.push(SubDcel::new(self, dcel, mapping));
+
+            result.push(SubDcel { dcel: self, sub: final_dcel, arc_mapping, vertex_mapping: builder.vertex_mapping });
         }
 
         Ok(result)
