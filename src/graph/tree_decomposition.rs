@@ -63,3 +63,50 @@ impl NiceTreeDecomposition for TreeDecomposition {
         result
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::graph::dcel::SpanningTree;
+    use crate::read_graph_file;
+
+    #[test]
+    pub fn test_tree_decomposition() {
+        let dcel = read_graph_file("data/exp.graph").unwrap();
+        let mut spanning_tree = SpanningTree::new(&dcel);
+        spanning_tree.build(0);
+        let mut dual_graph = DualGraph::new(&spanning_tree);
+        dual_graph.build();
+        let tree_decomposition = TreeDecomposition::from(&dual_graph);
+
+        println!("Normal tree decomposition:");
+        for bag in tree_decomposition.bags.iter() {
+            println!("{:?}", bag);
+        }
+
+        assert_eq!(tree_decomposition.bags.len(), 4);
+    }
+
+    #[test]
+    pub fn test_nice_tree_decomposition() {
+        let dcel = read_graph_file("data/exp.graph").unwrap();
+        let mut spanning_tree = SpanningTree::new(&dcel);
+        spanning_tree.build(0);
+        let mut dual_graph = DualGraph::new(&spanning_tree);
+        dual_graph.build();
+        let tree_decomposition = TreeDecomposition::from(&dual_graph);
+
+        let nice_td = tree_decomposition.make_nice();
+
+        assert_eq!(nice_td.bags.len(), 18);
+        let mut found = vec![false; 18];
+
+        println!("Nice tree decomposition:");
+        for bag in nice_td.bags.iter() {
+            found[bag.id] = true;
+            println!("{:?}", bag);
+        }
+
+        assert!(found.iter().all(|f| *f == true));
+    }
+}

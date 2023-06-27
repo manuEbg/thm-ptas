@@ -9,9 +9,9 @@ use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 use graph::{Dcel, DcelBuilder};
 use arboretum_td::tree_decomposition::TreeDecomposition;
-use graph::tree_decomposition::{NiceTreeDecomposition, td_make_nice};
+use graph::tree_decomposition::NiceTreeDecomposition;
 
-fn read_graph_file(filename: &str) -> Result<Dcel, String> {
+pub fn read_graph_file(filename: &str) -> Result<Dcel, String> {
     return if let Ok(mut lines) = read_lines(filename) {
         let mut dcel_builder: DcelBuilder;
         if let Some(Ok(_)) = lines.next() {
@@ -55,18 +55,7 @@ fn main() {
     let mut dual_graph = DualGraph::new(&spanning_tree);
     dual_graph.build();
     let tree_decomposition = TreeDecomposition::from(&dual_graph);
-    println!("{tree_decomposition:?}");
-
     let nice_td = tree_decomposition.make_nice();
-
-    let mut found = vec![false; 18];
-
-    for bag in nice_td.bags.iter() {
-        found[bag.id] = true;
-        println!("{:?}", bag);
-    }
-
-    assert!(found.iter().all(|f| *f == true));
 
     write_web_file("data/test.js", &dcel);
 
