@@ -13,7 +13,8 @@ pub fn do_vertice_fold_reduction(graph: &mut QuickGraph) -> Vec<MergeReduction> 
     let mut result: Vec<MergeReduction> = Vec::new();
     loop {
         if let Some(vertex) = graph.adjacency.iter()
-            .position(|neighborhood| neighborhood.len() == 2) {
+            .position(|neighborhood| neighborhood.len() == 2
+            && !graph.adjacency[neighborhood[0]].contains(&neighborhood[1])) {
             let neighborhood: Vec<usize> = graph.neighborhood(vertex).clone();
             result.push(merge_vertices_reversible(graph, vertex, neighborhood[0]));
             let updated_vertex: usize = if vertex > neighborhood[0] { vertex - 1} else {vertex};

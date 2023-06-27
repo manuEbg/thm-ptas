@@ -71,7 +71,7 @@ fn main() {
     let mut reductions: Vec<MergeReduction> = do_vertice_fold_reduction(&mut graph);
     println!("{:?}", reductions);
     println!("{:?}", graph);
-    let mut independence_set: Vec<usize> = vec![1, 2, 3];
+    let mut independence_set: Vec<usize> = vec![0, 1, 3, 5];
     independence_set = transfer_independence_set(independence_set, &mut reductions);
     println!("{:?}", independence_set);
 }
