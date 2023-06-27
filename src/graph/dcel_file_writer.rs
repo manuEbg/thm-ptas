@@ -261,7 +261,7 @@ impl WebFileWriter for Dcel {
            js_faces.push(JsFace::new(i, arcs_per_faces[i].clone(), verts_per_face[i].clone()));
         }
 
-        let rings = &self.cut_rings(5).unwrap();
+        let rings = &self.find_rings(5).unwrap();
 
         let ring_array = rings
             .iter()

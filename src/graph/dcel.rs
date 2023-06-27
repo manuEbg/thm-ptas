@@ -281,11 +281,11 @@ impl Dcel {
     }
 
 
-    pub fn cut_rings(&self, k: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
+    pub fn find_rings(&self, n: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
         let spanning_tree = self.spanning_tree(0);
 
-        for n in 1..(k+1) {
+        for depth in 1..(n+1) {
             let mut visited = vec![false; self.vertices.len()];
 
             let mut builder = SubDcelBuilder::new(self);
@@ -295,7 +295,7 @@ impl Dcel {
                 let src_level = spanning_tree.vertex_level()[arc.src()];
 
                 /* Is this vertex part of the ring? */
-                if src_level == n && !visited[arc.src()] {
+                if src_level == depth && !visited[arc.src()] {
                     visited[arc.src()] = true;
 
                     let outgoing_arcs = self.arcs().iter().filter(|a| a.src() == arc.src()).collect::<Vec<_>>();
@@ -303,7 +303,7 @@ impl Dcel {
 
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
-                        if dst_level == n && !visited[outgoing_arc.dst()] {
+                        if dst_level == depth && !visited[outgoing_arc.dst()] {
                             //println!("{:?} {:?}", arc.get_src(), outgoing_arc.get_dst());
                             // builder.push_arc(arc.src(), outgoing_arc.dst());
                             // builder.push_arc(outgoing_arc.dst(), arc.src());
