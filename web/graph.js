@@ -110,14 +110,13 @@ class Graph {
     this.spanningTreeVisible = false;
     this.id = id;
     this.timeout = timeout;
-    this.nextFace = 0;
-    this.prevFace = 0;
+    this.currentFace = -1;
 
     this.currentRing = -1;
 
     this.layout = layout;
 
-    const SCALING = 1000;
+    const SCALING = 10000;
 
     this.layout.forEach((v) => {
       this.vertices[v.id].position = {
@@ -186,21 +185,49 @@ class Graph {
     
     });
   }
+  
+  addClassToElement(el, className){
+    this.cy.getElementById(el).addClass(className);
+  }
 
-  highlightNextFace(){
+  removeClassFromElement(el, className){
+    this.cy.getElementById(el).removeClass(className);
+  }
+
+  addClassTo(item, className){
     let self = this;
-    self.lowlightFace(self.prevFace);
-    if (self.nextFace < self.faces.length){
-      self.highlightFace(self.nextFace);
-      self.prevFace = self.nextFace;
-      self.nextFace++;
-    } else {
-      self.nextFace = 0;
-    } 
+    if(Array.isArray(item)){
+      item.forEach( e => self.addClassToElement(e, className));
+      return;
+    }
+    self.addClassToElement(item, className);
+  }
+
+  removeClassFrom(item, className){
+    let self = this;
+    if(Array.isArray(item)){
+      item.forEach( e => self.removeClassFromElement(e, className));
+      return;
+    }
+    self.removeClassFromElement(item, className);
+  }
+
+  highlightNextFace(up = true){
+    let self = this;
+    let lastFace = self.currentFace;
+    if(up)self.currentFace++;
+    else self.currentFace--;
+    if(self.currentFace == -2) self.currentFace = self.faces.length - 1;
+    else if(self.currentFace >= self.faces.length) self.currentFace = -1;
+    if(lastFace >= 0) self.lowlightFace(lastFace);
+    if (self.currentFace >= 0){
+      self.highlightFace(self.currentFace);
+    }
+    console.log("Highlighting Face " + self.currentFace);
   }  
   
   lowlight(id){
-    this.cy.getElementById(id).removeClass('highlighted');
+    this.removeClassFrom(id, 'highlighted');
   }
   
   highlightFace(idx){
@@ -209,6 +236,7 @@ class Graph {
     self.faces[idx].arcs.forEach(function(a){ self.highlight(a)});
     self.faces[idx].vertices.forEach(v => self.highlight(v));
   }
+
   lowlightFace(idx){
     let self = this;
     self.lowlight(self.dualgraph.vertices[idx].data.id);
@@ -218,17 +246,13 @@ class Graph {
 
   showSpanningTree(){
     let self = this;
-    self.spanningTree.forEach(el => {
-      this.cy.getElementById(el).addClass('spanning-tree');
-    });
+    self.addClassTo(self.spanningTree,'spanning-tree');
     self.spanningTreeVisible = true;
   }
 
   hideSpanningTree(){
     let self = this;
-    self.spanningTree.forEach(el => {
-      this.cy.getElementById(el).removeClass('spanning-tree');
-    });
+    self.removeClassFrom(self.spanningTree, 'spanning-tree');
     self.spanningTreeVisible = false;
   }
 
