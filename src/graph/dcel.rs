@@ -82,7 +82,7 @@ impl<'a> SubDcelBuilder<'a> {
         self.vertex_mapping.push(v);
         self.last_vertex_id += 1;
 
-        return self.last_vertex_id - 1;
+        self.last_vertex_id - 1
     }
 
     pub fn push_arc(&mut self, a: &arc::Arc) {
@@ -115,6 +115,13 @@ pub struct Dcel {
     faces: Vec<Face>,
     arc_set: HashSet<String>,
     pre_triangulation_arc_count: usize,
+}
+
+enum FaceInfo {
+    Twins,
+    Triangle,
+    TriangulatedFace,
+    NotTriangulated,
 }
 
 impl Dcel {
@@ -211,58 +218,64 @@ impl Dcel {
         self.pre_triangulation_arc_count = self.num_arcs();
         let count = self.num_faces();
         for f in 0..count {
-            while self.triangulate_face(f) {}
+            loop {
+                if let FaceInfo::TriangulatedFace = self.triangulate_next_triangle(f) {
+                    break;
+                }
+            }
         }
     }
 
-    fn triangulate_face(&mut self, f: FaceId) -> bool {
+    fn triangulate_next_triangle(&mut self, f: FaceId) -> FaceInfo {
         let face = self.face(f);
-
         let mut face_iter = FaceIterator::new(self, face.start_arc());
-
-        let whatever = face_iter.next();
-        match whatever {
-            Some((mut a1, mut arc1)) => {
-                let mut a3 = 0;
-                for (a2, arc2) in face_iter {
-                    match self.triangle(arc1, arc2) {
-                        Some(result) => {
-                            if result {
-                                a3 = a2;
-                                break;
-                            }
+        let start = face_iter.next();
+        match start {
+            Some((mut a1, _)) => {
+                for (a2, _) in face_iter {
+                    match self.face_information(a1, a2) {
+                        FaceInfo::Twins | FaceInfo::Triangle => {
+                            a1 = a2;
+                            println!("1");
                         }
-                        None => {
-                            return false;
+                        FaceInfo::TriangulatedFace => {
+                            println!("3");
+                            return FaceInfo::TriangulatedFace;
+                        }
+                        FaceInfo::NotTriangulated => {
+                            self.close_triangle(a1, a2);
+                            println!("2");
+                            return FaceInfo::NotTriangulated;
                         }
                     }
-                    arc1 = arc2;
-                    a1 = a2;
                 }
-                self.close_triangle(a1, a3);
-                true
+                panic!("FACE {} HAS ONLY ONE EDGE", f);
             }
             None => {
-                panic!("FACE IS EMPTY!")
+                panic!("FACE {} IS EMPTY", f);
             }
         }
     }
 
-    fn triangle(&self, a1: &Arc, a2: &Arc) -> Option<bool> {
-        let a = a1.src();
-        let b = a1.dst();
-        let c = a2.dst();
-        let d = self.arc(a2.next()).dst();
-
-        if a == d {
-            return None;
+    fn face_information(&self, a: ArcId, b: ArcId) -> FaceInfo {
+        let arc_a = self.arc(a);
+        let arc_b = self.arc(b);
+        if arc_a.next() != b {
+            panic!(
+                "Arcs a {} and b {} need to be the be consecutive arcs of the same face",
+                a, b
+            )
+        };
+        if arc_a.twin() == b {
+            return FaceInfo::Twins;
+        } else if arc_b.next() == arc_a.prev() {
+            return FaceInfo::TriangulatedFace;
         }
 
-        if self.has_arc(a, c) || a == c {
-            //check next arc
-            return Some(false);
+        if self.has_arc(arc_b.dst(), arc_a.src()) {
+            return FaceInfo::Triangle;
         }
-        Some(true)
+        FaceInfo::NotTriangulated
     }
 
     fn close_triangle(&mut self, a1: ArcId, a2: ArcId) {
