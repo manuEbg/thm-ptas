@@ -1,5 +1,5 @@
-use super::dcel::*;
 use super::dcel::spanning_tree::SpanningTree;
+use super::dcel::*;
 use super::dual_graph::DualGraph;
 use super::Dcel;
 use std::fs::File;
@@ -62,11 +62,17 @@ struct JsArc {
     id: usize,
     src: usize,
     dst: usize,
+    is_added: bool,
 }
 
 impl JsArc {
-    pub fn new(id: usize, src: usize, dst: usize) -> Self {
-        Self { id, src, dst }
+    fn new(id: usize, src: usize, dst: usize, is_added: bool) -> Self {
+        Self {
+            id,
+            src,
+            dst,
+            is_added,
+        }
     }
 }
 
@@ -88,6 +94,12 @@ pub trait WebFileWriter {
             write!(*file, "\t")?;
         }
         Ok(())
+    }
+}
+
+impl WebFileWriter for bool {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        write!(*file, "{}", self)
     }
 }
 
@@ -185,6 +197,7 @@ impl WebFileWriter for JsArc {
                     JsValue::new("id", &id),
                     JsValue::new("source", &self.src),
                     JsValue::new("target", &self.dst),
+                    JsValue::new("is_added", &self.is_added),
                 ],
             },
         }
@@ -210,7 +223,7 @@ impl<'a> WebFileWriter for DualGraph<'a> {
 
             for (v, adj) in dg.get_adjacent().iter().enumerate() {
                 for u in adj.iter() {
-                    arcs.push(JsArc::new(arc_count, v, *u));
+                    arcs.push(JsArc::new(arc_count, v, *u, false));
                     arc_count += 1;
                 }
             }
@@ -244,35 +257,37 @@ impl WebFileWriter for Dcel {
             .arcs()
             .iter()
             .enumerate()
-            .map(|(i, a)| JsArc::new(i, a.src(), a.dst()))
+            .map(|(i, a)| JsArc::new(i, a.src(), a.dst(), i >= self.pre_triangulation_arc_count()))
             .collect();
         let faces = self.faces();
-        let arcs_per_faces: Vec<Vec<usize>> = faces.iter().map(|face| face.walk_face(self)).collect();
+        let arcs_per_faces: Vec<Vec<usize>> =
+            faces.iter().map(|face| face.walk_face(self)).collect();
         let verts_per_face: Vec<Vec<usize>> = arcs_per_faces
             .iter()
-            .map(|arcs| {
-                arcs.iter()
-                    .map(|arc| self.arc(*arc).src())
-                    .collect()
-            })
+            .map(|arcs| arcs.iter().map(|arc| self.arc(*arc).src()).collect())
             .collect();
         let mut js_faces = vec![];
         for (i, _) in faces.iter().enumerate() {
-           js_faces.push(JsFace::new(i, arcs_per_faces[i].clone(), verts_per_face[i].clone()));
+            js_faces.push(JsFace::new(
+                i,
+                arcs_per_faces[i].clone(),
+                verts_per_face[i].clone(),
+            ));
         }
 
         let rings = &self.find_rings(5).unwrap();
 
         let ring_array = rings
             .iter()
-            .map(|ring| ring
-                    .sub
+            .map(|ring| {
+                ring.sub
                     .arcs()
                     .iter()
                     .enumerate()
                     .map(|(i, _)| *ring.get_original_arc(i).unwrap())
                     .collect::<Vec<_>>()
-            ).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         file.write_all(b"let data = ")?;
         JsObject {
@@ -283,9 +298,11 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &dual_graph),
-                    JsValue::new("rings", &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()))
+                    JsValue::new(
+                        "rings",
+                        &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
+                    ),
                 ],
-                
             },
         }
         .write_to_file(file, id, level)

@@ -3,17 +3,14 @@ pub mod face;
 pub mod spanning_tree;
 pub mod vertex;
 
-
 use std::{collections::HashSet, error::Error};
 
 use self::face::FaceIterator;
 use super::iterators::bfs::BfsIter;
-use crate::graph::{dcel::spanning_tree::SpanningTree, builder::dcel_builder::DcelBuilder};
+use crate::graph::{builder::dcel_builder::DcelBuilder, dcel::spanning_tree::SpanningTree};
 use arc::{Arc, ArcId};
 use face::{Face, FaceId};
 use vertex::{Vertex, VertexId};
-
-
 
 #[derive(Debug)]
 pub struct SubDcel<'a> {
@@ -24,8 +21,18 @@ pub struct SubDcel<'a> {
 }
 
 impl<'a> SubDcel<'a> {
-    pub fn new(dcel: &'a Dcel, sub: Dcel, arc_mapping: Vec<arc::ArcId>, vertex_mapping: Vec<vertex::VertexId>) -> Self {
-        Self { dcel, sub, arc_mapping, vertex_mapping }
+    pub fn new(
+        dcel: &'a Dcel,
+        sub: Dcel,
+        arc_mapping: Vec<arc::ArcId>,
+        vertex_mapping: Vec<vertex::VertexId>,
+    ) -> Self {
+        Self {
+            dcel,
+            sub,
+            arc_mapping,
+            vertex_mapping,
+        }
     }
 
     pub fn get_original_arc(&self, a: arc::ArcId) -> Option<&arc::ArcId> {
@@ -47,12 +54,18 @@ pub struct SubDcelBuilder<'a> {
     pub dcel_builder: DcelBuilder,
     pub vertex_mapping: Vec<vertex::VertexId>,
     pub arc_mapping: Vec<arc::ArcId>,
-    pub last_vertex_id: vertex::VertexId
+    pub last_vertex_id: vertex::VertexId,
 }
 
 impl<'a> SubDcelBuilder<'a> {
     pub fn new(dcel: &'a Dcel) -> Self {
-        Self { dcel, dcel_builder: DcelBuilder::new(), vertex_mapping: vec![], arc_mapping: vec![], last_vertex_id: 0 }
+        Self {
+            dcel,
+            dcel_builder: DcelBuilder::new(),
+            vertex_mapping: vec![],
+            arc_mapping: vec![],
+            last_vertex_id: 0,
+        }
     }
 
     /* Returns the mapped vertex id */
@@ -69,7 +82,7 @@ impl<'a> SubDcelBuilder<'a> {
         self.vertex_mapping.push(v);
         self.last_vertex_id += 1;
 
-        return self.last_vertex_id-1;
+        return self.last_vertex_id - 1;
     }
 
     pub fn push_arc(&mut self, a: &arc::Arc) {
@@ -101,6 +114,7 @@ pub struct Dcel {
     arcs: Vec<Arc>,
     faces: Vec<Face>,
     arc_set: HashSet<String>,
+    pre_triangulation_arc_count: usize,
 }
 
 impl Dcel {
@@ -110,6 +124,7 @@ impl Dcel {
             arcs: vec![],
             faces: vec![],
             arc_set: HashSet::new(),
+            pre_triangulation_arc_count: 0,
         }
     }
 
@@ -193,6 +208,7 @@ impl Dcel {
     }
 
     pub fn triangulate(&mut self) {
+        self.pre_triangulation_arc_count = self.num_arcs();
         let count = self.num_faces();
         for f in 0..count {
             while self.triangulate_face(f) {}
@@ -280,12 +296,11 @@ impl Dcel {
         self.vertices[arc.src()].push_arc(id);
     }
 
-
     pub fn find_rings(&self, n: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
         let spanning_tree = self.spanning_tree(0);
 
-        for depth in 1..(n+1) {
+        for depth in 1..(n + 1) {
             let mut visited = vec![false; self.vertices.len()];
 
             let mut builder = SubDcelBuilder::new(self);
@@ -298,9 +313,12 @@ impl Dcel {
                 if src_level == depth && !visited[arc.src()] {
                     visited[arc.src()] = true;
 
-                    let outgoing_arcs = self.arcs().iter().filter(|a| a.src() == arc.src()).collect::<Vec<_>>();
+                    let outgoing_arcs = self
+                        .arcs()
+                        .iter()
+                        .filter(|a| a.src() == arc.src())
+                        .collect::<Vec<_>>();
                     for outgoing_arc in outgoing_arcs {
-
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
                         if dst_level == depth && !visited[outgoing_arc.dst()] {
@@ -319,15 +337,26 @@ impl Dcel {
             /* This probably very slow */
             for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
                 for (main_arc_idx, main_arc) in self.arcs.iter().enumerate() {
-                    if builder.vertex_mapping[sub_arc.src()] == main_arc.src() && builder.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
+                    if builder.vertex_mapping[sub_arc.src()] == main_arc.src()
+                        && builder.vertex_mapping[sub_arc.dst()] == main_arc.dst()
+                    {
                         arc_mapping[sub_arc_idx] = main_arc_idx;
                     }
                 }
             }
 
-            result.push(SubDcel { dcel: self, sub: final_dcel, arc_mapping, vertex_mapping: builder.vertex_mapping });
+            result.push(SubDcel {
+                dcel: self,
+                sub: final_dcel,
+                arc_mapping,
+                vertex_mapping: builder.vertex_mapping,
+            });
         }
 
         Ok(result)
+    }
+
+    pub fn pre_triangulation_arc_count(&self) -> usize {
+        self.pre_triangulation_arc_count
     }
 }
