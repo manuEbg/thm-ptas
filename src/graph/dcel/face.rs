@@ -2,7 +2,7 @@ use super::{Arc, ArcId, Dcel};
 
 pub type FaceId = usize;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Face {
     start_arc: ArcId,
 }

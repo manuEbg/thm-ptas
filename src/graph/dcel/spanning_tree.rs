@@ -7,6 +7,7 @@ pub struct SpanningTree<'a> {
     contains_arc: Vec<bool>,
     vertex_level: Vec<usize>,
     arcs: Vec<ArcId>,
+    max_level: usize
 }
 
 impl<'a> SpanningTree<'a> {
@@ -16,6 +17,7 @@ impl<'a> SpanningTree<'a> {
             contains_arc: vec![false; dcel.num_arcs()],
             arcs: vec![],
             vertex_level: vec![0; dcel.num_vertices()],
+            max_level: 0
         }
     }
 
@@ -29,6 +31,9 @@ impl<'a> SpanningTree<'a> {
                 self.arcs.push(a);
                 self.arcs.push(twin);
                 self.vertex_level[it.vertex] = it.level;
+                if it.level > self.max_level {
+                    self.max_level = it.level;
+                }
             }
         }
     }
@@ -51,5 +56,9 @@ impl<'a> SpanningTree<'a> {
 
     pub fn vertex_level(&self) -> &[usize] {
         self.vertex_level.as_ref()
+    }
+
+    pub fn max_level(&self) -> usize {
+        self.max_level
     }
 }

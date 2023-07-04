@@ -15,16 +15,16 @@ use vertex::{Vertex, VertexId};
 
 
 
-#[derive(Debug)]
-pub struct SubDcel<'a> {
-    pub dcel: &'a Dcel,
+#[derive(Clone, Debug)]
+pub struct SubDcel {
+    pub dcel: Dcel,
     pub sub: Dcel,
     pub arc_mapping: Vec<arc::ArcId>,
     pub vertex_mapping: Vec<vertex::VertexId>,
 }
 
-impl<'a> SubDcel<'a> {
-    pub fn new(dcel: &'a Dcel, sub: Dcel, arc_mapping: Vec<arc::ArcId>, vertex_mapping: Vec<vertex::VertexId>) -> Self {
+impl SubDcel {
+    pub fn new(dcel: Dcel, sub: Dcel, arc_mapping: Vec<arc::ArcId>, vertex_mapping: Vec<vertex::VertexId>) -> Self {
         Self { dcel, sub, arc_mapping, vertex_mapping }
     }
 
@@ -42,16 +42,16 @@ impl<'a> SubDcel<'a> {
 }
 
 #[derive(Debug)]
-pub struct SubDcelBuilder<'a> {
-    pub dcel: &'a Dcel,
+pub struct SubDcelBuilder {
+    pub dcel: Dcel,
     pub dcel_builder: DcelBuilder,
     pub vertex_mapping: Vec<vertex::VertexId>,
     pub arc_mapping: Vec<arc::ArcId>,
     pub last_vertex_id: vertex::VertexId
 }
 
-impl<'a> SubDcelBuilder<'a> {
-    pub fn new(dcel: &'a Dcel) -> Self {
+impl SubDcelBuilder {
+    pub fn new(dcel: Dcel) -> Self {
         Self { dcel, dcel_builder: DcelBuilder::new(), vertex_mapping: vec![], arc_mapping: vec![], last_vertex_id: 0 }
     }
 
@@ -79,23 +79,24 @@ impl<'a> SubDcelBuilder<'a> {
         self.dcel_builder.push_arc(dst, src);
     }
 
-    // pub fn build(&mut self) -> Result<SubDcel, Box<dyn Error>> {
-    //     let final_dcel = self.dcel_builder.build();
-    //     let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
-    //     /* This probably very slow */
-    //     for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
-    //         for (main_arc_idx, main_arc) in self.dcel.arcs.iter().enumerate() {
-    //             if self.vertex_mapping[sub_arc.src()] == main_arc.src() && self.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
-    //                 arc_mapping[sub_arc_idx] = main_arc_idx;
-    //             }
-    //         }
-    //     }
+    pub fn build(&mut self) -> Result<SubDcel, Box<dyn Error>> {
+        let final_dcel = self.dcel_builder.build();
+        let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
 
-    //     Ok(SubDcel { dcel: &self.dcel, sub: final_dcel, arc_mapping, vertex_mapping: self.vertex_mapping.clone() })
-    // }
+        /* This probably very slow */
+        for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
+            for (main_arc_idx, main_arc) in self.dcel.arcs.iter().enumerate() {
+                if self.vertex_mapping[sub_arc.src()] == main_arc.src() && self.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
+                    arc_mapping[sub_arc_idx] = main_arc_idx;
+                }
+            }
+        }
+
+        Ok(SubDcel::new(self.dcel.clone(), final_dcel, arc_mapping, self.vertex_mapping.clone()))
+    }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Dcel {
     vertices: Vec<Vertex>,
     arcs: Vec<Arc>,
@@ -280,7 +281,6 @@ impl Dcel {
         self.vertices[arc.src()].push_arc(id);
     }
 
-
     pub fn find_rings(&self, n: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
         let spanning_tree = self.spanning_tree(0);
@@ -288,7 +288,7 @@ impl Dcel {
         for depth in 1..(n+1) {
             let mut visited = vec![false; self.vertices.len()];
 
-            let mut builder = SubDcelBuilder::new(self);
+            let mut builder = SubDcelBuilder::new(self.clone());
 
             for spanning_arc in spanning_tree.arcs() {
                 let arc = self.arc(*spanning_arc);
@@ -300,34 +300,55 @@ impl Dcel {
 
                     let outgoing_arcs = self.arcs().iter().filter(|a| a.src() == arc.src()).collect::<Vec<_>>();
                     for outgoing_arc in outgoing_arcs {
-
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
                         if dst_level == depth && !visited[outgoing_arc.dst()] {
-                            //println!("{:?} {:?}", arc.get_src(), outgoing_arc.get_dst());
-                            // builder.push_arc(arc.src(), outgoing_arc.dst());
-                            // builder.push_arc(outgoing_arc.dst(), arc.src());
-
                             builder.push_arc(outgoing_arc);
                         }
                     }
                 }
             }
 
-            let final_dcel = builder.dcel_builder.build();
-            let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
-            /* This probably very slow */
-            for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
-                for (main_arc_idx, main_arc) in self.arcs.iter().enumerate() {
-                    if builder.vertex_mapping[sub_arc.src()] == main_arc.src() && builder.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
-                        arc_mapping[sub_arc_idx] = main_arc_idx;
-                    }
-                }
-            }
-
-            result.push(SubDcel { dcel: self, sub: final_dcel, arc_mapping, vertex_mapping: builder.vertex_mapping });
+            let resulting_sub_dcel = builder.build()?;
+            result.push(resulting_sub_dcel);
         }
 
         Ok(result)
+    }
+
+    pub fn collect_donut(&self, start: usize, end: usize) -> Result<SubDcel, Box<dyn Error>> {
+        let spanning_tree = self.spanning_tree(0);
+
+        if end > spanning_tree.max_level() {
+            return Err("Donut is out of bounds".into());
+        }
+
+        let mut visited = vec![false; self.vertices.len()];
+        let mut builder = SubDcelBuilder::new(self.clone());
+
+        for vertex in 0..self.vertices().len() {
+            let vertex_depth = spanning_tree.vertex_level()[vertex];
+
+            if vertex_depth >= start && vertex_depth < end && !visited[vertex] {
+                /* This vertex is part of the donut, so add all its associated arcs in the
+                 * donut */
+                let outgoing_arcs = self
+                    .arcs()
+                    .iter()
+                    .filter(|a| a.src() == vertex)
+                    .filter(|a| !visited[a.dst()])
+                    .filter(|a| spanning_tree.vertex_level()[a.dst()] >= start && spanning_tree.vertex_level()[a.dst()] < end)
+                    .collect::<Vec<_>>();
+
+                for arc in outgoing_arcs {
+                    builder.push_arc(arc);
+                }
+
+                visited[vertex] = true;
+            }
+        }
+
+        let sub_dcel = builder.build()?;
+        Ok(sub_dcel)
     }
 }
