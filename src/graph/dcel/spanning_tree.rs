@@ -7,7 +7,7 @@ pub struct SpanningTree<'a> {
     contains_arc: Vec<bool>,
     vertex_level: Vec<usize>,
     arcs: Vec<ArcId>,
-    max_level: usize
+    max_level: usize,
 }
 
 impl<'a> SpanningTree<'a> {
@@ -17,7 +17,7 @@ impl<'a> SpanningTree<'a> {
             contains_arc: vec![false; dcel.num_arcs()],
             arcs: vec![],
             vertex_level: vec![0; dcel.num_vertices()],
-            max_level: 0
+            max_level: 0,
         }
     }
 
