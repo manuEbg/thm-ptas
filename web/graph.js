@@ -106,6 +106,8 @@ class Graph {
     });
 
     this.ringArcs = obj.rings.map(r => r.map(a=> "a" + a));
+    this.currentRing = -1
+    this.previousRing = -1
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
@@ -114,11 +116,9 @@ class Graph {
     this.timeout = timeout;
     this.currentFace = -1;
 
-    this.currentRing = -1;
-
     this.layout = layout;
 
-    const SCALING = 10000;
+    const SCALING = 500;
 
     this.layout.forEach((v) => {
       this.vertices[v.id].position = {
@@ -299,21 +299,36 @@ class Graph {
     else self.showSpanningTree();
   }
 
-  highlightRing(lvl){
+  highlightPrevRing() {
+    this.previousRing = this.currentRing;
+    this.currentRing--;
+    if (this.currentRing < 0) {
+      this.currentRing = this.ringArcs.length-1;
+    }
+
+    this.highlightCurrentRing();
+  }
+
+  highlightNextRing() {
+    this.previousRing = this.currentRing;
+    this.currentRing++;
+    if (this.currentRing >= this.ringArcs.length) {
+      this.currentRing = 0;
+    }
+
+    this.highlightCurrentRing();
+  }
+
+  highlightCurrentRing(){
     let self = this;
 
-    if(this.currentRing != -1) {
-      self.ringArcs[this.currentRing].forEach(el => {
+    if(this.previousRing != -1) {
+      self.ringArcs[this.previousRing].forEach(el => {
         this.cy.getElementById(el).removeClass('red');
       })
     }
 
-    if (lvl == this.currentRing) {
-      this.currentRing = -1;
-      return;
-    }
-    this.currentRing = lvl;
-    self.ringArcs[lvl].forEach(el => {
+    self.ringArcs[this.currentRing].forEach(el => {
       this.cy.getElementById(el).addClass('red');
     })
   }

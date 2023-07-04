@@ -275,7 +275,7 @@ impl WebFileWriter for Dcel {
             ));
         }
 
-        let rings = &self.find_rings(5).unwrap();
+        let rings = &self.find_rings().unwrap();
 
         let ring_array = rings
             .iter()
