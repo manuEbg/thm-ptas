@@ -7,20 +7,20 @@ use fxhash::FxHashSet;
 impl From<&DualGraph<'_>> for TreeDecomposition {
     fn from(dual_graph: &DualGraph) -> Self {
         let dcel = dual_graph.get_dcel();
-        let faces = &dcel.get_faces();
+        let faces = &dcel.faces();
         let mut result = TreeDecomposition {
             bags: vec![],
             root: None,
             max_bag_size: faces
                 .iter()
                 .map(|face| face.walk_face(dcel).len())
-                .fold(0, |max, v| Ord::max(max, v)),
+                .fold(0, Ord::max),
         };
 
         for face in *faces {
             let mut vertices: FxHashSet<usize> = FxHashSet::default();
             for arc in face.walk_face(&dcel) {
-                vertices.insert(dcel.get_arc(arc).get_src());
+                vertices.insert(dcel.arc(arc).src());
             }
             result.add_bag(vertices);
         }
@@ -47,7 +47,7 @@ impl NiceTreeDecomposition for TreeDecomposition {
 
         for bag in self.bags.iter() {
             let mut pred_id = bag.id;
-            let vertices = bag.vertex_set.iter().map(|v| *v).collect::<Vec<usize>>();
+            let vertices = bag.vertex_set.iter().copied().collect::<Vec<usize>>();
 
             for i in (0..bag.vertex_set.len()).rev() {
                 let mut vs: FxHashSet<usize> = FxHashSet::default();
@@ -67,7 +67,7 @@ impl NiceTreeDecomposition for TreeDecomposition {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::graph::dcel::SpanningTree;
+    use crate::graph::dcel::spanning_tree::SpanningTree;
     use crate::read_graph_file;
 
     #[test]

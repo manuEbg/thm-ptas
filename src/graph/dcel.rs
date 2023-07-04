@@ -20,10 +20,19 @@ pub struct SubDcel {
     pub vertex_mapping: Vec<vertex::VertexId>,
 }
 
-
 impl SubDcel {
-    pub fn new(dcel: Dcel, sub: Dcel, arc_mapping: Vec<arc::ArcId>, vertex_mapping: Vec<vertex::VertexId>) -> Self {
-        Self { dcel, sub, arc_mapping, vertex_mapping }
+    pub fn new(
+        dcel: Dcel,
+        sub: Dcel,
+        arc_mapping: Vec<arc::ArcId>,
+        vertex_mapping: Vec<vertex::VertexId>,
+    ) -> Self {
+        Self {
+            dcel,
+            sub,
+            arc_mapping,
+            vertex_mapping,
+        }
     }
 
     pub fn get_original_arc(&self, a: arc::ArcId) -> Option<&arc::ArcId> {
@@ -48,10 +57,15 @@ pub struct SubDcelBuilder {
     pub last_vertex_id: vertex::VertexId,
 }
 
-
 impl SubDcelBuilder {
     pub fn new(dcel: Dcel) -> Self {
-        Self { dcel, dcel_builder: DcelBuilder::new(), vertex_mapping: vec![], arc_mapping: vec![], last_vertex_id: 0 }
+        Self {
+            dcel,
+            dcel_builder: DcelBuilder::new(),
+            vertex_mapping: vec![],
+            arc_mapping: vec![],
+            last_vertex_id: 0,
+        }
     }
 
     /* Returns the mapped vertex id */
@@ -68,7 +82,7 @@ impl SubDcelBuilder {
         self.vertex_mapping.push(v);
         self.last_vertex_id += 1;
 
-        return self.last_vertex_id - 1;
+        self.last_vertex_id - 1
     }
 
     pub fn push_arc(&mut self, a: &arc::Arc) {
@@ -85,13 +99,20 @@ impl SubDcelBuilder {
         /* This probably very slow */
         for (sub_arc_idx, sub_arc) in final_dcel.arcs.iter().enumerate() {
             for (main_arc_idx, main_arc) in self.dcel.arcs.iter().enumerate() {
-                if self.vertex_mapping[sub_arc.src()] == main_arc.src() && self.vertex_mapping[sub_arc.dst()] == main_arc.dst() {
+                if self.vertex_mapping[sub_arc.src()] == main_arc.src()
+                    && self.vertex_mapping[sub_arc.dst()] == main_arc.dst()
+                {
                     arc_mapping[sub_arc_idx] = main_arc_idx;
                 }
             }
         }
 
-        Ok(SubDcel::new(self.dcel.clone(), final_dcel, arc_mapping, self.vertex_mapping.clone()))
+        Ok(SubDcel::new(
+            self.dcel.clone(),
+            final_dcel,
+            arc_mapping,
+            self.vertex_mapping.clone(),
+        ))
     }
 }
 
@@ -342,7 +363,10 @@ impl Dcel {
                     .iter()
                     .filter(|a| a.src() == vertex)
                     .filter(|a| !visited[a.dst()])
-                    .filter(|a| spanning_tree.vertex_level()[a.dst()] >= start && spanning_tree.vertex_level()[a.dst()] < end)
+                    .filter(|a| {
+                        spanning_tree.vertex_level()[a.dst()] >= start
+                            && spanning_tree.vertex_level()[a.dst()] < end
+                    })
                     .collect::<Vec<_>>();
 
                 for arc in outgoing_arcs {
