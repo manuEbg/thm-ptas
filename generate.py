@@ -5,6 +5,7 @@
 #   NODE_PROBABILITY: probability that a node gets edges associated
 #   EDGE_PROBABILITY: probability that a edge is created
 
+
 import json
 import matplotlib.pyplot as plt
 import networkx as nx
@@ -62,6 +63,7 @@ with open(outfile, "w", encoding="utf-8") as f:
 
 print(f"Edges: {int(len(embedding.edges()) / 2)}")
 print(f"Output in '{outfile}'.")
+
 
 layout = nx.planar_layout(embedding)
 
