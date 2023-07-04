@@ -317,11 +317,11 @@ impl Dcel {
         self.vertices[arc.src()].push_arc(id);
     }
 
-    pub fn find_rings(&self, n: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
+    pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
         let spanning_tree = self.spanning_tree(0);
 
-        for depth in 1..(n + 1) {
+        for depth in 1..(spanning_tree.max_level()+1) {
             let mut visited = vec![false; self.vertices.len()];
 
             let mut builder = SubDcelBuilder::new(self.clone());
