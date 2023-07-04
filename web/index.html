@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.24.0/cytoscape.min.js" integrity="sha512-RNg7R9mgoEi0QKVP6HktZpG8CwaojI4YVO9UiI+GXnfC2Bif3/7vcJDim9NZ3ZZuhFGEwuGzmnHwXMOAzjM2qw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <script src="graph.js"></script>
     <script src="../data/test.js"></script>
+    <script src="../data/layout.js"></script>
 </head>
 
 <body>
@@ -21,10 +22,15 @@
     <div class="button-container">
       <button type="button" onclick="g.highlightNextFace()">Next face</button>
       <button type="button" onclick="g.toggleSpanningTree()">Spanning tree</button>
+      <button type="button" onclick="g.highlightRing(0)">View Ring 1</button>
+      <button type="button" onclick="g.highlightRing(1)">View Ring 2</button>
+      <button type="button" onclick="g.highlightRing(2)">View Ring 3</button>
+      <button type="button" onclick="g.highlightRing(3)">View Ring 4</button>
+      <button type="button" onclick="g.highlightRing(4)">View Ring 5</button>
     </div>
     
     <script>
-        let g = new Graph("graph", data, 100);
+        let g = new Graph("graph", data, layout, 100);
         g.draw();
     </script>
 </body>

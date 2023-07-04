@@ -42,6 +42,7 @@ let defaults = {
   ready: undefined, // callback on layoutready
   stop: undefined, // callback on layoutstop
   transform: function (node, position ){ return position; }, // transform a given node position. Useful for changing flow direction in discrete layouts 
+  faces: [],
 };
 
 function DefLayout( options ){
@@ -87,14 +88,14 @@ DefLayout.prototype.run = function(){
 
 
 class Graph {
-
-  constructor(id, data, timeout) {
+  constructor(id, data, layout, timeout) {
     var obj = data;
     this.vertices = obj.vertices.map(v => new Vertex(v));
     this.arcs = obj.arcs.map(a => new Arc(a));
     this.dualgraph = new Object();
     this.dualgraph.vertices = obj.dualgraph.vertices.map(v => new DualVertex(v));
     this.dualgraph.arcs = obj.dualgraph.arcs.map(a => new DualArc(a))
+
 
     this.faces = obj.faces;
     this.faces.forEach(f => {
@@ -103,6 +104,7 @@ class Graph {
       f.vertices = f.vertices.map(v => "v"+v);
     });
 
+    this.ringArcs = obj.rings.map(r => r.map(a=> "a" + a));
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
@@ -111,6 +113,18 @@ class Graph {
     this.nextFace = 0;
     this.prevFace = 0;
 
+    this.currentRing = -1;
+
+    this.layout = layout;
+
+    const SCALING = 1000;
+
+    this.layout.forEach((v) => {
+      this.vertices[v.id].position = {
+        x: v.x * SCALING,
+        y: -v.y * SCALING,
+      }
+    })
   }
 
   get_nodes(){
@@ -125,7 +139,7 @@ class Graph {
 
   draw() {
     let self = this;
-    cytoscape( 'layout', 'test', DefLayout ); 
+    //cytoscape( 'layout', 'test', DefLayout );
     self.cy = cytoscape({
       container: document.getElementById("graph"),
     
@@ -168,7 +182,7 @@ class Graph {
           edges: self.get_arcs()
         },
 
-      layout: {name: 'test'}
+      layout: {name: 'preset'}
     
     });
   }
@@ -222,6 +236,25 @@ class Graph {
     let self = this;
     if(self.spanningTreeVisible) self.hideSpanningTree();
     else self.showSpanningTree();
+  }
+
+  highlightRing(lvl){
+    let self = this;
+
+    if(this.currentRing != -1) {
+      self.ringArcs[this.currentRing].forEach(el => {
+        this.cy.getElementById(el).removeClass('highlighted');
+      })
+    }
+
+    if (lvl == this.currentRing) {
+      this.currentRing = -1;
+      return;
+    }
+    this.currentRing = lvl;
+    self.ringArcs[lvl].forEach(el => {
+      this.cy.getElementById(el).addClass('highlighted');
+    })
   }
 
 

@@ -5,6 +5,8 @@
 #   NODE_PROBABILITY: probability that a node gets edges associated
 #   EDGE_PROBABILITY: probability that a edge is created
 
+
+import json
 import matplotlib.pyplot as plt
 import networkx as nx
 import random
@@ -62,5 +64,23 @@ with open(outfile, "w", encoding="utf-8") as f:
 print(f"Edges: {int(len(embedding.edges()) / 2)}")
 print(f"Output in '{outfile}'.")
 
-nx.draw_networkx(embedding, pos=nx.planar_layout(embedding), with_labels=True)
+
+layout = nx.planar_layout(embedding)
+
+layout_json = []
+
+for vertex, position in layout.items():
+    x = position[0]
+    y = position[1]
+    layout_json.append({
+        'id': vertex,
+        'x': x,
+        'y': y,
+    })
+
+with open('./data/layout.js', 'w') as f:
+    f.write('let layout = ')
+    json.dump(layout_json, f)
+
+nx.draw_networkx(embedding, pos=layout, with_labels=True)
 plt.savefig('graph.pdf', format='pdf', bbox_inches='tight')
