@@ -4,6 +4,7 @@ class Arc{
       this.data.id = "a" + a.id;
       this.data.source = "v" + a.source;
       this.data.target = "v" + a.target;
+      this.is_added = a.is_added;
     } 
 }
 
@@ -91,7 +92,7 @@ class Graph {
   constructor(id, data, layout, timeout) {
     var obj = data;
     this.vertices = obj.vertices.map(v => new Vertex(v));
-    this.arcs = obj.arcs.map(a => new Arc(a));
+    this.arcs = obj.arcs.flatMap(a => new Arc(a));
     this.dualgraph = new Object();
     this.dualgraph.vertices = obj.dualgraph.vertices.map(v => new DualVertex(v));
     this.dualgraph.arcs = obj.dualgraph.arcs.map(a => new DualArc(a))
@@ -108,16 +109,16 @@ class Graph {
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
+    this.additionalEdgesHighlighted = false;
     this.id = id;
     this.timeout = timeout;
-    this.nextFace = 0;
-    this.prevFace = 0;
+    this.currentFace = -1;
 
     this.currentRing = -1;
 
     this.layout = layout;
 
-    const SCALING = 1000;
+    const SCALING = 10000;
 
     this.layout.forEach((v) => {
       this.vertices[v.id].position = {
@@ -153,28 +154,19 @@ class Graph {
           })
         .selector('edge')
           .style({
-            'curve-style': 'bezier',
+            'curve-style': 'straight',
             'target-arrow-shape': 'triangle',
             'width': 4,
             'line-color': '#ddd',
             'target-arrow-color': '#ddd'
           })
         .selector('.spanning-tree')
-          .style({
-            'background-color' : '#000000',
-            'line-color' : '#000000',
-            'target-arrow-color' : '#000000',
-            'transition-property': 'background-color, line-color, target-arrow-color',
-            'transition-duration': '0.5s'
-          })
-        .selector('.highlighted')
-          .style({ 
-            'background-color': '#61bffc',
-            'line-color': '#61bffc',
-            'target-arrow-color': '#61bffc',
-            'transition-property': 'background-color, line-color, target-arrow-color',
-            'transition-duration': '0.5s'
-          }),
+          .style(self.edgeStyleObject('#000000'))
+        .selector('edge.highlighted')
+          .style(self.edgeStyleObject('#61bffc'))
+        .selector('.red').style(self.edgeStyleObject("#ff0000"))
+        .selector('.green').style(self.edgeStyleObject('#00ff00'))
+        .selector('.pink').style(self.edgeStyleObject("#00ffff")),
     
       elements: {
           nodes: self.get_nodes(),
@@ -185,30 +177,74 @@ class Graph {
       layout: {name: 'preset'}
     
     });
+
+      }
+  
+  edgeStyleObject(colorCode){
+    return {
+      'background-color' : colorCode,
+      'line-color' : colorCode,
+      'target-arrow-color' : colorCode,
+      'width' : 50,
+      'transition-property' : 'background-color, line-color, target-arrow-color',
+      'transition-duration' : '0.5s'
+    }
+  }
+  addClassToElement(el, className){
+    this.cy.getElementById(el).addClass(className);
   }
 
-  highlightNextFace(){
+  removeClassFromElement(el, className){
+    this.cy.getElementById(el).removeClass(className);
+  }
+
+  addClassTo(item, className){
     let self = this;
-    self.lowlightFace(self.prevFace);
-    if (self.nextFace < self.faces.length){
-      self.highlightFace(self.nextFace);
-      self.prevFace = self.nextFace;
-      self.nextFace++;
-    } else {
-      self.nextFace = 0;
-    } 
+    if(Array.isArray(item)){
+      item.forEach( e => self.addClassToElement(e, className));
+      return;
+    }
+    self.addClassToElement(item, className);
+  }
+
+  removeClassFrom(item, className){
+    let self = this;
+    if(Array.isArray(item)){
+      item.forEach( e => self.removeClassFromElement(e, className));
+      return;
+    }
+    self.removeClassFromElement(item, className);
+  }
+
+  highlightNextFace(up = true){
+    let self = this;
+    let lastFace = self.currentFace;
+    if(up)self.currentFace++;
+    else self.currentFace--;
+    if(self.currentFace == -2) self.currentFace = self.faces.length - 1;
+    else if(self.currentFace >= self.faces.length) self.currentFace = -1;
+    if(lastFace >= 0) self.lowlightFace(lastFace);
+    if (self.currentFace >= 0){
+      self.highlightFace(self.currentFace);
+    }
+    console.log("Highlighting Face " + self.currentFace);
   }  
   
   lowlight(id){
-    this.cy.getElementById(id).removeClass('highlighted');
+    this.removeClassFrom(id, 'highlighted');
   }
-  
+
+  highlight(id){
+    this.cy.getElementById(id).addClass('highlighted');
+  }
+
   highlightFace(idx){
     let self = this;
     self.highlight(self.dualgraph.vertices[idx].data.id);
     self.faces[idx].arcs.forEach(function(a){ self.highlight(a)});
     self.faces[idx].vertices.forEach(v => self.highlight(v));
   }
+
   lowlightFace(idx){
     let self = this;
     self.lowlight(self.dualgraph.vertices[idx].data.id);
@@ -216,19 +252,44 @@ class Graph {
     self.faces[idx].vertices.forEach(v => self.lowlight(v));
   }
 
+  showAdditionalEdges(){
+    self = this;
+    self.arcs.forEach(a => {
+      if(a.is_added){
+        self.addClassToElement(a.data.id, "green");
+      }
+    })
+  }
+
+  hideAdditionalEdges(){
+    self = this;
+    self.arcs.forEach(a => {
+      if(a.is_added){
+        self.removeClassFromElement(a.data.id, "green");
+      }
+    })
+  }
+  
+  toggleAdditionalEdges(){
+    self = this;
+    self.additionalEdgesHighlighted = !self.additionalEdgesHighlighted;
+    if(self.additionalEdgesHighlighted){
+      self.showAdditionalEdges();  
+    } else {
+      self.hideAdditionalEdges();
+    }
+
+  }
+
   showSpanningTree(){
     let self = this;
-    self.spanningTree.forEach(el => {
-      this.cy.getElementById(el).addClass('spanning-tree');
-    });
+    self.addClassTo(self.spanningTree,'spanning-tree');
     self.spanningTreeVisible = true;
   }
 
   hideSpanningTree(){
     let self = this;
-    self.spanningTree.forEach(el => {
-      this.cy.getElementById(el).removeClass('spanning-tree');
-    });
+    self.removeClassFrom(self.spanningTree, 'spanning-tree');
     self.spanningTreeVisible = false;
   }
 
@@ -243,7 +304,7 @@ class Graph {
 
     if(this.currentRing != -1) {
       self.ringArcs[this.currentRing].forEach(el => {
-        this.cy.getElementById(el).removeClass('highlighted');
+        this.cy.getElementById(el).removeClass('red');
       })
     }
 
@@ -253,12 +314,8 @@ class Graph {
     }
     this.currentRing = lvl;
     self.ringArcs[lvl].forEach(el => {
-      this.cy.getElementById(el).addClass('highlighted');
+      this.cy.getElementById(el).addClass('red');
     })
   }
 
-
-  highlight(id){
-    this.cy.getElementById(id).addClass('highlighted');
-  }
 }
