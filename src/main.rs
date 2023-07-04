@@ -10,7 +10,7 @@ use graph::iterators::bfs::BfsIter;
 use graph::Dcel;
 use graph::DcelBuilder;
 
-fn read_graph_file(filename: &str) -> Result<Dcel, String> {
+pub fn read_graph_file(filename: &str) -> Result<Dcel, String> {
     return if let Ok(mut lines) = read_lines(filename) {
         let mut dcel_builder: DcelBuilder;
         if let Some(Ok(_)) = lines.next() {
@@ -64,4 +64,5 @@ fn main() {
     // dg.build();
 
     println!("{:?}", dcel);
+
 }

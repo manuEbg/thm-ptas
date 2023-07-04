@@ -1,7 +1,7 @@
 use super::ArcId;
 pub type VertexId = usize;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Vertex {
     arcs: Vec<ArcId>,
 }
