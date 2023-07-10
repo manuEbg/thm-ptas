@@ -57,7 +57,7 @@ fn main() {
     //let mut st =  SpanningTree::new(&dcel);
     // st.build(0);
 
-    dcel.triangulate();
+    //dcel.triangulate();
 
     write_web_file("data/test.js", &dcel);
     // let mut dg = DualGraph::new(&st);

@@ -5,6 +5,7 @@ use super::Dcel;
 use std::fs::File;
 use std::io::prelude::*;
 
+#[derive(Clone)]
 struct JsValue<'a> {
     name: &'a str,
     value: &'a dyn WebFileWriter,
@@ -212,9 +213,38 @@ impl<'a> WebFileWriter for SpanningTree<'a> {
     }
 }
 
+impl WebFileWriter for SubDcel {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        let mapped_arcs = self.get_untriangulated_arcs().iter().enumerate().map(|(i, _)| { *self.get_original_arc(i).unwrap() }).collect::<Vec<_>>();
+
+        let triangulated_arcs = self.get_triangulated_arcs().iter().map(|arc| {
+            let original_dst = self.get_original_vertex(arc.dst()).unwrap();
+            let original_src = self.get_original_vertex(arc.src()).unwrap();
+
+            JsValues::new(vec![
+                JsValue::new("dst", original_dst),
+                JsValue::new("src", original_src),
+            ])
+        })
+        .collect::<Vec<_>>();
+
+        let objs = triangulated_arcs.iter().map(|arcs| JsObject::new(arcs)).collect();
+
+        JsObject::new(&JsValues::new(vec![
+            JsValue::new(
+                "arcs",
+                &JsArray::new(&mapped_arcs),
+            ),
+            //JsValue::new("triangulated_arcs", &JsArray::new(&triangulated_arcs)),
+            JsValue::new("triangulated_arcs", &JsArray::new(&objs)),
+        ]))
+        .write_to_file(file, id, level)
+    }
+}
+
 impl<'a> WebFileWriter for DualGraph<'a> {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
-        fn build_js_vertecies(n: usize) -> Vec<JsVertex> {
+        fn build_js_verticies(n: usize) -> Vec<JsVertex> {
             (0..n).map(|id| JsVertex::new(id)).collect()
         }
         fn build_js_arcs(dg: &DualGraph) -> Vec<JsArc> {
@@ -233,7 +263,7 @@ impl<'a> WebFileWriter for DualGraph<'a> {
         JsObject::new(&JsValues::new(vec![
             JsValue::new(
                 "vertices",
-                &JsArray::new(&build_js_vertecies(self.num_vertices())),
+                &JsArray::new(&build_js_verticies(self.num_vertices())),
             ),
             JsValue::new("arcs", &JsArray::new(&build_js_arcs(self))),
         ]))
@@ -276,7 +306,6 @@ impl WebFileWriter for Dcel {
         }
 
         let rings = &self.find_rings().unwrap();
-
         let ring_array = rings
             .iter()
             .map(|ring| {
@@ -288,6 +317,8 @@ impl WebFileWriter for Dcel {
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
+
+        let donuts = &self.find_donuts_for_k(4).unwrap();
 
         file.write_all(b"let data = ")?;
         JsObject {
@@ -301,6 +332,10 @@ impl WebFileWriter for Dcel {
                     JsValue::new(
                         "rings",
                         &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
+                    ),
+                    JsValue::new(
+                        "donuts",
+                        &JsArray::new(&donuts)
                     ),
                 ],
             },

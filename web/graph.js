@@ -105,9 +105,18 @@ class Graph {
       f.vertices = f.vertices.map(v => "v"+v);
     });
 
-    this.ringArcs = obj.rings.map(r => r.map(a=> "a" + a));
+    this.ringArcs = obj.rings.map(r => r.map(a => "a" + a));
     this.currentRing = -1
     this.previousRing = -1
+
+    this.donuts = obj.donuts;
+    this.donuts.forEach((donut) => {
+      donut.arcElements = donut.arcs.map(a => "a"+a)
+    })
+
+    this.currentDonut = -1
+    this.previousDonut = -1
+    this.showTriangulatedDonutArcs = false;
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
     this.spanningTreeVisible = false;
@@ -135,6 +144,16 @@ class Graph {
 
   get_arcs(){
     let self = this;
+    if (this.currentDonut != -1 && this.showTriangulatedDonutArcs) {
+      let idx = 0;
+      const donutArcs = this.donuts[this.currentDonut].triangulated_arcs.map(a => (
+        { data: { id: "ta-"+(idx++), source: "v"+a.src, target: "v"+a.dst } }
+      ))
+      //console.log(this.donuts[this.currentDonut]);
+      //console.log(donutArcs);
+      return self.arcs.concat(self.dualgraph.arcs).concat(donutArcs);
+    }
+
     return self.arcs.concat(self.dualgraph.arcs);
   }
 
@@ -156,7 +175,7 @@ class Graph {
           .style({
             'curve-style': 'straight',
             'target-arrow-shape': 'triangle',
-            'width': 4,
+            'width': 1,
             'line-color': '#ddd',
             'target-arrow-color': '#ddd'
           })
@@ -333,4 +352,52 @@ class Graph {
     })
   }
 
+
+  highlightPrevDonut() {
+    this.previousDonut = this.currentDonut;
+    this.currentDonut--;
+    if (this.currentDonut < 0) {
+      this.currentDonut = this.donuts.length-1;
+    }
+
+    this.highlightCurrentDonut();
+  }
+
+  highlightNextDonut() {
+    this.previousDonut = this.currentDonut;
+    this.currentDonut++;
+    if (this.currentDonut >= this.donuts.length) {
+      this.currentDonut = 0;
+    }
+
+    this.highlightCurrentDonut();
+  }
+
+  highlightCurrentDonut(){
+    let self = this;
+
+    if (this.showTriangulatedDonutArcs) {
+      this.draw();
+    }
+
+    if(this.previousDonut != -1) {
+      self.donuts[this.previousDonut].arcElements.forEach(el => {
+        this.cy.getElementById(el).removeClass('red');
+      })
+    }
+
+    self.donuts[this.currentDonut].arcElements.forEach(el => {
+      this.cy.getElementById(el).addClass('red');
+    })
+
+    for (let i = 0; i < self.donuts[this.currentDonut].triangulated_arcs.length; ++i) {
+      this.cy.getElementById("ta-"+i).addClass('red');
+    }
+  }
+
+  toggleShowTriangulatedDonutArcs(){
+    this.showTriangulatedDonutArcs = !this.showTriangulatedDonutArcs;
+    this.draw();
+    this.highlightCurrentDonut();
+  }
 }

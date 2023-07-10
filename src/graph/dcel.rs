@@ -46,6 +46,23 @@ impl SubDcel {
     pub fn get_vertices(&self) -> &Vec<vertex::Vertex> {
         return self.sub.vertices();
     }
+
+    pub fn triangulate(&mut self) {
+        self.sub.triangulate();
+    }
+
+    pub fn get_untriangulated_arcs(&self) -> Vec<arc::Arc> {
+        return self.sub.arcs[0..self.sub.pre_triangulation_arc_count].to_vec();
+    }
+
+    pub fn get_triangulated_arcs(&self) -> Vec<arc::Arc> {
+        let arc_len = self.sub.arcs().len();
+        return self.sub.arcs[self.sub.pre_triangulation_arc_count..arc_len].to_vec();
+    }
+
+    pub fn was_triangulated(&self) -> bool {
+        self.sub.pre_triangulation_arc_count() > 0
+    }
 }
 
 #[derive(Debug)]
@@ -358,7 +375,7 @@ impl Dcel {
     pub fn collect_donut(&self, start: usize, end: usize) -> Result<SubDcel, Box<dyn Error>> {
         let spanning_tree = self.spanning_tree(0);
 
-        if end > spanning_tree.max_level() {
+        if end > spanning_tree.max_level()+1 {
             return Err("Donut is out of bounds".into());
         }
 
@@ -392,6 +409,31 @@ impl Dcel {
 
         let sub_dcel = builder.build()?;
         Ok(sub_dcel)
+    }
+
+    pub fn find_donuts_for_k(&self, k: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
+        let mut result = vec![];
+        let spanning_tree = self.spanning_tree(0);
+
+        let mut last_level = 1;
+
+        for n in 1..(spanning_tree.max_level()+1) {
+            if n % k == 0 {
+                /* Current donut is from last_level -> n */
+                let mut donut = self.collect_donut(last_level, n)?;
+                donut.triangulate();
+                result.push(donut);
+                last_level = n+1
+            }
+        }
+
+        if last_level != spanning_tree.max_level() {
+            let mut last_donut = self.collect_donut(last_level, spanning_tree.max_level()+1)?;
+            last_donut.triangulate();
+            result.push(last_donut);
+        }
+
+        Ok(result)
     }
 
     pub fn pre_triangulation_arc_count(&self) -> usize {
