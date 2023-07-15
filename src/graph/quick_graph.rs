@@ -30,6 +30,16 @@ impl QuickGraph {
             self.edge_count -= 1;
         }
     }
+
+    pub fn insert_vertex(&mut self, vertex: usize, neighborhood: Vec<usize>) {
+        self.adjacency = self.adjacency.iter().map(|neighbors|
+            neighbors.iter().map(|&neighbor|
+                if neighbor >= vertex { neighbor + 1} else {neighbor}).collect()
+        ).collect();
+        self.adjacency.insert(vertex, neighborhood.clone());
+        neighborhood.iter().for_each(|&neighbor| self.adjacency[neighbor].push(vertex));
+        self.edge_count += self.adjacency[vertex].len();
+    }
 }
 
 impl Reducible for QuickGraph {
