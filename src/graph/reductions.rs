@@ -1,19 +1,33 @@
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
 
-pub type MergeReduction = (Vec<Vec<usize>>, usize, usize);
-pub type RemoveReduction = (usize, Vec<usize>);
+
+pub struct MergeReduction {
+    old_graph: Vec<Vec<usize>>,
+    u: usize,
+    v: usize
+}
+
+pub struct RemoveReduction {
+    vertex: usize,
+    neighborhood: Vec<usize>
+}
+
+pub struct IsolatedClique {
+    isolated_vertex: usize,
+    size: usize
+}
 
 fn merge_vertices_reversible(graph: &mut QuickGraph, u: usize, v: usize) -> MergeReduction {
     let copy: Vec<Vec<usize>> = graph.adjacency.clone();
     graph.merge_vertices(u, v);
-    (copy, u, v)
+    MergeReduction {old_graph: copy, u, v}
 }
 
 fn remove_vertex_reversible(graph: &mut QuickGraph, u: usize) -> RemoveReduction {
     let neighborhood: Vec<usize> = graph.adjacency[u].clone();
     graph.remove_vertex(u);
-    (u, neighborhood)
+    RemoveReduction {vertex: u, neighborhood}
 }
 
 pub fn do_vertice_fold_reduction(graph: &mut QuickGraph) -> Vec<MergeReduction> {
@@ -46,8 +60,9 @@ pub fn transfer_independence_set_vertex_fold(
     let mut result: Vec<usize> = independence_set.clone();
     while let Some((second, first)) =
         reductions.pop().zip(reductions.pop()) {
-        let (_, _, second_neighbor) = second;
-        let (_, original_vertex, first_neighbor) = first;
+        let second_neighbor = second.v;
+        let original_vertex = first.u;
+        let first_neighbor = first.v;
         result = result.iter().map(|&vertex| {
             if vertex >= second_neighbor {vertex + 1} else {vertex}
         }).map(|vertex| {
@@ -88,14 +103,17 @@ fn decrease_neighborhood(neighborhood: Vec<usize>, vertex: usize) -> Vec<usize> 
 }
 
 pub fn do_isolated_clique_reductions(graph: &mut QuickGraph)
-    -> (Vec<RemoveReduction>, Vec<(usize, usize)>) {
-    let mut result: (Vec<RemoveReduction>, Vec<(usize, usize)>) = (Vec::new(), Vec::new());
+    -> (Vec<RemoveReduction>, Vec<IsolatedClique>) {
+    let mut result: (Vec<RemoveReduction>, Vec<IsolatedClique>) = (Vec::new(), Vec::new());
     loop {
         if let Some(vertex) = (0..graph.num_vertices())
             .find(|&vertex| is_isolated_clique(graph, vertex)) {
 
             let mut neighborhood: Vec<usize> = graph.adjacency[vertex].clone();
-            result.1.push((vertex, neighborhood.len()));
+            result.1.push(IsolatedClique {
+                isolated_vertex: vertex,
+                size: neighborhood.len() + 1
+            });
             result.0.push(remove_vertex_reversible(graph, vertex));
             neighborhood = decrease_neighborhood(neighborhood, vertex);
 
@@ -114,18 +132,18 @@ pub fn do_isolated_clique_reductions(graph: &mut QuickGraph)
 
 pub fn transfer_independence_set_isolated_clique(
     graph: &mut QuickGraph,
-    reductions: &mut (Vec<RemoveReduction>, Vec<(usize, usize)>),
+    reductions: &mut (Vec<RemoveReduction>, Vec<IsolatedClique>),
     independence_set: Vec<usize>) -> Vec<usize> {
     let mut result = independence_set.clone();
     while !reductions.1.is_empty() {
         let next_isolated_clique = reductions.1.pop().unwrap();
-        for _ in 0..(next_isolated_clique.1 + 1) {
+        for _ in 0..(next_isolated_clique.size) {
             let reduction = reductions.0.pop().unwrap();
-            graph.insert_vertex(reduction.0, reduction.1);
+            graph.insert_vertex(reduction.vertex, reduction.neighborhood);
             result = result.iter().map(
-                |&vertex| if vertex >= reduction.0 { vertex + 1} else {vertex}).collect();
+                |&vertex| if vertex >= reduction.vertex { vertex + 1} else {vertex}).collect();
         }
-        result.push(next_isolated_clique.0);
+        result.push(next_isolated_clique.isolated_vertex);
     }
     result
 }
