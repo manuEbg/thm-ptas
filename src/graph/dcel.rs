@@ -261,15 +261,15 @@ impl Dcel {
                     match self.face_information(a1, a2) {
                         FaceInfo::Twins | FaceInfo::Triangle => {
                             a1 = a2;
-                            println!("1");
+                            // println!("1");
                         }
                         FaceInfo::TriangulatedFace => {
-                            println!("3");
+                            // println!("3");
                             return FaceInfo::TriangulatedFace;
                         }
                         FaceInfo::NotTriangulated => {
                             self.close_triangle(a1, a2);
-                            println!("2");
+                            // println!("2");
                             return FaceInfo::NotTriangulated;
                         }
                     }
