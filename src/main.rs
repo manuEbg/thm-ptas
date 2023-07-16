@@ -66,7 +66,8 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 }
 
 fn main() {
-    let graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
+    let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
     println!("{:?}", graph);
-    println!("{:?}", graph.find_twins());
+    println!("{:?}", do_twin_reductions(&mut graph));
+    println!("{:?}", graph);
 }

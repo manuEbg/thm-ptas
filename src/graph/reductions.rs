@@ -1,13 +1,14 @@
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
 
-
+#[derive(Debug)]
 pub struct MergeReduction {
     old_graph: Vec<Vec<usize>>,
     u: usize,
     v: usize
 }
 
+#[derive(Debug)]
 pub struct RemoveReduction {
     vertex: usize,
     neighborhood: Vec<usize>
@@ -16,6 +17,21 @@ pub struct RemoveReduction {
 pub struct IsolatedClique {
     isolated_vertex: usize,
     removed_vertices: Vec<RemoveReduction>
+}
+
+#[derive(Debug)]
+enum ReduceOperation {
+    MergeReduction(MergeReduction),
+    RemoveReduction(RemoveReduction)
+}
+
+#[derive(Debug)]
+pub struct TwinReduction {
+    u: usize,
+    v: usize,
+    neighborhood: Vec<usize>,
+    reductions: Vec<ReduceOperation>,
+    remaining_vertex: Option<usize>
 }
 
 fn merge_vertices_reversible(graph: &mut QuickGraph, u: usize, v: usize) -> MergeReduction {
@@ -96,7 +112,7 @@ fn is_isolated_clique(graph: &QuickGraph, vertex: usize) -> bool {
     true
 }
 
-fn decrease_neighborhood(neighborhood: Vec<usize>, vertex: usize) -> Vec<usize> {
+fn decrease_neighborhood(neighborhood: &Vec<usize>, vertex: usize) -> Vec<usize> {
     neighborhood.iter().
         map(|&neighbor| if neighbor > vertex { neighbor - 1} else {neighbor} ).
         collect()
@@ -115,14 +131,14 @@ pub fn do_isolated_clique_reductions(graph: &mut QuickGraph)
                 removed_vertices: Vec::new()
             };
             isolated_clique.removed_vertices.push(remove_vertex_reversible(graph, vertex));
-            neighborhood = decrease_neighborhood(neighborhood, vertex);
+            neighborhood = decrease_neighborhood(&neighborhood, vertex);
 
             while !neighborhood.is_empty() {
                 let neighbor = neighborhood.pop().unwrap();
                 isolated_clique.removed_vertices.push(
                     remove_vertex_reversible(graph, neighbor)
                 );
-                neighborhood = decrease_neighborhood(neighborhood, vertex);
+                neighborhood = decrease_neighborhood(&neighborhood, vertex);
             }
             result.push(isolated_clique);
         } else {
@@ -147,6 +163,79 @@ pub fn transfer_independence_set_isolated_clique(
                 |&vertex| if vertex >= reduction.vertex { vertex + 1} else {vertex}).collect();
         }
         result.push(next_isolated_clique.isolated_vertex);
+    }
+    result
+}
+
+pub fn do_twin_reductions(graph: &mut QuickGraph) -> Vec<TwinReduction> {
+    let mut result: Vec<TwinReduction> = Vec::new();
+    loop {
+        if let Some((u, v)) = graph.find_twins() {
+            let original_neighborhood = graph.adjacency[u].clone();
+            let mut current_neighbors = original_neighborhood.clone();
+            let mut reductions: Vec<ReduceOperation> = Vec::new();
+            reductions.push(
+              ReduceOperation::RemoveReduction(remove_vertex_reversible(graph, u))
+            );
+            let current_v = v - 1;
+            current_neighbors = decrease_neighborhood(&current_neighbors, u);
+            reductions.push(
+                ReduceOperation::RemoveReduction(remove_vertex_reversible(graph, current_v))
+            );
+            current_neighbors = decrease_neighborhood(&current_neighbors, current_v);
+            let remaining_vertex: Option<usize>;
+            if graph.adjacency[current_neighbors[0]].contains(&current_neighbors[1]) ||
+                graph.adjacency[current_neighbors[0]].contains(&current_neighbors[2]) ||
+                graph.adjacency[current_neighbors[1]].contains(&current_neighbors[2]) {
+
+                for index in 0..current_neighbors.len() {
+                    let neighbor = current_neighbors[index];
+                    reductions.push(
+                        ReduceOperation::RemoveReduction(
+                            remove_vertex_reversible(graph, neighbor)
+                        )
+                    );
+                    current_neighbors = decrease_neighborhood(
+                        &current_neighbors,
+                        neighbor
+                    );
+                }
+                remaining_vertex = None;
+            } else {
+                reductions.push(
+                    ReduceOperation::MergeReduction(merge_vertices_reversible(
+                        graph,
+                        current_neighbors[0],
+                        current_neighbors[1]
+                    ))
+                );
+                current_neighbors = decrease_neighborhood(
+                    &current_neighbors,
+                    current_neighbors[1]
+                );
+                reductions.push(
+                    ReduceOperation::MergeReduction(merge_vertices_reversible(
+                        graph,
+                        current_neighbors[0],
+                        current_neighbors[2]
+                    ))
+                );
+                current_neighbors = decrease_neighborhood(
+                    &current_neighbors,
+                    current_neighbors[2]
+                );
+                remaining_vertex = Some(current_neighbors[0]);
+            }
+            result.push(TwinReduction {
+                u,
+                v,
+                neighborhood: original_neighborhood,
+                reductions,
+                remaining_vertex
+            });
+        } else {
+            break;
+        }
     }
     result
 }
