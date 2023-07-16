@@ -274,7 +274,16 @@ impl Dcel {
                         }
                     }
                 }
-                panic!("FACE {} HAS ONLY ONE EDGE", f);
+                let face_iter2 = FaceIterator::new(self, face.start_arc());
+                let mut vec = vec![];
+                for (a, _) in face_iter2 {
+                    vec.push(a);
+                }
+                panic!(
+                    "FACE {} with {:?} edges iterated. Should never be here",
+                    f, vec
+                );
+                // FaceInfo::TriangulatedFace
             }
             None => {
                 panic!("FACE {} IS EMPTY", f);
@@ -285,7 +294,7 @@ impl Dcel {
     fn face_information(&self, a: ArcId, b: ArcId) -> FaceInfo {
         let arc_a = self.arc(a);
         let arc_b = self.arc(b);
-        if arc_a.next() != b {
+        if arc_a.next() != b || arc_b.prev() != a {
             panic!(
                 "Arcs a {} and b {} need to be the be consecutive arcs of the same face",
                 a, b
@@ -338,7 +347,7 @@ impl Dcel {
         let mut result = vec![];
         let spanning_tree = self.spanning_tree(0);
 
-        for depth in 1..(spanning_tree.max_level()+1) {
+        for depth in 1..(spanning_tree.max_level() + 1) {
             let mut visited = vec![false; self.vertices.len()];
 
             let mut builder = SubDcelBuilder::new(self.clone());
@@ -375,7 +384,7 @@ impl Dcel {
     pub fn collect_donut(&self, start: usize, end: usize) -> Result<SubDcel, Box<dyn Error>> {
         let spanning_tree = self.spanning_tree(0);
 
-        if end > spanning_tree.max_level()+1 {
+        if end > spanning_tree.max_level() + 1 {
             return Err("Donut is out of bounds".into());
         }
 
@@ -417,18 +426,18 @@ impl Dcel {
 
         let mut last_level = 1;
 
-        for n in 1..(spanning_tree.max_level()+1) {
+        for n in 1..(spanning_tree.max_level() + 1) {
             if n % k == 0 {
                 /* Current donut is from last_level -> n */
                 let mut donut = self.collect_donut(last_level, n)?;
                 donut.triangulate();
                 result.push(donut);
-                last_level = n+1
+                last_level = n + 1
             }
         }
 
         if last_level != spanning_tree.max_level() {
-            let mut last_donut = self.collect_donut(last_level, spanning_tree.max_level()+1)?;
+            let mut last_donut = self.collect_donut(last_level, spanning_tree.max_level() + 1)?;
             last_donut.triangulate();
             result.push(last_donut);
         }
