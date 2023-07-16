@@ -40,6 +40,25 @@ impl QuickGraph {
         neighborhood.iter().for_each(|&neighbor| self.adjacency[neighbor].push(vertex));
         self.edge_count += self.adjacency[vertex].len();
     }
+
+    pub fn find_twins(&self) -> Option<(usize, usize)> {
+        let sorted_adjacency: Vec<Vec<usize>> = self.adjacency.iter().map(|adjacency_list| {
+            let mut copy = adjacency_list.clone();
+            copy.sort();
+            copy
+        }).collect();
+        for u in 0..sorted_adjacency.len() {
+            let current_neighbors: &Vec<usize> = &sorted_adjacency[u];
+            if current_neighbors.len() == 3 {
+                for v in (u + 1)..sorted_adjacency.len() {
+                    if sorted_adjacency[v].len() == 3 && *current_neighbors == sorted_adjacency[v] {
+                        return Some((u, v));
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 impl Reducible for QuickGraph {

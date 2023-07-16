@@ -66,14 +66,7 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 }
 
 fn main() {
-    let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
+    let graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
     println!("{:?}", graph);
-    let mut result = do_isolated_clique_reductions(&mut graph);
-    let independence_set =
-        transfer_independence_set_isolated_clique(
-            &mut graph,
-            &mut result,
-            vec![5]
-        );
-    println!("{:?}", independence_set);
+    println!("{:?}", graph.find_twins());
 }
