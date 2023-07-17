@@ -1,14 +1,12 @@
 /* data structure for twin reduction */
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
-use crate::graph::reductions::utils::*;
 
 pub struct TwinReduction {
     u: usize,
     v: usize,
     neighborhood: Vec<usize>,
-    removed_vertices: Vec<usize>,
-    remaining_vertex: Option<usize>
+    adjacent_neighbors: bool
 }
 
 pub fn do_twin_reductions(graph: &mut QuickGraph) -> Vec<TwinReduction> {
@@ -17,45 +15,42 @@ pub fn do_twin_reductions(graph: &mut QuickGraph) -> Vec<TwinReduction> {
         if let Some((u, v)) = graph.find_twins() {
 
             /* create twin reduction datastructure */
-            let mut twin_reduction = TwinReduction {
+            let neighbors = graph.adjacency[u].clone().unwrap();
+            let twin_reduction = TwinReduction {
                 u,
                 v,
-                neighborhood: graph.adjacency[u].clone(),
-                removed_vertices: vec![u, v - 1],
-                remaining_vertex: None,
+                neighborhood: neighbors.clone(),
+                adjacent_neighbors: graph.are_adjacent_triple(
+                    neighbors[0],
+                    neighbors[1],
+                    neighbors[2]
+                )
             };
 
-            /* copy neighbors for updating and remove twins */
-            let mut current_neighbors = graph.adjacency[u].clone();
-            for &twin in &twin_reduction.removed_vertices {
-                graph.remove_vertex(twin);
-                current_neighbors = decrease_vertices(&current_neighbors, twin);
-            }
+            /* remove twins from graph */
+            graph.remove_vertex(u);
+            graph.remove_vertex(v);
 
-            /* check if any of the three neighbors are adjacent */
-            if graph.adjacency[current_neighbors[0]].contains(&current_neighbors[1]) ||
-                graph.adjacency[current_neighbors[0]].contains(&current_neighbors[2]) ||
-                graph.adjacency[current_neighbors[1]].contains(&current_neighbors[2]) {
-
-
-                /* remove all three neighbors */
-                for index in 0..current_neighbors.len() {
-                    let neighbor = current_neighbors[index];
-                    graph.remove_vertex(neighbor);
-                    twin_reduction.removed_vertices.push(neighbor);
-                    current_neighbors = decrease_vertices(&current_neighbors, neighbor);
-                }
+            /* handle neighbors depending from adjacency */
+            if twin_reduction.adjacent_neighbors {
+                /* remove all five concerned vertices */
+                twin_reduction.neighborhood.iter().for_each(|&neighbor| {
+                   graph.remove_vertex(neighbor);
+                });
             } else {
-                for index in 1..current_neighbors.len() {
-                    graph.merge_vertices(current_neighbors[0], current_neighbors[index]);
-                    twin_reduction.removed_vertices.push(current_neighbors[index]);
-                    current_neighbors = decrease_vertices(
-                        &current_neighbors,
-                        current_neighbors[index]
-                    );
-                }
-                twin_reduction.remaining_vertex = Some(current_neighbors[0]);
+                /* merge two of the three neighbors */
+                graph.merge_vertices(
+                    twin_reduction.neighborhood[0],
+                    twin_reduction.neighborhood[1]
+                );
+
+                /* merge the third neighbor */
+                graph.merge_vertices(
+                    twin_reduction.neighborhood[0],
+                    twin_reduction.neighborhood[2]
+                )
             }
+
             result.push(twin_reduction);
         } else {
             break;
@@ -69,22 +64,15 @@ pub fn transfer_twin_reductions(
     independence_set: Vec<usize>
 ) -> Vec<usize> {
     let mut result: Vec<usize> = independence_set.clone();
-    while !reductions.is_empty() {
-        let mut reduction: TwinReduction = reductions.pop().unwrap();
-        let mut take_neighbors: bool = false;
-
-        /* decide if neighbors or twins should be taken into solution */
-        if let Some(vertex) = reduction.remaining_vertex {
-            take_neighbors = result.contains(&vertex);
-            result.retain(|&result_member| result_member != vertex);
-        }
-
-        result = restore_independence_set(result, reduction.removed_vertices);
-        if take_neighbors {
-            reduction.neighborhood.iter().for_each(|&vertex| result.push(vertex));
-        } else {
+    while let Some(reduction) = reductions.pop() {
+        /* decide which vertices should be taken into the solution */
+        if reduction.adjacent_neighbors || !result.contains(&reduction.neighborhood[0]){
             result.push(reduction.u);
             result.push(reduction.v);
+        } else {
+            for index in 1..reduction.neighborhood.len() {
+                result.push(reduction.neighborhood[index]);
+            }
         }
     }
     result

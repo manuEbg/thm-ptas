@@ -27,7 +27,11 @@ fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String
             let mut edge = edge.split(" ");
             let u: usize = edge.next().unwrap().parse().unwrap();
             let v: usize = edge.next().unwrap().parse().unwrap();
-            graph.adjacency[u].push(v);
+            if let Some(ref mut adjacency_u) = &mut graph.adjacency[u] {
+                adjacency_u.push(v);
+            } else {
+                return Err(String::from("Could not push neighbor to adjacency list. "));
+            }
         }
 
         Ok(graph)
@@ -78,9 +82,9 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 }
 
 fn main() {
-    let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graphs.txt").unwrap();
+    let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
     println!("{:?}", graph);
-    let mut reductions = do_nodal_fold_reductions(&mut graph);
+    let mut reductions = do_twin_reductions(&mut graph);
     println!("{:?}", graph);
-    println!("{:?}", transfer_nodal_fold_reduction(vec![0, 1, 3, 4], &mut reductions));
+    println!("{:?}", transfer_twin_reductions(&mut reductions, vec![]));
 }
