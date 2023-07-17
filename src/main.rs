@@ -3,8 +3,11 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
-use graph::dcel_file_writer::DcelWriter;
+use graph::dcel::spanning_tree::SpanningTree;
+use graph::dcel_file_writer::JsDataWriter;
+use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
+
 use graph::{Dcel, DcelBuilder};
 use graph::quick_graph::QuickGraph;
 use graph::reducible::Reducible;
@@ -77,14 +80,29 @@ where
 }
 
 fn write_web_file(filename: &str, dcel: &Dcel) {
-    let mut writer = DcelWriter::new(filename, dcel);
-    writer.write_dcel()
+    let mut writer = JsDataWriter::new(filename, dcel);
+    writer.write_data()
 }
 
 fn main() {
-    let mut graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
-    println!("{:?}", graph);
-    let mut reductions = do_twin_reductions(&mut graph);
-    println!("{:?}", graph);
-    println!("{:?}", transfer_twin_reductions(&mut reductions, vec![]));
+
+    let args: Vec<String> = env::args().collect();
+    let mut dcel = read_graph_file(&args[1]).unwrap();
+
+    for a in BfsIter::new(&dcel, 0) {
+        print!("{:?}", a);
+    }
+
+    //let mut st =  SpanningTree::new(&dcel);
+    // st.build(0);
+
+    //dcel.triangulate();
+
+    write_web_file("data/test.js", &dcel);
+    // let mut dg = DualGraph::new(&st);
+    // dg.build();
+
+    println!("{:?}", dcel);
+
 }
+
