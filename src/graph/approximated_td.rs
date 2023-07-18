@@ -1,5 +1,3 @@
-use std::borrow::Borrow;
-
 use super::dcel::arc::ArcId;
 use super::dcel::face::FaceId;
 use super::dcel::vertex::VertexId;
@@ -51,6 +49,7 @@ pub struct TDBuilder<'a> {
     main_graph: &'a Dcel,
     adjacent: Vec<Vec<BagId>>,
     bags: Vec<Vec<VertexId>>,
+    on_tree_path: Vec<Vec<BagId>>,
 }
 
 impl<'a> TDBuilder<'a> {
@@ -60,6 +59,7 @@ impl<'a> TDBuilder<'a> {
             main_graph: st.dcel(),
             adjacent: vec![vec![]; st.dcel().num_faces()],
             bags: vec![vec![]; st.dcel().num_faces()],
+            on_tree_path: vec![vec![]; st.dcel().num_faces()],
         }
     }
 }
@@ -78,7 +78,7 @@ impl<'a> TreeDecomposable for TDBuilder<'a> {
     }
 
     fn spanning_tree_to_root(&self, start_from: VertexId) -> &Vec<VertexId> {
-        todo!()
+        &self.on_tree_path[start_from]
     }
 
     fn vertex_mapping(&self, v: VertexId) -> VertexId {
@@ -122,6 +122,7 @@ pub struct SubTDBuilder<'a> {
     adjacent: Vec<Vec<BagId>>,
     bags: Vec<Vec<VertexId>>,
     min_level: usize,
+    on_tree_path: Vec<Vec<VertexId>>,
 }
 
 impl<'a> TreeDecomposable for SubTDBuilder<'a> {
@@ -154,7 +155,7 @@ impl<'a> TreeDecomposable for SubTDBuilder<'a> {
     }
 
     fn spanning_tree_to_root(&self, start_from: VertexId) -> &Vec<VertexId> {
-        todo!()
+        &self.on_tree_path[start_from]
     }
 
     fn vertex_mapping(&self, v: VertexId) -> VertexId {
@@ -207,6 +208,7 @@ impl<'a> SubTDBuilder<'a> {
             adjacent: vec![vec![]; donut.sub.num_faces()],
             bags: vec![vec![]; donut.sub.num_faces()],
             min_level,
+            on_tree_path: vec![vec![]; donut.sub.num_faces()],
         }
     }
 }
@@ -270,7 +272,7 @@ trait TreeDecomposable {
         let faces = self.get_graph().faces().clone();
         for (i, f) in faces.iter().enumerate() {
             self.add_face(f, i);
-            // self.add_on_path_to_root(i);
+            self.add_on_path_to_root(i);
         }
     }
 }
