@@ -1,12 +1,12 @@
-use crate::graph::dual_graph::DualGraph;
+use crate::graph::approximated_td::ApproximatedTD;
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use fxhash::FxHashSet;
 
 /// This function is used to create a tree decomposition on one of the rings
 /// in a DCEL data structure.
-impl From<&DualGraph<'_>> for TreeDecomposition {
-    fn from(dual_graph: &DualGraph) -> Self {
-        let dcel = dual_graph.get_dcel();
+impl From<&ApproximatedTD<'_>> for TreeDecomposition {
+    fn from(approx_td: &ApproximatedTD) -> Self {
+        let dcel = approx_td.graph();
         let faces = &dcel.faces();
         let mut result = TreeDecomposition {
             bags: vec![],
@@ -25,8 +25,8 @@ impl From<&DualGraph<'_>> for TreeDecomposition {
             result.add_bag(vertices);
         }
 
-        for i in 0..dual_graph.get_adjacent().len() {
-            let neighbors = &dual_graph.get_adjacent()[i];
+        for i in 0..approx_td.num_bags() {
+            let neighbors = &approx_td.adjacent()[i];
             for n in neighbors {
                 result.add_edge(i, *n);
             }
@@ -67,6 +67,7 @@ impl NiceTreeDecomposition for TreeDecomposition {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::graph::approximated_td::TDBuilder;
     use crate::graph::dcel::spanning_tree::SpanningTree;
     use crate::read_graph_file;
 
@@ -75,9 +76,9 @@ pub mod tests {
         let dcel = read_graph_file("data/exp.graph").unwrap();
         let mut spanning_tree = SpanningTree::new(&dcel);
         spanning_tree.build(0);
-        let mut dual_graph = DualGraph::new(&spanning_tree);
-        dual_graph.build();
-        let tree_decomposition = TreeDecomposition::from(&dual_graph);
+        let mut b = TDBuilder::new(&spanning_tree);
+        let approx_td = ApproximatedTD::from(&mut b);
+        let tree_decomposition = TreeDecomposition::from(&approx_td);
 
         println!("Normal tree decomposition:");
         for bag in tree_decomposition.bags.iter() {
@@ -92,9 +93,9 @@ pub mod tests {
         let dcel = read_graph_file("data/exp.graph").unwrap();
         let mut spanning_tree = SpanningTree::new(&dcel);
         spanning_tree.build(0);
-        let mut dual_graph = DualGraph::new(&spanning_tree);
-        dual_graph.build();
-        let tree_decomposition = TreeDecomposition::from(&dual_graph);
+        let mut b = TDBuilder::new(&spanning_tree);
+        let approx_td = ApproximatedTD::from(&mut b);
+        let tree_decomposition = TreeDecomposition::from(&approx_td);
 
         let nice_td = tree_decomposition.make_nice();
 
