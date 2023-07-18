@@ -50,16 +50,50 @@ pub struct TDBuilder<'a> {
     adjacent: Vec<Vec<BagId>>,
     bags: Vec<Vec<VertexId>>,
     on_tree_path: Vec<Vec<BagId>>,
+    tree_path_calculated: Vec<bool>,
 }
 
 impl<'a> TDBuilder<'a> {
     pub fn new(st: &'a SpanningTree) -> Self {
-        TDBuilder {
+        let mut b = TDBuilder {
             spanning_tree: st,
             main_graph: st.dcel(),
             adjacent: vec![vec![]; st.dcel().num_faces()],
             bags: vec![vec![]; st.dcel().num_faces()],
-            on_tree_path: vec![vec![]; st.dcel().num_faces()],
+            on_tree_path: vec![vec![]; st.dcel().num_vertices()],
+            tree_path_calculated: vec![false; st.dcel().num_vertices()],
+        };
+        b.initialize_tree_paths();
+        b
+    }
+
+    fn initialize_tree_paths(&mut self) {
+        self.tree_path_calculated[self.spanning_tree.root()] = true;
+        for v in (0..self.main_graph.num_vertices()) {
+            self.tree_path(v);
+        }
+    }
+
+    fn tree_path(&mut self, v: VertexId) {
+        let mut stack = vec![v];
+        let mut current = v;
+        loop {
+            if self.tree_path_calculated[current] {
+                break;
+            }
+            let prev = self.spanning_tree.discovered_by(current).src();
+            stack.push(prev);
+            current = prev;
+        }
+        if stack.len() < 2 {
+            return;
+        }
+
+        for i in (stack.len() - 2..=0) {
+            let this_v = stack[i];
+            let prev_v = stack[i + 1];
+            self.on_tree_path[this_v] = [vec![prev_v], self.on_tree_path[prev_v].clone()].concat();
+            self.tree_path_calculated[this_v] = true;
         }
     }
 }

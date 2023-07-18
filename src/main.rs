@@ -3,6 +3,8 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
+use graph::approximated_td::{ApproximatedTD, TDBuilder};
+use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel_file_writer::JsDataWriter;
 use graph::iterators::bfs::BfsIter;
 use graph::Dcel;
@@ -52,14 +54,15 @@ fn main() {
         print!("{:?}", a);
     }
 
-    //let mut st =  SpanningTree::new(&dcel);
-    // st.build(0);
+    let mut st = SpanningTree::new(&dcel);
+    st.build(0);
 
     //dcel.triangulate();
 
     write_web_file("data/test.js", &dcel);
-    // let mut dg = DualGraph::new(&st);
+    let mut tdb = TDBuilder::new(&st);
+    let td = ApproximatedTD::from(&mut tdb);
     // dg.build();
 
-    println!("{:?}", dcel);
+    println!("{:?}", td);
 }

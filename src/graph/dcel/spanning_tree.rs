@@ -1,3 +1,4 @@
+use super::arc::Arc;
 use super::BfsIter;
 use super::{ArcId, Dcel, VertexId};
 
@@ -9,6 +10,7 @@ pub struct SpanningTree<'a> {
     arcs: Vec<ArcId>,
     max_level: usize,
     discovered_by: Vec<ArcId>,
+    root: VertexId,
 }
 
 impl<'a> SpanningTree<'a> {
@@ -20,10 +22,12 @@ impl<'a> SpanningTree<'a> {
             vertex_level: vec![0; dcel.num_vertices()],
             max_level: 0,
             discovered_by: vec![0; dcel.num_vertices()],
+            root: 0,
         }
     }
 
     pub fn build(&mut self, start: VertexId) {
+        self.root = start;
         let mut iterator = BfsIter::new(self.dcel, start);
         while let Some(it) = iterator.next() {
             if let Some(a) = it.arc {
@@ -57,11 +61,19 @@ impl<'a> SpanningTree<'a> {
         self.contains_arc[arc]
     }
 
+    pub fn root(&self) -> VertexId {
+        self.root
+    }
+
     pub fn vertex_level(&self) -> &[usize] {
         self.vertex_level.as_ref()
     }
 
     pub fn max_level(&self) -> usize {
         self.max_level
+    }
+
+    pub fn discovered_by(&self, v: VertexId) -> &Arc {
+        self.dcel.arc(self.discovered_by[v])
     }
 }
