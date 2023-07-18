@@ -87,7 +87,7 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 fn main() {
 
     let args: Vec<String> = env::args().collect();
-    let mut dcel = read_graph_file(&args[1]).unwrap();
+    let mut dcel = read_graph_file_into_dcel(&args[1]).unwrap();
 
     for a in BfsIter::new(&dcel, 0) {
         print!("{:?}", a);
