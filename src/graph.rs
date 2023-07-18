@@ -1,9 +1,10 @@
+pub mod approximated_td;
+pub mod builder;
 pub mod dcel;
 pub mod dcel_file_writer;
-pub mod dual_graph;
 pub mod iterators;
 pub mod tree_decomposition;
-pub mod builder;
 
-pub use dcel::Dcel;
 pub use builder::dcel_builder::DcelBuilder;
+pub use dcel::Dcel;
+

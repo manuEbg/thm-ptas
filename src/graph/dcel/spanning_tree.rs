@@ -8,6 +8,7 @@ pub struct SpanningTree<'a> {
     vertex_level: Vec<usize>,
     arcs: Vec<ArcId>,
     max_level: usize,
+    discovered_by: Vec<ArcId>,
 }
 
 impl<'a> SpanningTree<'a> {
@@ -18,6 +19,7 @@ impl<'a> SpanningTree<'a> {
             arcs: vec![],
             vertex_level: vec![0; dcel.num_vertices()],
             max_level: 0,
+            discovered_by: vec![0; dcel.num_vertices()],
         }
     }
 
@@ -34,6 +36,7 @@ impl<'a> SpanningTree<'a> {
                 if it.level > self.max_level {
                     self.max_level = it.level;
                 }
+                self.discovered_by[it.vertex] = a;
             }
         }
     }

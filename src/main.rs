@@ -3,9 +3,7 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
 pub mod graph;
-use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel_file_writer::JsDataWriter;
-use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 use graph::Dcel;
 use graph::DcelBuilder;
@@ -64,5 +62,4 @@ fn main() {
     // dg.build();
 
     println!("{:?}", dcel);
-
 }
