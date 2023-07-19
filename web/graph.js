@@ -39,64 +39,6 @@ class DualArc {
   }
 }
 
-let defaults = {
-  fit: true, // whether to fit to viewport
-  padding: 30, // fit padding
-  boundingBox: undefined, // constrain layout bounds; { x1, y1, x2, y2 } or { x1, y1, w, h }
-  animate: false, // whether to transition the node positions
-  animationDuration: 500, // duration of animation in ms if enabled
-  animationEasing: undefined, // easing of animation if enabled
-  animateFilter: function(node, i) { return true; }, // a function that determines whether the node should be animated.  All nodes animated by default on animate enabled.  Non-animated nodes are positioned immediately when the layout starts
-  ready: undefined, // callback on layoutready
-  stop: undefined, // callback on layoutstop
-  transform: function(node, position) { return position; }, // transform a given node position. Useful for changing flow direction in discrete layouts 
-  faces: [],
-};
-
-class DefLayout {
-  constructor(options) {
-    this.iteration = 1;
-    var opts = this.options = {};
-    for (var i in defaults) { opts[i] = defaults[i]; }
-    for (var i in options) { opts[i] = options[i]; }
-  }
-  run() {
-    let layout = this;
-    let options = this.options;
-    let cy = options.cy;
-    let eles = options.eles;
-    let factor = this.iteration * 10;
-    layout.emit({ type: 'layoutstart', layout: layout });
-
-    let getPos = function(factor) {
-
-      return function(node, i) {
-        let sign_x = (i % 2 == 0) ? -1 : +1;
-        let sign_y = (i % 4 == 0 || (i - 1) % 4 == 0) ? -1 : 1;
-        let p = i - (i % 4) + 1;
-        return {
-          x: p * factor * sign_x,
-          y: p * factor * sign_y
-        };
-      };
-    };
-
-    let frame = function() { };
-    while (this.iteration < 1000) {
-      eles.nodes().layoutPositions(this, options, getPos(this.iteration * 0.1));
-      requestAnimationFrame(frame);
-      this.iteration++;
-    }
-    layout.one('layoutstop', options.stop);
-    layout.emit({ type: 'layoutstop', layout: layout });
-
-    // eles.nodes().forEach(n => n.renderedPosition({x: 100 , y: 100}));
-    return this; // chaining
-  }
-}
-
-
-
 class Graph {
   constructor(id, data, layout, timeout) {
     var obj = data;
