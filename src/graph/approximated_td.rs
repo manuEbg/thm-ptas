@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use super::dcel::arc::ArcId;
 use super::dcel::face::FaceId;
 use super::dcel::vertex::VertexId;
@@ -9,7 +11,7 @@ type BagId = usize;
 #[derive(Debug)]
 pub struct ApproximatedTD<'a> {
     graph: &'a Dcel,
-    bags: Vec<Vec<VertexId>>,
+    bags: Vec<HashSet<VertexId>>,
     adjacent: Vec<Vec<BagId>>,
     root_bag: BagId,
 }
@@ -48,7 +50,7 @@ pub struct TDBuilder<'a> {
     spanning_tree: &'a SpanningTree<'a>,
     main_graph: &'a Dcel,
     adjacent: Vec<Vec<BagId>>,
-    bags: Vec<Vec<VertexId>>,
+    bags: Vec<HashSet<VertexId>>,
     on_tree_path: Vec<Vec<BagId>>,
     tree_path_calculated: Vec<bool>,
 }
@@ -59,7 +61,7 @@ impl<'a> TDBuilder<'a> {
             spanning_tree: st,
             main_graph: st.dcel(),
             adjacent: vec![vec![]; st.dcel().num_faces()],
-            bags: vec![vec![]; st.dcel().num_faces()],
+            bags: vec![HashSet::new(); st.dcel().num_faces()],
             on_tree_path: vec![vec![]; st.dcel().num_vertices()],
             tree_path_calculated: vec![false; st.dcel().num_vertices()],
         };
@@ -69,7 +71,7 @@ impl<'a> TDBuilder<'a> {
 
     fn initialize_tree_paths(&mut self) {
         self.tree_path_calculated[self.spanning_tree.root()] = true;
-        for v in (0..self.main_graph.num_vertices()) {
+        for v in 0..self.main_graph.num_vertices() {
             self.tree_path(v);
         }
     }
@@ -89,12 +91,12 @@ impl<'a> TDBuilder<'a> {
             return;
         }
 
-        for i in (stack.len() - 2..=0) {
+        (stack.len() - 2..=0).for_each(|i| {
             let this_v = stack[i];
             let prev_v = stack[i + 1];
             self.on_tree_path[this_v] = [vec![prev_v], self.on_tree_path[prev_v].clone()].concat();
             self.tree_path_calculated[this_v] = true;
-        }
+        });
     }
 }
 
@@ -128,14 +130,14 @@ impl<'a> TreeDecomposable for TDBuilder<'a> {
     }
 
     fn add_vertex(&mut self, v: VertexId, to: BagId) {
-        self.bags[to].push(v);
+        self.bags[to].insert(v);
     }
 
     fn get_graph(&self) -> &Dcel {
         self.main_graph
     }
 
-    fn vertices(&self, bag: BagId) -> &Vec<VertexId> {
+    fn vertices(&self, bag: BagId) -> &HashSet<VertexId> {
         &self.bags[bag]
     }
 
@@ -154,7 +156,7 @@ pub struct SubTDBuilder<'a> {
     spanning_tree: &'a SpanningTree<'a>,
     donut: &'a SubDcel,
     adjacent: Vec<Vec<BagId>>,
-    bags: Vec<Vec<VertexId>>,
+    bags: Vec<HashSet<VertexId>>,
     min_level: usize,
     on_tree_path: Vec<Vec<VertexId>>,
 }
@@ -212,14 +214,14 @@ impl<'a> TreeDecomposable for SubTDBuilder<'a> {
 
     fn add_vertex(&mut self, v: VertexId, to: BagId) {
         let mapped_v = self.vertex_mapping(v);
-        self.bags[to].push(mapped_v);
+        self.bags[to].insert(mapped_v);
     }
 
     fn get_graph(&self) -> &Dcel {
         &self.donut.sub
     }
 
-    fn vertices(&self, bag: BagId) -> &Vec<VertexId> {
+    fn vertices(&self, bag: BagId) -> &HashSet<VertexId> {
         &self.bags[bag]
     }
 
@@ -240,7 +242,7 @@ impl<'a> SubTDBuilder<'a> {
             spanning_tree: st,
             donut,
             adjacent: vec![vec![]; donut.sub.num_faces()],
-            bags: vec![vec![]; donut.sub.num_faces()],
+            bags: vec![HashSet::new(); donut.sub.num_faces()],
             min_level,
             on_tree_path: vec![vec![]; donut.sub.num_faces()],
         }
@@ -273,7 +275,7 @@ trait TreeDecomposable {
     fn get_graph(&self) -> &Dcel;
 
     /// returns the ids of all the vertices in a Bag
-    fn vertices(&self, bag: BagId) -> &Vec<VertexId>;
+    fn vertices(&self, bag: BagId) -> &HashSet<VertexId>;
 
     fn to_td(&mut self) -> ApproximatedTD;
 
