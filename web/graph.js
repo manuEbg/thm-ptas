@@ -1,14 +1,21 @@
-class Arc{
-    constructor(a) {
-      this.data = new Object();
-      this.data.id = "a" + a.id;
-      this.data.source = "v" + a.source;
-      this.data.target = "v" + a.target;
-      this.is_added = a.is_added;
-    } 
+const THICK_EDGE = 3;
+const MEDIUM_EDGE = 2;
+const FINE_EDGE = 1;
+const NODE_SIZE = 3;
+const LAYOUT_FACTOR = 4000;
+
+
+class Arc {
+  constructor(a) {
+    this.data = new Object();
+    this.data.id = "a" + a.id;
+    this.data.source = "v" + a.source;
+    this.data.target = "v" + a.target;
+    this.is_added = a.is_added;
+  }
 }
 
-class Vertex{
+class Vertex {
   constructor(v) {
     this.data = new Object();
     this.data.id = "v" + v.id;
@@ -16,7 +23,7 @@ class Vertex{
 }
 
 
-class DualVertex{
+class DualVertex {
   constructor(v) {
     this.data = new Object();
     this.data.id = "dv" + v.id;
@@ -39,53 +46,55 @@ let defaults = {
   animate: false, // whether to transition the node positions
   animationDuration: 500, // duration of animation in ms if enabled
   animationEasing: undefined, // easing of animation if enabled
-  animateFilter: function ( node, i ){ return true; }, // a function that determines whether the node should be animated.  All nodes animated by default on animate enabled.  Non-animated nodes are positioned immediately when the layout starts
+  animateFilter: function(node, i) { return true; }, // a function that determines whether the node should be animated.  All nodes animated by default on animate enabled.  Non-animated nodes are positioned immediately when the layout starts
   ready: undefined, // callback on layoutready
   stop: undefined, // callback on layoutstop
-  transform: function (node, position ){ return position; }, // transform a given node position. Useful for changing flow direction in discrete layouts 
+  transform: function(node, position) { return position; }, // transform a given node position. Useful for changing flow direction in discrete layouts 
   faces: [],
 };
 
-function DefLayout( options ){
-  this.iteration = 1;
-  var opts = this.options = {};
-  for( var i in defaults ){ opts[i] = defaults[i]; }
-  for( var i in options ){ opts[i] = options[i]; }
+class DefLayout {
+  constructor(options) {
+    this.iteration = 1;
+    var opts = this.options = {};
+    for (var i in defaults) { opts[i] = defaults[i]; }
+    for (var i in options) { opts[i] = options[i]; }
+  }
+  run() {
+    let layout = this;
+    let options = this.options;
+    let cy = options.cy;
+    let eles = options.eles;
+    let factor = this.iteration * 10;
+    layout.emit({ type: 'layoutstart', layout: layout });
+
+    let getPos = function(factor) {
+
+      return function(node, i) {
+        let sign_x = (i % 2 == 0) ? -1 : +1;
+        let sign_y = (i % 4 == 0 || (i - 1) % 4 == 0) ? -1 : 1;
+        let p = i - (i % 4) + 1;
+        return {
+          x: p * factor * sign_x,
+          y: p * factor * sign_y
+        };
+      };
+    };
+
+    let frame = function() { };
+    while (this.iteration < 1000) {
+      eles.nodes().layoutPositions(this, options, getPos(this.iteration * 0.1));
+      requestAnimationFrame(frame);
+      this.iteration++;
+    }
+    layout.one('layoutstop', options.stop);
+    layout.emit({ type: 'layoutstop', layout: layout });
+
+    // eles.nodes().forEach(n => n.renderedPosition({x: 100 , y: 100}));
+    return this; // chaining
+  }
 }
 
-DefLayout.prototype.run = function(){
-  let layout = this;
-  let options = this.options;
-  let cy = options.cy;
-  let eles = options.eles;
-  let factor = this.iteration * 10;
-  layout.emit( { type: 'layoutstart', layout: layout } );
-
-  let getPos = function( factor ){
-
-    return function(node, i){
-      let sign_x = (i % 2 == 0) ? -1 : +1;
-      let sign_y = (i % 4 == 0 || (i-1)%4 == 0) ? -1 : 1;
-      let p = i - (i % 4) + 1;
-      return {
-        x: p*factor * sign_x  ,
-        y: p*factor * sign_y
-        };
-      }
-  };
-
-  let frame = function(){};
-  while(this.iteration < 1000) {
-    eles.nodes().layoutPositions( this, options, getPos(this.iteration*0.1) );
-    requestAnimationFrame(frame);
-    this.iteration++; 
-  }
-  layout.one('layoutstop', options.stop);
-      layout.emit({ type: 'layoutstop', layout: layout });
-
-  // eles.nodes().forEach(n => n.renderedPosition({x: 100 , y: 100}));
-  return this; // chaining
-};
 
 
 class Graph {
@@ -99,10 +108,21 @@ class Graph {
 
 
     this.faces = obj.faces;
+
+    this.layout = layout;
+
+
+    this.layout.forEach((v) => {
+      this.vertices[v.id].position = {
+        x: v.x * LAYOUT_FACTOR,
+        y: -v.y * LAYOUT_FACTOR,
+      }
+    })
+    this.position_tree_decomposition();
     this.faces.forEach(f => {
       f.id = "f" + f.id;
       f.arcs = f.arcs.map(a => "a" + a);
-      f.vertices = f.vertices.map(v => "v"+v);
+      f.vertices = f.vertices.map(v => "v" + v);
     });
 
     this.ringArcs = obj.rings.map(r => r.map(a => "a" + a));
@@ -111,7 +131,7 @@ class Graph {
 
     this.donuts = obj.donuts;
     this.donuts.forEach((donut) => {
-      donut.arcElements = donut.arcs.map(a => "a"+a)
+      donut.arcElements = donut.arcs.map(a => "a" + a)
     })
 
     this.currentDonut = -1
@@ -125,29 +145,34 @@ class Graph {
     this.timeout = timeout;
     this.currentFace = -1;
 
-    this.layout = layout;
+  }
 
-    const SCALING = 500;
-
-    this.layout.forEach((v) => {
-      this.vertices[v.id].position = {
-        x: v.x * SCALING,
-        y: -v.y * SCALING,
-      }
+  position_tree_decomposition() {
+    let self = this;
+    self.dualgraph.vertices.forEach((v, index) => {
+      console.log(v + " :" + index);
+      let x = 0.0;
+      let y = 0.0;
+      self.faces[index].vertices.forEach(v => {
+        x += self.vertices[v].position.x;
+        y += self.vertices[v].position.y;
+      })
+      v.position = { x: x / self.faces[index].vertices.length, y: y / self.faces[index].vertices.length }
     })
   }
 
-  get_nodes(){
+
+  get_nodes() {
     let self = this;
     return self.vertices.concat(self.dualgraph.vertices);
   }
 
-  get_arcs(){
+  get_arcs() {
     let self = this;
     if (this.currentDonut != -1 && this.showTriangulatedDonutArcs) {
       let idx = 0;
       const donutArcs = this.donuts[this.currentDonut].triangulated_arcs.map(a => (
-        { data: { id: "ta-"+(idx++), source: "v"+a.src, target: "v"+a.dst } }
+        { data: { id: "ta-" + (idx++), source: "v" + a.src, target: "v" + a.dst } }
       ))
       //console.log(this.donuts[this.currentDonut]);
       //console.log(donutArcs);
@@ -162,167 +187,211 @@ class Graph {
     //cytoscape( 'layout', 'test', DefLayout );
     self.cy = cytoscape({
       container: document.getElementById("graph"),
-    
+
       boxSelectionEnabled: false,
       autounselectify: true,
-    
+
       style: cytoscape.stylesheet()
         .selector('node')
-          .style({
-            'content': 'data(id)'
-          })
+        .style({
+          'content': 'data(id)',
+          'width': NODE_SIZE,
+          'height': NODE_SIZE,
+        })
         .selector('edge')
-          .style({
-            'curve-style': 'straight',
-            'target-arrow-shape': 'triangle',
-            'width': 1,
-            'line-color': '#ddd',
-            'target-arrow-color': '#ddd'
-          })
+        .style({
+          'curve-style': 'straight',
+          'target-arrow-shape': 'triangle',
+          'width': FINE_EDGE,
+          'line-color': '#ddd',
+          'target-arrow-color': '#ddd'
+        })
         .selector('.spanning-tree')
-          .style(self.edgeStyleObject('#000000'))
+        .style(self.edgeStyleObject('#000000'))
         .selector('edge.highlighted')
-          .style(self.edgeStyleObject('#61bffc'))
-        .selector('.red').style(self.edgeStyleObject("#ff0000"))
-        .selector('.green').style(self.edgeStyleObject('#00ff00'))
-        .selector('.pink').style(self.edgeStyleObject("#00ffff")),
-    
+        .style(self.edgeStyleObject('#61bffc'))
+        .selector('node.highlighted').style(self.vertexStyleObject('#61bffc'))
+        .selector('edge.red').style(self.edgeStyleObject("#ff0000"))
+        .selector('edge.green').style(self.edgeStyleObject("#00ff00"))
+        .selector('edge.cyan').style(self.edgeStyleObject("#00ffff"))
+        .selector('node.td').style(self.vertexStyleObject("#ff00ff"))
+        .selector('edge.td').style(self.edgeStyleObject("#ff00ff", MEDIUM_EDGE))
+        .selector('node.td.invisible').style({ 'display': 'none' })
+        .selector('edge.td.invisible').style({ 'display': 'none' }),
+
       elements: {
-          nodes: self.get_nodes(),
-    
-          edges: self.get_arcs()
-        },
+        nodes: self.get_nodes(),
 
-      layout: {name: 'preset'}
-    
+        edges: self.get_arcs()
+      },
+
+      layout: { name: 'preset' }
+
     });
+    self.dualgraph.vertices.forEach(v => {
+      self.addClassToElement(v.data.id, "td");
+    })
+    self.dualgraph.arcs.forEach(a => {
+      self.addClassToElement(a.data.id, "td");
+    })
+  }
 
-      }
-  
-  edgeStyleObject(colorCode){
+  vertexStyleObject(colorCode, important = false) {
     return {
-      'background-color' : colorCode,
-      'line-color' : colorCode,
-      'target-arrow-color' : colorCode,
-      'width' : 50,
-      'transition-property' : 'background-color, line-color, target-arrow-color',
-      'transition-duration' : '0.5s'
+      'color': colorCode,
+      'background-color': colorCode,
+      'transition-property': 'background-color, line-color, target-arrow-color',
+      'transition-duration': '0.5s'
     }
   }
-  addClassToElement(el, className){
+
+  edgeStyleObject(colorCode, w = THICK_EDGE) {
+    return {
+      'background-color': colorCode,
+      'line-color': colorCode,
+      'target-arrow-color': colorCode,
+      'width': w,
+      'transition-property': 'background-color, line-color, target-arrow-color',
+      'transition-duration': '0.5s'
+    }
+  }
+  addClassToElement(el, className) {
     this.cy.getElementById(el).addClass(className);
   }
 
-  removeClassFromElement(el, className){
+  removeClassFromElement(el, className) {
     this.cy.getElementById(el).removeClass(className);
   }
 
-  addClassTo(item, className){
+  addClassTo(item, className) {
     let self = this;
-    if(Array.isArray(item)){
-      item.forEach( e => self.addClassToElement(e, className));
+    if (Array.isArray(item)) {
+      item.forEach(e => self.addClassToElement(e, className));
       return;
     }
     self.addClassToElement(item, className);
   }
 
-  removeClassFrom(item, className){
+  removeClassFrom(item, className) {
     let self = this;
-    if(Array.isArray(item)){
-      item.forEach( e => self.removeClassFromElement(e, className));
+    if (Array.isArray(item)) {
+      item.forEach(e => self.removeClassFromElement(e, className));
       return;
     }
     self.removeClassFromElement(item, className);
   }
 
-  highlightNextFace(up = true){
+  highlightNextFace(up = true) {
     let self = this;
     let lastFace = self.currentFace;
-    if(up)self.currentFace++;
+    if (up) self.currentFace++;
     else self.currentFace--;
-    if(self.currentFace == -2) self.currentFace = self.faces.length - 1;
-    else if(self.currentFace >= self.faces.length) self.currentFace = -1;
-    if(lastFace >= 0) self.lowlightFace(lastFace);
-    if (self.currentFace >= 0){
+    if (self.currentFace == -2) self.currentFace = self.faces.length - 1;
+    else if (self.currentFace >= self.faces.length) self.currentFace = -1;
+    if (lastFace >= 0) self.lowlightFace(lastFace);
+    if (self.currentFace >= 0) {
       self.highlightFace(self.currentFace);
     }
     console.log("Highlighting Face " + self.currentFace);
-  }  
-  
-  lowlight(id){
+  }
+
+  lowlight(id) {
     this.removeClassFrom(id, 'highlighted');
   }
 
-  highlight(id){
+  highlight(id) {
     this.cy.getElementById(id).addClass('highlighted');
   }
 
-  highlightFace(idx){
+  highlightFace(idx) {
     let self = this;
+    self.removeClassFromElement(self.dualgraph.vertices[idx].data.id, 'td');
     self.highlight(self.dualgraph.vertices[idx].data.id);
-    self.faces[idx].arcs.forEach(function(a){ self.highlight(a)});
+    self.faces[idx].arcs.forEach(function(a) { self.highlight(a) });
     self.faces[idx].vertices.forEach(v => self.highlight(v));
   }
 
-  lowlightFace(idx){
+  lowlightFace(idx) {
     let self = this;
     self.lowlight(self.dualgraph.vertices[idx].data.id);
-    self.faces[idx].arcs.forEach(function(el){self.lowlight(el)});
+    self.addClassToElement(self.dualgraph.vertices[idx].data.id, 'td');
+    self.faces[idx].arcs.forEach(function(el) { self.lowlight(el) });
     self.faces[idx].vertices.forEach(v => self.lowlight(v));
   }
 
-  showAdditionalEdges(){
+  showAdditionalEdges() {
     self = this;
     self.arcs.forEach(a => {
-      if(a.is_added){
+      if (a.is_added) {
         self.addClassToElement(a.data.id, "green");
       }
     })
   }
 
-  hideAdditionalEdges(){
+  hideAdditionalEdges() {
     self = this;
     self.arcs.forEach(a => {
-      if(a.is_added){
+      if (a.is_added) {
         self.removeClassFromElement(a.data.id, "green");
       }
     })
   }
-  
-  toggleAdditionalEdges(){
+
+  toggleAdditionalEdges() {
     self = this;
     self.additionalEdgesHighlighted = !self.additionalEdgesHighlighted;
-    if(self.additionalEdgesHighlighted){
-      self.showAdditionalEdges();  
+    if (self.additionalEdgesHighlighted) {
+      self.showAdditionalEdges();
     } else {
       self.hideAdditionalEdges();
     }
 
   }
 
-  showSpanningTree(){
+  showSpanningTree() {
     let self = this;
-    self.addClassTo(self.spanningTree,'spanning-tree');
+    self.addClassTo(self.spanningTree, 'spanning-tree');
     self.spanningTreeVisible = true;
   }
 
-  hideSpanningTree(){
+  hideSpanningTree() {
     let self = this;
     self.removeClassFrom(self.spanningTree, 'spanning-tree');
     self.spanningTreeVisible = false;
   }
 
-  toggleSpanningTree(){
+  toggleSpanningTree() {
     let self = this;
-    if(self.spanningTreeVisible) self.hideSpanningTree();
+    if (self.spanningTreeVisible) self.hideSpanningTree();
     else self.showSpanningTree();
+  }
+
+  showTD() {
+    let self = this;
+    self.dualgraph.vertices.forEach(v => {
+      self.removeClassFromElement(v.data.id, 'invisible');
+    })
+    self.tdVisible = true;
+  }
+  hideTD() {
+    let self = this;
+    self.dualgraph.vertices.forEach(v => {
+      self.addClassToElement(v.data.id, 'invisible');
+    })
+
+    self.tdVisible = false;
+  }
+  toggleTD() {
+    let self = this;
+    if (self.tdVisible) self.hideTD();
+    else self.showTD();
   }
 
   highlightPrevRing() {
     this.previousRing = this.currentRing;
     this.currentRing--;
     if (this.currentRing < 0) {
-      this.currentRing = this.ringArcs.length-1;
+      this.currentRing = this.ringArcs.length - 1;
     }
 
     this.highlightCurrentRing();
@@ -338,10 +407,10 @@ class Graph {
     this.highlightCurrentRing();
   }
 
-  highlightCurrentRing(){
+  highlightCurrentRing() {
     let self = this;
 
-    if(this.previousRing != -1) {
+    if (this.previousRing != -1) {
       self.ringArcs[this.previousRing].forEach(el => {
         this.cy.getElementById(el).removeClass('red');
       })
@@ -357,7 +426,7 @@ class Graph {
     this.previousDonut = this.currentDonut;
     this.currentDonut--;
     if (this.currentDonut < 0) {
-      this.currentDonut = this.donuts.length-1;
+      this.currentDonut = this.donuts.length - 1;
     }
 
     this.highlightCurrentDonut();
@@ -373,14 +442,14 @@ class Graph {
     this.highlightCurrentDonut();
   }
 
-  highlightCurrentDonut(){
+  highlightCurrentDonut() {
     let self = this;
 
     if (this.showTriangulatedDonutArcs) {
       this.draw();
     }
 
-    if(this.previousDonut != -1) {
+    if (this.previousDonut != -1) {
       self.donuts[this.previousDonut].arcElements.forEach(el => {
         this.cy.getElementById(el).removeClass('red');
       })
@@ -391,11 +460,11 @@ class Graph {
     })
 
     for (let i = 0; i < self.donuts[this.currentDonut].triangulated_arcs.length; ++i) {
-      this.cy.getElementById("ta-"+i).addClass('red');
+      this.cy.getElementById("ta-" + i).addClass('red');
     }
   }
 
-  toggleShowTriangulatedDonutArcs(){
+  toggleShowTriangulatedDonutArcs() {
     this.showTriangulatedDonutArcs = !this.showTriangulatedDonutArcs;
     this.draw();
     this.highlightCurrentDonut();
