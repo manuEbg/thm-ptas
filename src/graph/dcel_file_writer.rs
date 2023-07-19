@@ -57,8 +57,6 @@ struct JsVertex {
     id: usize,
 }
 
-// impl From<JsVertex> for JsVertex {}
-
 impl JsVertex {
     pub fn new(id: usize) -> Self {
         Self { id }

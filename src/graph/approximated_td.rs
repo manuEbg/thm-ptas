@@ -44,6 +44,14 @@ impl<'a> ApproximatedTD<'a> {
     pub fn num_bags(&self) -> usize {
         self.adjacent.len()
     }
+
+    pub fn bag(&self, bag: BagId) -> &HashSet<BagId> {
+        &self.bags[bag]
+    }
+
+    pub fn bags(&self) -> &Vec<HashSet<BagId>> {
+        &self.bags
+    }
 }
 
 pub struct TDBuilder<'a> {
