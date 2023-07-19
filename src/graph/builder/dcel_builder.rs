@@ -1,3 +1,7 @@
+use crate::graph::dcel::arc::ArcId;
+use crate::graph::dcel::face::FaceId;
+use crate::graph::dcel::vertex::VertexId;
+use crate::graph::reducible::Reducible;
 use super::dcel::Dcel;
 use super::dcel;
 use super::types::*;
@@ -22,7 +26,7 @@ impl DcelBuilder {
         self.arcs.push(Arc::new(src, dst));
         let current_arc = self.arcs.len() - 1;
 
-        // If src does not exist, add all missing vertecies
+        // If src does not exist, add all missing vertices
         while self.vertices.len() <= src {
             self.vertices.push(Vertex::new());
         }
@@ -118,5 +122,63 @@ impl DcelBuilder {
 
         dest_v.arcs[next_port]
     }
-    
+
+
+    /* decrease indices of elements when elements with smaller index are removed */
+    fn decrease_index(index: usize, removed_indices: &Vec<usize>) -> usize {
+        let smaller_indices: Vec<VertexId> = removed_indices.iter()
+            .filter(|&&removed_index| removed_index < index).map(|&element| element).
+            collect();
+        index - smaller_indices.len()
+    }
+}
+
+impl Reducible for DcelBuilder{
+    fn remove_vertex(&mut self, u: usize) {
+        /* find all arcs to be removed */
+        let mut arcs_to_be_removed: Vec<usize> = self.arcs.iter().enumerate()
+            .filter(|(_, &ref arc)| arc.src == u || arc.dst == u).map(|(i, _)| i).collect();
+
+        /* remove arcs */
+        arcs_to_be_removed.sort();
+        arcs_to_be_removed.reverse();
+        for index in &arcs_to_be_removed {
+            self.arcs.remove(*index);
+        }
+
+        /* remove vertex */
+        self.vertices.remove(u);
+
+        /* remove ports */
+        for mut vertex in &mut self.vertices {
+            vertex.arcs.retain(|arc| !arcs_to_be_removed.contains(arc));
+        }
+
+        /* update vertices */
+        for mut vertex in &mut self.vertices {
+            vertex.arcs = vertex.arcs.iter().map(|&arc_index|
+                DcelBuilder::decrease_index(arc_index, &arcs_to_be_removed)
+            ).collect();
+        }
+
+        /* update arcs */
+        for vertex in &mut self.vertices {
+            for index in 0..vertex.arcs.len() {
+                let mut arc: &mut Arc = &mut self.arcs[vertex.arcs[index]];
+                arc.src = DcelBuilder::decrease_index(arc.src, &vec![u]);
+                arc.dst = DcelBuilder::decrease_index(arc.dst, &vec![u]);
+                arc.src_port = Some(index);
+                arc.twin = match arc.twin {
+                    Some(twin) => {
+                        Some(DcelBuilder::decrease_index(
+                        twin, &arcs_to_be_removed)
+                    )},
+                    None => None
+                };
+            }
+        }
+    }
+
+    fn merge_vertices(&mut self, u: usize, v: usize) {
+    }
 }

@@ -43,7 +43,7 @@ fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String
     };
 }
 
-fn read_graph_file_into_dcel(filename: &str) -> Result<Dcel, String> {
+fn read_graph_file_into_dcel_builder(filename: &str) -> Result<DcelBuilder, String> {
     return if let Ok(mut lines) = read_lines(filename) {
         /* build datastructure for DECL */
         let mut dcel_builder: DcelBuilder;
@@ -63,9 +63,8 @@ fn read_graph_file_into_dcel(filename: &str) -> Result<Dcel, String> {
             return Err(String::from("Error: Could not read line. "));
         }
 
-        /* build and return DECL */
-        let dcel = dcel_builder.build();
-        Ok(dcel)
+        /* return DCEL-Builder */
+        Ok(dcel_builder)
     } else {
         Err(format!("Could not open file {}", filename))
     };
@@ -86,9 +85,9 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 
 fn main() {
 
-    let args: Vec<String> = env::args().collect();
-    let mut dcel = read_graph_file_into_dcel(&args[1]).unwrap();
-
+    /* let args: Vec<String> = env::args().collect();
+    let mut dcel_builder = read_graph_file_into_dcel_builder(&args[1]).unwrap();
+    let dcel = dcel_builder.build();
     for a in BfsIter::new(&dcel, 0) {
         print!("{:?}", a);
     }
@@ -104,5 +103,14 @@ fn main() {
 
     println!("{:?}", dcel);
 
+     */
+
+    let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
+    let mut dcel: Dcel = dcel_builder.build();
+    println!("{:?}", dcel);
+    dcel_builder.remove_vertex(4);
+    println!("{:?}", dcel_builder);
+    dcel = dcel_builder.build();
+    println!("{:?}", dcel);
 }
 
