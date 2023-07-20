@@ -106,11 +106,9 @@ fn main() {
      */
 
     let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
-    let mut dcel: Dcel = dcel_builder.build();
+    let dcel: Dcel = dcel_builder.build();
     println!("{:?}", dcel);
-    dcel_builder.remove_vertex(4);
+    dcel_builder.merge_vertices(3, 5);
     println!("{:?}", dcel_builder);
-    dcel = dcel_builder.build();
-    println!("{:?}", dcel);
 }
 
