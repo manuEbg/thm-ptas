@@ -5,12 +5,15 @@ use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::time::{Instant, Duration};
 pub mod graph;
+
+use graph::approximated_td::{ApproximatedTD, TDBuilder};
+
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
+
 use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
-use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
 
 use graph::{Dcel, DcelBuilder};
@@ -256,7 +259,7 @@ fn main() {
 
 //    println!("{:?}", dcel);
 
-     */
+     
 
     let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
     let dcel: Dcel = dcel_builder.build();
