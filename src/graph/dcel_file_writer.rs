@@ -332,23 +332,21 @@ impl WebFileWriter for Dcel {
             ));
         }
 
-        // let rings = &self.find_rings().unwrap();
-        // let ring_array = rings
-        //     .iter()
-        //     .map(|ring| {
-        //         ring.sub
-        //             .arcs()
-        //             .iter()
-        //             .enumerate()
-        //             .map(|(i, _)| *ring.get_original_arc(i).unwrap())
-        //             .collect::<Vec<_>>()
-        //     })
-        //     .collect::<Vec<_>>();
+        let rings = &self.find_rings().unwrap();
+        let ring_array = rings
+            .iter()
+            .map(|ring| {
+                ring.sub
+                    .arcs()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
-        // let donuts = &self.find_donuts_for_k(40).unwrap();
+        let donuts = &self.find_donuts_for_k(4).unwrap();
 
-        let ring_array: Vec<Vec<usize>> = vec![];
-        let donuts: Vec<SubDcel> = vec![];
         file.write_all(b"let data = ")?;
         JsObject {
             item: &JsValues {

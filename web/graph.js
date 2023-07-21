@@ -1,8 +1,8 @@
-const THICK_EDGE = 3;
-const MEDIUM_EDGE = 2;
-const FINE_EDGE = 1;
-const NODE_SIZE = 20;
-const FAT_NODE_SIZE = 10;
+const THICK_EDGE = 30;
+const MEDIUM_EDGE = 20;
+const FINE_EDGE = 10;
+const NODE_SIZE = 150;
+const FAT_NODE_SIZE = 200;
 const LAYOUT_FACTOR = 4000;
 
 
