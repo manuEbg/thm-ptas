@@ -21,9 +21,16 @@ body {
 
 button {
   width: 90%;
-  height: 10%;
+  height: 6%;
   position: relative;
   margin-left: 3%;
   margin-top: 5%;
   z-index:100;
+}
+
+button.small{
+  width: 40%;
+  height: 3%;
+  margin-left: 4%;
+  margin-right:4%;
 }

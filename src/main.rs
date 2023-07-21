@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use std::{env, result, string};
 pub mod graph;
 
-use graph::approximated_td::{ApproximatedTD, TDBuilder};
+use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
 
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
@@ -166,20 +166,22 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
             let _rings = graph.find_rings();
             watch.stop();
 
+            // TODO
+            // build spanning tree
             for i in 1..ptas_config.k {
                 watch.start(format!("Approximation: i={i:?}").as_str());
+                // TODO use spanning tree to find donuts
                 let donuts = graph.find_donuts_for_k(i)?;
+                for donut_reductions in ptas_config.reduce_donuts.clone() {
+                    // TODO: apply donut reduction on DCEL builders
+                }
 
                 for donut in donuts {
-                    let st = SpanningTree::new(&donut.sub);
-                    // let mut dg = DualGraph::new(&st);
-                    // dg.build();
 
-                    for donut_reductions in ptas_config.reduce_donuts.clone() {
-                        // TODO: apply donut reduction
-                    }
+                    // let td_b = SubTDBuilder::new(&donut, &st, 0);
+                    // let td = ApproximatedTD::from(td_b);
 
-                    // let decomp = TreeDecomposition::from(&dg);
+                    // let decomp = TreeDecomposition::from(&td);
 
                     // TODO: generate MIS for this donut and add to list
                 }
@@ -273,9 +275,6 @@ fn main() {
     //        print!("{:?}", a);
     //    }
 
-    //    //let mut st =  SpanningTree::new(&dcel);
-    //    // st.build(0);
-
     //    //dcel.triangulate();
 
     write_web_file(&args.output, &dcel);
@@ -283,10 +282,4 @@ fn main() {
     //    // dg.build();
 
     //    println!("{:?}", dcel);
-
-    // let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
-    // let dcel: Dcel = dcel_builder.build();
-    // println!("{:?}", dcel);
-    // dcel_builder.merge_vertices(3, 5);
-    // println!("{:?}", dcel_builder);
 }

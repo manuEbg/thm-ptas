@@ -1,8 +1,11 @@
 use super::approximated_td::ApproximatedTD;
 use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
+use super::dcel::vertex::VertexId;
 use super::dcel::*;
 use super::Dcel;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -251,6 +254,20 @@ impl WebFileWriter for SubDcel {
     }
 }
 
+impl<'a> WebFileWriter for HashSet<VertexId> {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        JsArray::new(
+            &self
+                .iter()
+                .collect::<Vec<&VertexId>>()
+                .iter()
+                .map(|m| JsVertex::new(**m))
+                .collect::<Vec<JsVertex>>(),
+        )
+        .write_to_file(file, id, level)
+    }
+}
+
 impl<'a> WebFileWriter for ApproximatedTD<'a> {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         fn build_js_verticies(n: usize) -> Vec<JsVertex> {
@@ -275,6 +292,7 @@ impl<'a> WebFileWriter for ApproximatedTD<'a> {
                 &JsArray::new(&build_js_verticies(self.num_bags())),
             ),
             JsValue::new("arcs", &JsArray::new(&build_js_arcs(self))),
+            JsValue::new("bags", &JsArray::new(self.bags())),
         ]))
         .write_to_file(file, id, level)
     }
