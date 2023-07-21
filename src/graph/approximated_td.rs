@@ -237,7 +237,7 @@ impl<'a> TreeDecomposable for SubTDBuilder<'a> {
 }
 
 impl<'a> SubTDBuilder<'a> {
-    fn new(donut: &'a SubDcel, st: &'a SpanningTree, min_level: usize) -> Self {
+    pub fn new(donut: &'a SubDcel, st: &'a SpanningTree, min_level: usize) -> Self {
         SubTDBuilder {
             spanning_tree: st,
             donut,
