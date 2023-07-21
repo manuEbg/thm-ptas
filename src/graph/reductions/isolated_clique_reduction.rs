@@ -6,6 +6,7 @@ use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
 use crate::graph::reductions::{remove_vertex_and_update_indices, update_vertex_indices};
 
+#[derive(Debug)]
 pub struct IsolatedClique {
     pub(crate) isolated_vertex: usize,
     pub(crate) members: Vec<usize>
@@ -58,11 +59,9 @@ solution for the graph after isolated clique reductions
 
 pub fn transfer_isolated_clique(
     isolated_cliques: Vec<IsolatedClique>,
-    independence_set: Vec<usize>
-) -> Vec<usize> {
-    let mut result = independence_set.clone();
-    result.extend(isolated_cliques.iter().map(|isolated_clique|
+    mut independence_set: &mut Vec<usize>
+) {
+    independence_set.extend(isolated_cliques.iter().map(|isolated_clique|
         isolated_clique.isolated_vertex)
     );
-    result
 }

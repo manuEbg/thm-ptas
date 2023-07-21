@@ -6,6 +6,7 @@ use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
 use crate::graph::reductions::{merge_vertices_and_update_indices, update_vertex_indices};
 
+#[derive(Debug)]
 pub struct NodalFold {
     pub(crate) inner_vertex: usize,
     pub(crate) neighbors: Vec<usize>
@@ -64,18 +65,16 @@ pub fn do_nodal_fold_reductions(graph: &mut QuickGraph) -> Vec<NodalFold> {
 
 /* restore solution from solution after nodal fold reductions */
 pub fn transfer_nodal_fold_reduction(
-    independence_set: Vec<usize>,
-    reductions: &mut Vec<NodalFold>
-) -> Vec<usize> {
-    let mut result = independence_set.clone();
+    mut independence_set: Vec<usize>,
+    mut reductions: Vec<NodalFold>
+) {
     while let Some(reduction) = reductions.pop() {
         /* decide if the inner vertex or the neighbors should be taken into the solution */
-        if result.contains(&reduction.inner_vertex) {
-            result.retain(|&vertex| vertex != reduction.inner_vertex);
-            reduction.neighbors.iter().for_each(|&neighbor| result.push(neighbor));
+        if independence_set.contains(&reduction.inner_vertex) {
+            independence_set.retain(|&vertex| vertex != reduction.inner_vertex);
+            reduction.neighbors.iter().for_each(|&neighbor| independence_set.push(neighbor));
         } else {
-            result.push(reduction.inner_vertex);
+            independence_set.push(reduction.inner_vertex);
         }
     }
-    result
 }

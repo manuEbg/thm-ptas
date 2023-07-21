@@ -6,6 +6,7 @@ use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
 use crate::graph::reductions::{merge_vertices_and_update_indices, remove_vertex_and_update_indices, update_vertex_indices};
 
+#[derive(Debug)]
 pub struct TwinReduction {
     pub(crate) u: usize,
     pub(crate) v: usize,
@@ -113,19 +114,17 @@ pub fn do_twin_reductions(graph: &mut QuickGraph) -> Vec<TwinReduction> {
 
 pub fn transfer_twin_reductions(
     reductions: &mut Vec<TwinReduction>,
-    independence_set: Vec<usize>
-) -> Vec<usize> {
-    let mut result: Vec<usize> = independence_set.clone();
+    mut independence_set: &mut Vec<usize>
+) {
     while let Some(reduction) = reductions.pop() {
         /* decide which vertices should be taken into the solution */
-        if reduction.adjacent_neighbors || !result.contains(&reduction.neighborhood[0]){
-            result.push(reduction.u);
-            result.push(reduction.v);
+        if reduction.adjacent_neighbors || !independence_set.contains(&reduction.neighborhood[0]){
+            independence_set.push(reduction.u);
+            independence_set.push(reduction.v);
         } else {
             for index in 1..reduction.neighborhood.len() {
-                result.push(reduction.neighborhood[index]);
+                independence_set.push(reduction.neighborhood[index]);
             }
         }
     }
-    result
 }

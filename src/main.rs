@@ -259,21 +259,9 @@ fn main() {
 
 */
 
-    let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
-    let dcel: Dcel = dcel_builder.build();
-    let quick_graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
-    println!("{:?}", dcel);
-    let twin_reduction: TwinReduction = TwinReduction {
-        u: 0,
-        v: 1,
-        neighborhood: vec![2, 3, 4],
-        adjacent_neighbors: true,
-    };
-    let mut vertex_ids: HashMap<VertexId, VertexId> = HashMap::new();
-    for vertex in 0..quick_graph.adjacency.len() {
-        vertex_ids.insert(vertex, vertex);
-    }
-    twin_reduction.reduce_dcel_builder(&mut dcel_builder, &mut vertex_ids);
-    println!("{:?}", dcel_builder);
+    let mut quick_graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
+    let reductions: Reductions = Reductions::reduce_quick_graph(&mut quick_graph);
+    println!("{:?}", reductions);
+    println!("{:?}", quick_graph);
 }
 

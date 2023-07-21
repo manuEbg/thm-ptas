@@ -1,32 +1,35 @@
 use std::collections::HashMap;
 use crate::graph::dcel::vertex::VertexId;
 use crate::graph::DcelBuilder;
+use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
-use crate::graph::reductions::nodal_fold_reduction::NodalFold;
-use crate::graph::reductions::twin_reduction::TwinReduction;
+use crate::graph::reductions::isolated_clique_reduction::{do_isolated_clique_reductions, IsolatedClique};
+use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, NodalFold};
+use crate::graph::reductions::twin_reduction::{do_twin_reductions, TwinReduction};
 
 pub mod nodal_fold_reduction;
 pub mod isolated_clique_reduction;
 pub mod twin_reduction;
 
+#[derive(Debug)]
 pub struct Reductions {
-    isolated_cliques: Vec<usize>,
+    isolated_cliques: Vec<IsolatedClique>,
     twin_reductions: Vec<TwinReduction>,
     nodal_fold_reductions: Vec<NodalFold>
 }
 
 impl Reductions {
-    pub fn new() -> Reductions {
-        Reductions {
-            isolated_cliques: Vec::new(),
-            twin_reductions: Vec::new(),
-            nodal_fold_reductions: Vec::new()
-        }
+    pub fn reduce_quick_graph(mut quick_graph: &mut QuickGraph) -> Reductions {
+        let isolated_cliques: Vec<IsolatedClique> = do_isolated_clique_reductions(&mut quick_graph);
+        let twin_reductions: Vec<TwinReduction> = do_twin_reductions(&mut quick_graph);
+        let nodal_fold_reductions: Vec<NodalFold> = do_nodal_fold_reductions(&mut quick_graph);
+        Reductions {isolated_cliques, twin_reductions, nodal_fold_reductions}
     }
 
     pub fn reduce_dcel_builder(&self, dcel_builder: &mut DcelBuilder) -> HashMap<usize, usize> {
         HashMap::new()
     }
+
 }
 
 pub fn update_vertex_indices(
