@@ -1,9 +1,9 @@
-use std::{env, string, result};
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
+use std::{env, result, string};
 pub mod graph;
 
 use graph::approximated_td::{ApproximatedTD, TDBuilder};
@@ -16,13 +16,17 @@ use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
 use graph::iterators::bfs::BfsIter;
 
-use graph::{Dcel, DcelBuilder};
+use crate::graph::reductions::isolated_clique_reduction::{
+    do_isolated_clique_reductions, transfer_isolated_clique,
+};
+use crate::graph::reductions::nodal_fold_reduction::{
+    do_nodal_fold_reductions, transfer_nodal_fold_reduction,
+};
+use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
 use graph::quick_graph::QuickGraph;
 use graph::reducible::Reducible;
 use graph::reductions::*;
-use crate::graph::reductions::isolated_clique_reduction::{do_isolated_clique_reductions, transfer_isolated_clique};
-use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, transfer_nodal_fold_reduction};
-use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
+use graph::{Dcel, DcelBuilder};
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -33,7 +37,7 @@ fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String
         graph.edge_count = lines.next().unwrap().unwrap().parse().unwrap();
 
         /* read in edges */
-        for _ in 0..(2 *graph.edge_count) {
+        for _ in 0..(2 * graph.edge_count) {
             let edge = lines.next().unwrap().unwrap();
             let mut edge = edge.split(" ");
             let u: usize = edge.next().unwrap().parse().unwrap();
@@ -95,26 +99,26 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
 enum Reduction {
     Twin,
     IsolatedClique,
-    NodalFold
+    NodalFold,
 }
 
 struct PTASConfig {
     k: usize,
     exact_donut_tree_decomposition: bool,
     reduce_input: Vec<Reduction>,
-    reduce_donuts: Vec<Reduction>
+    reduce_donuts: Vec<Reduction>,
 }
 
 enum Scheme {
     PTAS { config: PTASConfig },
-    Exhaustive { reduce_input: Vec<Reduction> }
+    Exhaustive { reduce_input: Vec<Reduction> },
 }
 
 #[derive(Debug)]
 struct MISResult {
     timings: Vec<(String, Duration)>,
     total_time: Duration,
-    result: Vec<VertexId>
+    result: Vec<VertexId>,
 }
 
 struct Stopwatch {
@@ -124,8 +128,12 @@ struct Stopwatch {
 }
 
 impl Stopwatch {
-    fn new() -> Self  {
-        Self { timings: vec![], current: String::from(""), current_start: Instant::now() }
+    fn new() -> Self {
+        Self {
+            timings: vec![],
+            current: String::from(""),
+            current_start: Instant::now(),
+        }
     }
 
     fn start(&mut self, period: &str) {
@@ -145,7 +153,9 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
     let start_time = Instant::now();
 
     let _result = match scheme {
-        Scheme::PTAS {config: ptas_config } => {
+        Scheme::PTAS {
+            config: ptas_config,
+        } => {
             watch.start("Applying approximations");
             for input_reduction in ptas_config.reduce_input {
                 // TODO: apply input reduction
@@ -162,38 +172,43 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
 
                 for donut in donuts {
                     let st = SpanningTree::new(&donut.sub);
-                    let mut dg = DualGraph::new(&st);
-                    dg.build();
+                    // let mut dg = DualGraph::new(&st);
+                    // dg.build();
 
                     for donut_reductions in ptas_config.reduce_donuts.clone() {
                         // TODO: apply donut reduction
                     }
 
-                    let decomp = TreeDecomposition::from(&dg);
+                    // let decomp = TreeDecomposition::from(&dg);
 
                     // TODO: generate MIS for this donut and add to list
                 }
 
-                // TODO: 
+                // TODO:
                 watch.stop();
             }
 
             // Choose best MIS and return that
-        },
-        Scheme::Exhaustive { reduce_input: input_reductions } => {
         }
+        Scheme::Exhaustive {
+            reduce_input: input_reductions,
+        } => {}
     };
 
     let end_time = Instant::now();
     let total_time = end_time.duration_since(start_time);
 
-    Ok(MISResult { timings: watch.timings, total_time, result: vec![] })
+    Ok(MISResult {
+        timings: watch.timings,
+        total_time,
+        result: vec![],
+    })
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum CliScheme {
     PTAS,
-    Exhaustive
+    Exhaustive,
 }
 
 #[derive(Debug, Parser)]
@@ -225,46 +240,53 @@ fn main() {
     println!("{args:?}");
 
     let scheme = match args.scheme {
-        CliScheme::Exhaustive => Scheme::Exhaustive{reduce_input: args.input_reductions},
-        CliScheme::PTAS => Scheme::PTAS{config: PTASConfig{k: args.k, exact_donut_tree_decomposition: args.exact_donut_tree_decomposition, reduce_input: args.input_reductions, reduce_donuts: args.donut_reductions}}
+        CliScheme::Exhaustive => Scheme::Exhaustive {
+            reduce_input: args.input_reductions,
+        },
+        CliScheme::PTAS => Scheme::PTAS {
+            config: PTASConfig {
+                k: args.k,
+                exact_donut_tree_decomposition: args.exact_donut_tree_decomposition,
+                reduce_input: args.input_reductions,
+                reduce_donuts: args.donut_reductions,
+            },
+        },
     };
 
-    let dcel = match read_graph_file_into_dcel(args.input.to_str().unwrap()) {
+    let mut dcel_b = match read_graph_file_into_dcel_builder(args.input.to_str().unwrap()) {
         Ok(result) => result,
-        Err(error) => panic!("Failed to read graph file into DCEL: {error:?}")
+        Err(error) => panic!("Failed to read graph file into DCEL: {error:?}"),
     };
+
+    let dcel = dcel_b.build();
 
     let mis_result = match find_max_independent_set(&dcel, scheme) {
         Ok(result) => result,
-        Err(error) => panic!("Failed computing maximum independent set: {error:?}")
+        Err(error) => panic!("Failed computing maximum independent set: {error:?}"),
     };
 
     println!("Result: {mis_result:?}");
 
+    //    let args: Vec<String> = env::args().collect();
 
-//    let args: Vec<String> = env::args().collect();
+    //    for a in BfsIter::new(&dcel, 0) {
+    //        print!("{:?}", a);
+    //    }
 
-//    for a in BfsIter::new(&dcel, 0) {
-//        print!("{:?}", a);
-//    }
+    //    //let mut st =  SpanningTree::new(&dcel);
+    //    // st.build(0);
 
-//    //let mut st =  SpanningTree::new(&dcel);
-//    // st.build(0);
-
-//    //dcel.triangulate();
+    //    //dcel.triangulate();
 
     write_web_file(&args.output, &dcel);
-//    // let mut dg = DualGraph::new(&st);
-//    // dg.build();
+    //    // let mut dg = DualGraph::new(&st);
+    //    // dg.build();
 
-//    println!("{:?}", dcel);
+    //    println!("{:?}", dcel);
 
-     
-
-    let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
-    let dcel: Dcel = dcel_builder.build();
-    println!("{:?}", dcel);
-    dcel_builder.merge_vertices(3, 5);
-    println!("{:?}", dcel_builder);
+    // let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
+    // let dcel: Dcel = dcel_builder.build();
+    // println!("{:?}", dcel);
+    // dcel_builder.merge_vertices(3, 5);
+    // println!("{:?}", dcel_builder);
 }
-
