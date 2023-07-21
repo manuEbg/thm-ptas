@@ -1,34 +1,36 @@
+use super::dcel::arc::ArcId;
+use super::dcel::vertex::VertexId;
+
 use super::dcel::Dcel;
 use std::collections::VecDeque;
 
 #[derive(Debug)]
 pub struct BfsIter<'a> {
-    dcel: &'a  Dcel,
-    queue: VecDeque<usize>,
+    dcel: &'a Dcel,
+    queue: VecDeque<VertexId>,
     discovered: Vec<bool>,
-    discovered_arc: Vec<Option<usize>>,
+    discovered_arc: Vec<Option<ArcId>>,
     visited: Vec<bool>,
     level: Vec<usize>,
 }
 
 #[derive(Debug)]
 pub struct BfsItem {
-    pub vertex: usize,
     pub level: usize,
+    pub vertex: VertexId,
     //the arc used to discover the current vertex
-    pub arc: Option<usize>,
+    pub arc: Option<ArcId>,
 }
 
 impl<'a> BfsIter<'a> {
-
-    pub fn new(dcel: &'a Dcel, start: usize) -> Self {
-        let mut iter = BfsIter { 
-            dcel, 
+    pub fn new(dcel: &'a Dcel, start: VertexId) -> Self {
+        let mut iter = BfsIter {
+            dcel,
             queue: VecDeque::from([start]),
-            visited: vec![false; dcel.num_vertices()], 
+            visited: vec![false; dcel.num_vertices()],
             discovered: vec![false; dcel.num_vertices()],
             discovered_arc: vec![None; dcel.num_vertices()],
-            level: vec![0; dcel.num_vertices()] 
+            level: vec![0; dcel.num_vertices()],
         };
         iter.discovered[start] = true;
         iter
@@ -37,20 +39,22 @@ impl<'a> BfsIter<'a> {
 
 impl<'a> Iterator for BfsIter<'a> {
     type Item = BfsItem;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         while let Some(vertex) = self.queue.pop_front() {
             let it = Self::Item {
-                vertex, 
+                vertex,
                 level: self.level[vertex],
                 arc: self.discovered_arc[vertex],
             };
 
             for a in self.dcel.vertex(vertex).arcs() {
                 let n = self.dcel.arc(*a).dst();
-                
-                if self.discovered[n] { continue }
-                
+
+                if self.discovered[n] {
+                    continue;
+                }
+
                 self.discovered_arc[n] = Some(*a);
                 self.discovered[n] = true;
                 self.level[n] = self.level[vertex] + 1;

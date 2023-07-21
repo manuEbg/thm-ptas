@@ -106,7 +106,6 @@ impl SubDcelBuilder {
         let src = self.push_vertex(a.src());
         let dst = self.push_vertex(a.dst());
         self.dcel_builder.push_arc(src, dst);
-        self.dcel_builder.push_arc(dst, src);
     }
 
     pub fn build(&mut self) -> Result<SubDcel, Box<dyn Error>> {
@@ -368,7 +367,7 @@ impl Dcel {
                     for outgoing_arc in outgoing_arcs {
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
-                        if dst_level == depth && !visited[outgoing_arc.dst()] {
+                        if dst_level == depth {
                             builder.push_arc(outgoing_arc);
                         }
                     }
@@ -401,7 +400,6 @@ impl Dcel {
                     .arcs()
                     .iter()
                     .filter(|a| a.src() == vertex)
-                    .filter(|a| !visited[a.dst()])
                     .filter(|a| {
                         spanning_tree.vertex_level()[a.dst()] >= start
                             && spanning_tree.vertex_level()[a.dst()] < end
