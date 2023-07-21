@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 arboretum-td = "*"
 fxhash = "*"
+clap = { version = "4.0", features = ["derive"] }
