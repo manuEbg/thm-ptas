@@ -1,8 +1,11 @@
 use super::approximated_td::ApproximatedTD;
 use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
+use super::dcel::vertex::VertexId;
 use super::dcel::*;
 use super::Dcel;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -251,6 +254,20 @@ impl WebFileWriter for SubDcel {
     }
 }
 
+impl<'a> WebFileWriter for HashSet<VertexId> {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        JsArray::new(
+            &self
+                .iter()
+                .collect::<Vec<&VertexId>>()
+                .iter()
+                .map(|m| JsVertex::new(**m))
+                .collect::<Vec<JsVertex>>(),
+        )
+        .write_to_file(file, id, level)
+    }
+}
+
 impl<'a> WebFileWriter for ApproximatedTD<'a> {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         fn build_js_verticies(n: usize) -> Vec<JsVertex> {
@@ -275,6 +292,7 @@ impl<'a> WebFileWriter for ApproximatedTD<'a> {
                 &JsArray::new(&build_js_verticies(self.num_bags())),
             ),
             JsValue::new("arcs", &JsArray::new(&build_js_arcs(self))),
+            JsValue::new("bags", &JsArray::new(self.bags())),
         ]))
         .write_to_file(file, id, level)
     }
@@ -314,21 +332,23 @@ impl WebFileWriter for Dcel {
             ));
         }
 
-        let rings = &self.find_rings().unwrap();
-        let ring_array = rings
-            .iter()
-            .map(|ring| {
-                ring.sub
-                    .arcs()
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+        // let rings = &self.find_rings().unwrap();
+        // let ring_array = rings
+        //     .iter()
+        //     .map(|ring| {
+        //         ring.sub
+        //             .arcs()
+        //             .iter()
+        //             .enumerate()
+        //             .map(|(i, _)| *ring.get_original_arc(i).unwrap())
+        //             .collect::<Vec<_>>()
+        //     })
+        //     .collect::<Vec<_>>();
 
-        let donuts = &self.find_donuts_for_k(4).unwrap();
+        // let donuts = &self.find_donuts_for_k(40).unwrap();
 
+        let ring_array: Vec<Vec<usize>> = vec![];
+        let donuts: Vec<SubDcel> = vec![];
         file.write_all(b"let data = ")?;
         JsObject {
             item: &JsValues {
