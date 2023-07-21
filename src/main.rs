@@ -1,9 +1,14 @@
-use std::env;
+use std::{env, string, result};
+use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{Instant, Duration};
 pub mod graph;
+use arboretum_td::tree_decomposition::TreeDecomposition;
+use clap::Parser;
 use graph::dcel::spanning_tree::SpanningTree;
+use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
 use graph::dual_graph::DualGraph;
 use graph::iterators::bfs::BfsIter;
@@ -84,25 +89,173 @@ fn write_web_file(filename: &str, dcel: &Dcel) {
     writer.write_data()
 }
 
-fn main() {
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum Reduction {
+    Twin,
+    IsolatedClique,
+    NodalFold
+}
 
-    let args: Vec<String> = env::args().collect();
-    let mut dcel = read_graph_file(&args[1]).unwrap();
+struct PTASConfig {
+    k: usize,
+    exact_donut_tree_decomposition: bool,
+    reduce_input: Vec<Reduction>,
+    reduce_donuts: Vec<Reduction>
+}
 
-    for a in BfsIter::new(&dcel, 0) {
-        print!("{:?}", a);
+enum Scheme {
+    PTAS { config: PTASConfig },
+    Exhaustive { reduce_input: Vec<Reduction> }
+}
+
+#[derive(Debug)]
+struct MISResult {
+    timings: Vec<(String, Duration)>,
+    total_time: Duration,
+    result: Vec<VertexId>
+}
+
+struct Stopwatch {
+    current: String,
+    current_start: Instant,
+    timings: Vec<(String, Duration)>,
+}
+
+impl Stopwatch {
+    fn new() -> Self  {
+        Self { timings: vec![], current: String::from(""), current_start: Instant::now() }
     }
 
-    //let mut st =  SpanningTree::new(&dcel);
-    // st.build(0);
+    fn start(&mut self, period: &str) {
+        self.current = String::from(period);
+        self.current_start = Instant::now();
+    }
 
-    //dcel.triangulate();
+    fn stop(&mut self) {
+        let stopping_time = Instant::now();
+        let duration = stopping_time.duration_since(self.current_start);
+        self.timings.push((self.current.clone(), duration));
+    }
+}
 
-    write_web_file("data/test.js", &dcel);
-    // let mut dg = DualGraph::new(&st);
-    // dg.build();
+fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, Box<dyn Error>> {
+    let mut watch = Stopwatch::new();
+    let start_time = Instant::now();
 
-    println!("{:?}", dcel);
+    let _result = match scheme {
+        Scheme::PTAS {config: ptas_config } => {
+            watch.start("Applying approximations");
+            for input_reduction in ptas_config.reduce_input {
+                // TODO: apply input reduction
+            }
+            watch.stop();
+
+            watch.start("Find Rings");
+            let _rings = graph.find_rings();
+            watch.stop();
+
+            for i in 1..ptas_config.k {
+                watch.start(format!("Approximation: i={i:?}").as_str());
+                let donuts = graph.find_donuts_for_k(i)?;
+
+                for donut in donuts {
+                    let st = SpanningTree::new(&donut.sub);
+                    let mut dg = DualGraph::new(&st);
+                    dg.build();
+
+                    for donut_reductions in ptas_config.reduce_donuts.clone() {
+                        // TODO: apply donut reduction
+                    }
+
+                    let decomp = TreeDecomposition::from(&dg);
+
+                    // TODO: generate MIS for this donut and add to list
+                }
+
+                // TODO: 
+                watch.stop();
+            }
+
+            // Choose best MIS and return that
+        },
+        Scheme::Exhaustive { reduce_input: input_reductions } => {
+        }
+    };
+
+    let end_time = Instant::now();
+    let total_time = end_time.duration_since(start_time);
+
+    Ok(MISResult { timings: watch.timings, total_time, result: vec![] })
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum CliScheme {
+    PTAS,
+    Exhaustive
+}
+
+#[derive(Debug, Parser)]
+struct CliArguments {
+    #[arg(value_enum)]
+    scheme: CliScheme,
+
+    #[arg(long, default_value_t = 1)]
+    k: usize,
+
+    #[arg(short = 'E')]
+    exact_donut_tree_decomposition: bool,
+
+    #[arg(short = 'R')]
+    input_reductions: Vec<Reduction>,
+
+    #[arg(short = 'D')]
+    donut_reductions: Vec<Reduction>,
+
+    #[arg(value_hint = clap::ValueHint::DirPath)]
+    input: PathBuf,
+
+    #[arg(default_value_t = String::from("data/test.js"))]
+    output: String,
+}
+
+fn main() {
+    let args = CliArguments::parse();
+    println!("{args:?}");
+
+    let scheme = match args.scheme {
+        CliScheme::Exhaustive => Scheme::Exhaustive{reduce_input: args.input_reductions},
+        CliScheme::PTAS => Scheme::PTAS{config: PTASConfig{k: args.k, exact_donut_tree_decomposition: args.exact_donut_tree_decomposition, reduce_input: args.input_reductions, reduce_donuts: args.donut_reductions}}
+    };
+
+    let dcel = match read_graph_file_into_dcel(args.input.to_str().unwrap()) {
+        Ok(result) => result,
+        Err(error) => panic!("Failed to read graph file into DCEL: {error:?}")
+    };
+
+    let mis_result = match find_max_independent_set(&dcel, scheme) {
+        Ok(result) => result,
+        Err(error) => panic!("Failed computing maximum independent set: {error:?}")
+    };
+
+    println!("Result: {mis_result:?}");
+
+
+//    let args: Vec<String> = env::args().collect();
+
+//    for a in BfsIter::new(&dcel, 0) {
+//        print!("{:?}", a);
+//    }
+
+//    //let mut st =  SpanningTree::new(&dcel);
+//    // st.build(0);
+
+//    //dcel.triangulate();
+
+    write_web_file(&args.output, &dcel);
+//    // let mut dg = DualGraph::new(&st);
+//    // dg.build();
+
+//    println!("{:?}", dcel);
 
 }
 
