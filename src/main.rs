@@ -177,6 +177,7 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                 }
 
                 for donut in donuts {
+
                     // let td_b = SubTDBuilder::new(&donut, &st, 0);
                     // let td = ApproximatedTD::from(td_b);
 
@@ -260,6 +261,7 @@ fn main() {
     };
 
     let dcel = dcel_b.build();
+
     let mis_result = match find_max_independent_set(&dcel, scheme) {
         Ok(result) => result,
         Err(error) => panic!("Failed computing maximum independent set: {error:?}"),
@@ -272,9 +274,6 @@ fn main() {
     //    for a in BfsIter::new(&dcel, 0) {
     //        print!("{:?}", a);
     //    }
-
-    //    //let mut st =  SpanningTree::new(&dcel);
-    //    // st.build(0);
 
     //    //dcel.triangulate();
 
