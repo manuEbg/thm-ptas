@@ -1,12 +1,64 @@
 /* data structure for twin reduction */
+use std::collections::HashMap;
+use crate::graph::dcel::vertex::VertexId;
+use crate::graph::DcelBuilder;
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
+use crate::graph::reductions::{merge_vertices_and_update_indices, remove_vertex_and_update_indices, update_vertex_indices};
 
 pub struct TwinReduction {
-    u: usize,
-    v: usize,
-    neighborhood: Vec<usize>,
-    adjacent_neighbors: bool
+    pub(crate) u: usize,
+    pub(crate) v: usize,
+    pub(crate) neighborhood: Vec<usize>,
+    pub(crate) adjacent_neighbors: bool
+}
+
+impl TwinReduction {
+    pub fn reduce_dcel_builder(
+        &self,
+        dcel_builder: &mut DcelBuilder,
+        vertex_ids: &mut HashMap<VertexId, VertexId>) {
+        if self.adjacent_neighbors {
+            /* remove twins and neighbors */
+            remove_vertex_and_update_indices(dcel_builder, self.u, vertex_ids);
+            remove_vertex_and_update_indices(dcel_builder, self.v, vertex_ids);
+            for &neighbor in &self.neighborhood {
+                remove_vertex_and_update_indices(dcel_builder, neighbor, vertex_ids);
+            }
+        } else {
+            /* merge u into remaining vertex */
+            merge_vertices_and_update_indices(
+                dcel_builder,
+                self.neighborhood[0],
+                self.u,
+                vertex_ids
+            );
+
+            /* merge one neighbor of the twins into the remaining vertex */
+            merge_vertices_and_update_indices(
+                dcel_builder,
+                self.neighborhood[0],
+                self.neighborhood[1],
+                vertex_ids
+            );
+
+            /* merge v */
+            merge_vertices_and_update_indices(
+                dcel_builder,
+                self.neighborhood[0],
+                self.v,
+                vertex_ids
+            );
+
+            /* merge the remaining neighbor into the remaining vertex */
+            merge_vertices_and_update_indices(
+                dcel_builder,
+                self.neighborhood[0],
+                self.neighborhood[2],
+                vertex_ids
+            );
+        }
+    }
 }
 
 pub fn do_twin_reductions(graph: &mut QuickGraph) -> Vec<TwinReduction> {

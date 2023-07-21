@@ -1,10 +1,31 @@
 /* data structure for nodal fold reduction */
+use std::collections::HashMap;
+use crate::graph::dcel::vertex::VertexId;
+use crate::graph::DcelBuilder;
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
+use crate::graph::reductions::{merge_vertices_and_update_indices, update_vertex_indices};
 
 pub struct NodalFold {
-    inner_vertex: usize,
-    neighbors: Vec<usize>
+    pub(crate) inner_vertex: usize,
+    pub(crate) neighbors: Vec<usize>
+}
+
+impl NodalFold {
+    pub fn reduce_dcel_builder(
+        &self,
+        dcel_builder: &mut DcelBuilder,
+        vertex_ids: &mut HashMap<usize, usize>
+    ) {
+        for &neighbor in &self.neighbors {
+            merge_vertices_and_update_indices(
+                dcel_builder,
+                self.inner_vertex,
+                neighbor,
+                vertex_ids
+            );
+        }
+    }
 }
 
 pub fn do_nodal_fold_reductions(graph: &mut QuickGraph) -> Vec<NodalFold> {

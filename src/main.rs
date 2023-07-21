@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -12,9 +13,10 @@ use graph::{Dcel, DcelBuilder};
 use graph::quick_graph::QuickGraph;
 use graph::reducible::Reducible;
 use graph::reductions::*;
-use crate::graph::reductions::isolated_clique_reduction::{do_isolated_clique_reductions, transfer_isolated_clique};
-use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, transfer_nodal_fold_reduction};
-use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
+use crate::graph::dcel::vertex::VertexId;
+use crate::graph::reductions::isolated_clique_reduction::{do_isolated_clique_reductions, IsolatedClique, transfer_isolated_clique};
+use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, NodalFold, transfer_nodal_fold_reduction};
+use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions, TwinReduction};
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -107,8 +109,19 @@ fn main() {
 
     let mut dcel_builder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
     let dcel: Dcel = dcel_builder.build();
+    let quick_graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
     println!("{:?}", dcel);
-    dcel_builder.merge_vertices(3, 5);
+    let twin_reduction: TwinReduction = TwinReduction {
+        u: 0,
+        v: 1,
+        neighborhood: vec![2, 3, 4],
+        adjacent_neighbors: true,
+    };
+    let mut vertex_ids: HashMap<VertexId, VertexId> = HashMap::new();
+    for vertex in 0..quick_graph.adjacency.len() {
+        vertex_ids.insert(vertex, vertex);
+    }
+    twin_reduction.reduce_dcel_builder(&mut dcel_builder, &mut vertex_ids);
     println!("{:?}", dcel_builder);
 }
 
