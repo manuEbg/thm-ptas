@@ -260,13 +260,15 @@ impl NiceTreeDecomposition for TreeDecomposition {
 
         let mut bag_relations = BagRelations::new(&self.bags);
 
-        // ntd.add_bag(FxHashSet::from_iter(self.bags[self.root.unwrap()].vertex_set.iter().copied()));
+        ntd.add_bag(FxHashSet::from_iter(self.bags[self.root.unwrap()].vertex_set.iter().copied()));
 
         for old_bag in BfsIter::new(&self) {
             // TODO: Do not insert always because the bag might have been a child of another and is
             // already inserted?
-            let bag_id = ntd.add_bag(old_bag.vertex_set.clone());
+            // let bag_id = ntd.add_bag(old_bag.vertex_set.clone());
+            let bag_id = bag_relations.to_new[&old_bag.id];
 
+            /*
             let mapped_bag = match bag_relations.to_old.get(&bag_id) {
                 Some(id) => *id,
                 None => {
@@ -274,10 +276,11 @@ impl NiceTreeDecomposition for TreeDecomposition {
                     old_bag.id
                 }
             };
+            */
 
             println!("New {} -> Old {}", bag_id, old_bag.id);
 
-            let children = &node_relations.children[&mapped_bag];
+            let children = &node_relations.children[&old_bag.id];
 
             println!(
                 "|children| = ({}) {{{}}}",
@@ -569,17 +572,19 @@ fn td_write_to_dot(
             max_bag_size: 2,
         };
 
-        let ab = td.add_bag(FxHashSet::from_iter(vec![0, 1]));
-        let cd = td.add_bag(FxHashSet::from_iter(vec![2, 3]));
-        let ef = td.add_bag(FxHashSet::from_iter(vec![4, 5]));
-        let gh = td.add_bag(FxHashSet::from_iter(vec![6, 7]));
-        let ij = td.add_bag(FxHashSet::from_iter(vec![8, 9]));
-        let kl = td.add_bag(FxHashSet::from_iter(vec![10, 11]));
-        td.add_edge(ab, cd);
-        td.add_edge(ab, ef);
-        td.add_edge(ab, gh);
-        td.add_edge(cd, ij);
-        td.add_edge(cd, kl);
+        let b0 = td.add_bag(FxHashSet::from_iter(vec![0, 1]));
+        let b1 = td.add_bag(FxHashSet::from_iter(vec![2, 3]));
+        let b2 = td.add_bag(FxHashSet::from_iter(vec![4, 5]));
+        let b3 = td.add_bag(FxHashSet::from_iter(vec![6, 7]));
+        let b4 = td.add_bag(FxHashSet::from_iter(vec![8, 9]));
+        let b5 = td.add_bag(FxHashSet::from_iter(vec![10, 11]));
+        let b6 = td.add_bag(FxHashSet::from_iter(vec![12, 13]));
+        td.add_edge(b0, b1);
+        td.add_edge(b0, b2);
+        td.add_edge(b0, b3);
+        td.add_edge(b1, b4);
+        td.add_edge(b1, b5);
+        td.add_edge(b5, b6);
 
         let td_rels = NodeRelations::new(&td);
 
