@@ -158,8 +158,15 @@ fn get_bag_intersection(
     (intersection, b1_diff, b2_diff)
 }
 
-fn build_between_bag_sets(s1: &FxHashSet<usize>, s2: &FxHashSet<usize>) -> Vec<FxHashSet<usize>> {
-    let mut result = Vec::new();
+fn insert_between_bags(
+    ntd: &mut TreeDecomposition,
+    bag_relations: &mut BagRelations,
+    s1: &FxHashSet<usize>,
+    s2: &FxHashSet<usize>,
+    new_parent_id: usize,
+    old_child_id: Option<usize>,
+) {
+    let mut sets = Vec::new();
     let (intersection, b1_diff, b2_diff) = get_bag_intersection(s1, s2);
 
     // Build introduces.
@@ -167,7 +174,7 @@ fn build_between_bag_sets(s1: &FxHashSet<usize>, s2: &FxHashSet<usize>) -> Vec<F
         // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b1_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
-        result.push(set);
+        sets.push(set);
     }
 
     // Build forgets.
@@ -176,29 +183,31 @@ fn build_between_bag_sets(s1: &FxHashSet<usize>, s2: &FxHashSet<usize>) -> Vec<F
         // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b2_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
-        result.push(set);
+        sets.push(set);
     }
 
-    result
-}
+    let mut last_parent = new_parent_id;
 
-fn find_bag_relation(left: bool, other: usize, relations: &Vec<(usize, usize)>) -> usize {
-    if left {
-        for (left, right) in relations.iter() {
-            if *right == other {
-                return *left;
-            }
-        }
-    } else {
-        for (left, right) in relations.iter() {
-            if *left == other {
-                return *right;
-            }
-        }
+    for set in sets.into_iter() {
+        let copy = set.clone();
+        let between_bag = ntd.add_bag(set);
+        println!("Between bag {between_bag}: {{{}}}", vertex_set_to_string(copy.iter()));
+        println!("{last_parent} -> {between_bag}");
+        ntd.add_edge(last_parent, between_bag);
+        println!("Between bag neighbors: {{{}}}", vertex_set_to_string(ntd.bags[between_bag].neighbors.iter()));
+        last_parent = between_bag;
     }
-    panic!(
-        "Could not find any relation for {other} where it is on the {}",
-        if left { "right" } else { "right" }
+
+    let child_id = ntd.add_bag(s2.clone());
+    ntd.add_edge(last_parent, child_id);
+    if let Some(id) = old_child_id {
+        bag_relations.to_old.insert(child_id, id);
+        bag_relations.to_new.insert(id, child_id);
+    }
+
+    println!(
+        "Parent: ({}) {:?} -> Child: ({child_id}) {:?}",
+        new_parent_id, ntd.bags[new_parent_id].vertex_set, ntd.bags[child_id].vertex_set
     );
 }
 
@@ -209,16 +218,19 @@ struct BagRelations {
 
 impl BagRelations {
     fn new(bags: &Vec<Bag>) -> Self {
-        let (to_new, to_old) = bags.iter().fold((HashMap::new(), HashMap::new()), |(mut to_new, mut to_old), bag| {
-            to_new.insert(bag.id, bag.id);
-            to_old.insert(bag.id, bag.id);
-            (to_new, to_old)
-        });
+        let (to_new, to_old) = bags.iter().fold(
+            (HashMap::new(), HashMap::new()),
+            |(mut to_new, mut to_old), bag| {
+                to_new.insert(bag.id, bag.id);
+                to_old.insert(bag.id, bag.id);
+                (to_new, to_old)
+            },
+        );
         Self { to_new, to_old }
     }
 }
 
-// TODO: Rework with the 3 cases.
+// TODO: Maybe do a dfs instead of a bfs?
 impl NiceTreeDecomposition for TreeDecomposition {
     fn make_nice(&self, node_relations: &NodeRelations) -> TreeDecomposition {
         let mut ntd = TreeDecomposition {
@@ -248,12 +260,13 @@ impl NiceTreeDecomposition for TreeDecomposition {
 
         let mut bag_relations = BagRelations::new(&self.bags);
 
-        println!("First iteration for join nodes.");
+        // ntd.add_bag(FxHashSet::from_iter(self.bags[self.root.unwrap()].vertex_set.iter().copied()));
+
         for old_bag in BfsIter::new(&self) {
-            println!("Old bag: {}", old_bag.id);
+            // TODO: Do not insert always because the bag might have been a child of another and is
+            // already inserted?
             let bag_id = ntd.add_bag(old_bag.vertex_set.clone());
-            println!("New bag: {bag_id}");
-            // let mapped_bag = node_mappings.get(&old_bag.id);
+
             let mapped_bag = match bag_relations.to_old.get(&bag_id) {
                 Some(id) => *id,
                 None => {
@@ -261,9 +274,16 @@ impl NiceTreeDecomposition for TreeDecomposition {
                     old_bag.id
                 }
             };
-            let children = node_relations.children.get(&mapped_bag).unwrap();
 
-            println!("|children| = ({}) {}", children.len(), vertex_set_to_string(children.iter()));
+            println!("New {} -> Old {}", bag_id, old_bag.id);
+
+            let children = &node_relations.children[&mapped_bag];
+
+            println!(
+                "|children| = ({}) {{{}}}",
+                children.len(),
+                vertex_set_to_string(children.iter())
+            );
 
             if children.len() >= 2 {
                 // Join node.
@@ -281,70 +301,58 @@ impl NiceTreeDecomposition for TreeDecomposition {
                         ntd.add_edge(parent_id, left_clone_id);
                         ntd.add_edge(parent_id, right_clone_id);
 
-                        println!("Left clone ID: {left_clone_id}");
+                        println!("Left clone : ({left_clone_id}) {{{}}}", vertex_set_to_string(ntd.bags[left_clone_id].vertex_set.iter()));
+                        println!("Child      : ({}) {{{}}}", old_child.id, vertex_set_to_string(old_child.vertex_set.iter()));
 
-                        // TODO: Don't do this, insert the between nodes directly.
-                        // ntd.add_edge(left_clone_id, child_id);
-                        let sets = build_between_bag_sets(&old_bag.vertex_set, &old_child.vertex_set);
-                        let mut last_parent = left_clone_id;
+                        insert_between_bags(&mut ntd, &mut bag_relations, &old_bag.vertex_set, &old_child.vertex_set, left_clone_id, Some(old_child.id));
 
-                        for set in sets.into_iter() {
-                            println!("Between set = {{{}}}", vertex_set_to_string(set.iter()));
-                            let between_bag = ntd.add_bag(set);
-                            println!("Between bag ID: {between_bag}");
-                            ntd.add_edge(last_parent, between_bag);
-                            last_parent = between_bag;
-                        }
+                        println!("Parent: ({parent_id}) {:?} -> ({left_clone_id}) {:?}, ({right_clone_id}) {:?}",
+                            ntd.bags[parent_id].vertex_set,
+                            ntd.bags[left_clone_id].vertex_set,
+                            ntd.bags[right_clone_id].vertex_set);
 
-                        let child_id = ntd.add_bag(old_child.vertex_set.clone());
-                        println!("Child ID: {child_id}");
-                        ntd.add_edge(last_parent, child_id);
-                        bag_relations.to_old.insert(child_id, old_child.id);
-                        bag_relations.to_new.insert(old_child.id, child_id);
-                        // node_mappings.insert(old_child.id, child_id);
-
-                        println!("Parent : ({parent_id}) {:?} -> ({left_clone_id}) {:?}, ({right_clone_id}) {:?}",
-                                 ntd.bags[parent_id].vertex_set,
-                                 ntd.bags[left_clone_id].vertex_set,
-                                 ntd.bags[right_clone_id].vertex_set);
-                        println!("Left   : ({left_clone_id}) {:?} -> ({child_id}) {:?}", ntd.bags[left_clone_id].vertex_set, ntd.bags[child_id].vertex_set);
                         right_clone_id
                     });
 
-                // TODO: Add between bags.
-                let last_child = self.bags.get(*children.last().unwrap()).unwrap();
-                let sets = build_between_bag_sets(&old_bag.vertex_set, &last_child.vertex_set);
-                let mut last_parent = last_clone;
-
-                for set in sets.into_iter() {
-                    println!("Between set = {{{}}}", vertex_set_to_string(set.iter()));
-                    let between_bag = ntd.add_bag(set);
-                    println!("Between bag ID: {between_bag}");
-                    ntd.add_edge(last_parent, between_bag);
-                    last_parent = between_bag;
-                }
-
-                let last_child =
-                    ntd.add_bag(self.bags[*children.last().unwrap()].vertex_set.clone());
-                ntd.add_edge(last_parent, last_child);
+                let last_child = &self.bags[*children.last().unwrap()];
+                println!("Add last child {}: {{{}}}", last_child.id, vertex_set_to_string(last_child.vertex_set.iter()));
+                insert_between_bags(
+                    &mut ntd,
+                    &mut bag_relations,
+                    &old_bag.vertex_set,
+                    &last_child.vertex_set,
+                    last_clone,
+                    Some(last_child.id),
+                );
             } else if children.len() == 1 {
-                println!("Inner node: {:?}", old_bag.vertex_set);
-                let old_child = self.bags.get(*children.get(0).unwrap()).unwrap();
-                let sets = build_between_bag_sets(&old_bag.vertex_set, &old_child.vertex_set);
-                let mut last_parent = *bag_relations.to_new.get(&old_bag.id).unwrap();
-                println!("Old ID: {}, new ID: {last_parent}", old_bag.id);
-                for set in sets.into_iter() {
-                    let between_bag = ntd.add_bag(set);
-                    ntd.add_edge(last_parent, between_bag);
-                    last_parent = between_bag;
-                }
-                let child_id = ntd.add_bag(old_child.vertex_set.clone());
-                ntd.add_edge(last_parent, child_id);
-                // Introduce bags from a set of one element to the leaf set.
+                println!("Inner node: {{{}}}", vertex_set_to_string(old_bag.vertex_set.iter()));
+                let child = &self.bags[children[0]];
+                println!("Child: {{{}}}", vertex_set_to_string(child.vertex_set.iter()));
+                let inserted_id = bag_relations.to_new[&bag_relations.to_old[&bag_id]];
+
+                insert_between_bags(
+                    &mut ntd,
+                    &mut bag_relations,
+                    &old_bag.vertex_set,
+                    &child.vertex_set,
+                    inserted_id,
+                    Some(child.id),
+                );
             } else {
                 println!("Leaf node: {:?}", old_bag.vertex_set);
-                // Introduce bags from a set of one element to the leaf set.
+                let end_set = FxHashSet::from_iter(old_bag.vertex_set.iter().take(1).copied());
+                let inserted_id = bag_relations.to_new[&bag_relations.to_old[&bag_id]];
+
+                insert_between_bags(
+                    &mut ntd,
+                    &mut bag_relations,
+                    &old_bag.vertex_set,
+                    &end_set,
+                    inserted_id,
+                    None
+                );
             }
+            println!("-----");
         }
 
         /*
@@ -566,10 +574,12 @@ fn td_write_to_dot(
         let ef = td.add_bag(FxHashSet::from_iter(vec![4, 5]));
         let gh = td.add_bag(FxHashSet::from_iter(vec![6, 7]));
         let ij = td.add_bag(FxHashSet::from_iter(vec![8, 9]));
+        let kl = td.add_bag(FxHashSet::from_iter(vec![10, 11]));
         td.add_edge(ab, cd);
         td.add_edge(ab, ef);
         td.add_edge(ab, gh);
         td.add_edge(cd, ij);
+        td.add_edge(cd, kl);
 
         let td_rels = NodeRelations::new(&td);
 
