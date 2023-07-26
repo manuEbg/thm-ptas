@@ -128,26 +128,10 @@ pub trait NiceTreeDecomposition {
     fn make_nice(&self, node_relations: &NodeRelations) -> TreeDecomposition;
 }
 
-/*
-fn filter_split<'a, T, F>(v: Vec<T>, pred: F) -> (Vec<&'a T>, Vec<&'a T>)
-where
-    F: Fn(&'a T) -> bool,
-{
-    let mut wanted = Vec::new();
-    let mut unwanted = Vec::new();
-
-    for item in v.iter() {
-        if pred(item) {
-            wanted.push(item);
-        } else {
-            unwanted.push(item);
-        }
-    }
-
-    (wanted, unwanted)
-}
-*/
-
+/// This function returns the intersection between two bags and two vectors.
+/// The first vector is the set difference between the first set and the intersection. Similarly, the
+/// second vector is the set differences between the second set and the intersection.
+/// They are used to easier create the between bags in [insert_between_bags] function.
 fn get_bag_intersection(
     s1: &FxHashSet<usize>,
     s2: &FxHashSet<usize>,
@@ -158,6 +142,10 @@ fn get_bag_intersection(
     (intersection, b1_diff, b2_diff)
 }
 
+/// This function inserts between bags into the nice tree decomposition.
+/// The between bags are connected to the given 'new parent bag' and if the old bag had some child,
+/// the relation will be updated.
+/// The sets for the between bags are calculated by [get_bag_intersection].
 fn insert_between_bags(
     ntd: &mut TreeDecomposition,
     bag_relations: &mut BagRelations,
@@ -189,12 +177,8 @@ fn insert_between_bags(
     let mut last_parent = new_parent_id;
 
     for set in sets.into_iter() {
-        let copy = set.clone();
         let between_bag = ntd.add_bag(set);
-        println!("Between bag {between_bag}: {{{}}}", vertex_set_to_string(copy.iter()));
-        println!("{last_parent} -> {between_bag}");
         ntd.add_edge(last_parent, between_bag);
-        println!("Between bag neighbors: {{{}}}", vertex_set_to_string(ntd.bags[between_bag].neighbors.iter()));
         last_parent = between_bag;
     }
 
@@ -204,11 +188,6 @@ fn insert_between_bags(
         bag_relations.to_old.insert(child_id, id);
         bag_relations.to_new.insert(id, child_id);
     }
-
-    println!(
-        "Parent: ({}) {:?} -> Child: ({child_id}) {:?}",
-        new_parent_id, ntd.bags[new_parent_id].vertex_set, ntd.bags[child_id].vertex_set
-    );
 }
 
 struct BagRelations {
@@ -230,7 +209,6 @@ impl BagRelations {
     }
 }
 
-// TODO: Maybe do a dfs instead of a bfs?
 impl NiceTreeDecomposition for TreeDecomposition {
     fn make_nice(&self, node_relations: &NodeRelations) -> TreeDecomposition {
         let mut ntd = TreeDecomposition {
@@ -239,61 +217,24 @@ impl NiceTreeDecomposition for TreeDecomposition {
             max_bag_size: self.max_bag_size,
         };
 
-        // let (inner_nodes, leafs) = filter_split();
-
-        // 1. Joins
-        // For each bag that is not a leaf do
-        // if |children| >= 2 and the bags have different vertex sets then
-        //   Clone the bag |children| - 1 times.
-        //   Set new edges and parents for each cloned self and child.
-
-        // TODO: We need to remember the updated parents.
-        // Now we look up the wrong values when e.g. a join inserts new bags.
-        // Or we create a mapping from old bag ids to new bag ids. (THIS is better)
-
-        /*
-        let mut node_mappings = self.bags.iter().fold(HashMap::new(), |mut ms, bag| {
-            ms.insert(bag.id, bag.id);
-            ms
-        });
-        */
-
         let mut bag_relations = BagRelations::new(&self.bags);
-
-        ntd.add_bag(FxHashSet::from_iter(self.bags[self.root.unwrap()].vertex_set.iter().copied()));
+        ntd.add_bag(FxHashSet::from_iter(
+            self.bags[self.root.unwrap()].vertex_set.iter().copied(),
+        ));
 
         for old_bag in BfsIter::new(&self) {
-            // TODO: Do not insert always because the bag might have been a child of another and is
-            // already inserted?
-            // let bag_id = ntd.add_bag(old_bag.vertex_set.clone());
             let bag_id = bag_relations.to_new[&old_bag.id];
-
-            /*
-            let mapped_bag = match bag_relations.to_old.get(&bag_id) {
-                Some(id) => *id,
-                None => {
-                    bag_relations.to_old.insert(bag_id, old_bag.id);
-                    old_bag.id
-                }
-            };
-            */
-
-            println!("New {} -> Old {}", bag_id, old_bag.id);
 
             let children = &node_relations.children[&old_bag.id];
 
-            println!(
-                "|children| = ({}) {{{}}}",
-                children.len(),
-                vertex_set_to_string(children.iter())
-            );
-
             if children.len() >= 2 {
-                // Join node.
-                println!("Join node: {:?}", old_bag.vertex_set);
+                // 1. Joins
+                // For each bag that is not a leaf do
+                // if |children| >= 2 and the bags have different vertex sets then
+                //   Clone the bag |children| - 1 times.
+                //   Set new edges and parents for each cloned self and child.
 
-                // Clone the bag |children| - 1 times.
-                // Set new edges and parents for each cloned self and child.
+                // We take all children but the last, iterate from left to right and insert join nodes.
                 let last_clone = children
                     .iter()
                     .take(children.len() - 1)
@@ -304,21 +245,22 @@ impl NiceTreeDecomposition for TreeDecomposition {
                         ntd.add_edge(parent_id, left_clone_id);
                         ntd.add_edge(parent_id, right_clone_id);
 
-                        println!("Left clone : ({left_clone_id}) {{{}}}", vertex_set_to_string(ntd.bags[left_clone_id].vertex_set.iter()));
-                        println!("Child      : ({}) {{{}}}", old_child.id, vertex_set_to_string(old_child.vertex_set.iter()));
-
-                        insert_between_bags(&mut ntd, &mut bag_relations, &old_bag.vertex_set, &old_child.vertex_set, left_clone_id, Some(old_child.id));
-
-                        println!("Parent: ({parent_id}) {:?} -> ({left_clone_id}) {:?}, ({right_clone_id}) {:?}",
-                            ntd.bags[parent_id].vertex_set,
-                            ntd.bags[left_clone_id].vertex_set,
-                            ntd.bags[right_clone_id].vertex_set);
+                        // Inserts between bags between the clone and the current child.
+                        insert_between_bags(
+                            &mut ntd,
+                            &mut bag_relations,
+                            &old_bag.vertex_set,
+                            &old_child.vertex_set,
+                            left_clone_id,
+                            Some(old_child.id)
+                        );
 
                         right_clone_id
                     });
 
                 let last_child = &self.bags[*children.last().unwrap()];
-                println!("Add last child {}: {{{}}}", last_child.id, vertex_set_to_string(last_child.vertex_set.iter()));
+
+                // Inserts between bags between the last clone and the most right child.
                 insert_between_bags(
                     &mut ntd,
                     &mut bag_relations,
@@ -328,9 +270,11 @@ impl NiceTreeDecomposition for TreeDecomposition {
                     Some(last_child.id),
                 );
             } else if children.len() == 1 {
-                println!("Inner node: {{{}}}", vertex_set_to_string(old_bag.vertex_set.iter()));
+                // 2. Introduces and forgets
+                // For each bag that is not a leaf do
+                //   Calculate the intersection with the parent bag.
+                //   Introduce and forget until the intersection is met.
                 let child = &self.bags[children[0]];
-                println!("Child: {{{}}}", vertex_set_to_string(child.vertex_set.iter()));
                 let inserted_id = bag_relations.to_new[&bag_relations.to_old[&bag_id]];
 
                 insert_between_bags(
@@ -342,7 +286,9 @@ impl NiceTreeDecomposition for TreeDecomposition {
                     Some(child.id),
                 );
             } else {
-                println!("Leaf node: {:?}", old_bag.vertex_set);
+                // 3. Introduces
+                // For each leaf:
+                //   Introduce bags from a set of one element to the leaf set.
                 let end_set = FxHashSet::from_iter(old_bag.vertex_set.iter().take(1).copied());
                 let inserted_id = bag_relations.to_new[&bag_relations.to_old[&bag_id]];
 
@@ -352,159 +298,10 @@ impl NiceTreeDecomposition for TreeDecomposition {
                     &old_bag.vertex_set,
                     &end_set,
                     inserted_id,
-                    None
+                    None,
                 );
             }
-            println!("-----");
         }
-
-        /*
-        println!("Second iteration for inner and leaf nodes.");
-        let tmp_ntd_node_rels = NodeRelations::new(&ntd);
-        for bag in BfsIter::new(&ntd) {
-            let children = tmp_ntd_node_rels.children.get(&bag.id).unwrap();
-            if children.len() < 2 {
-                // Inner node.
-                println!("Inner or leaf node: ({}) {:?}", bag.id, bag.vertex_set);
-
-                if let NodeParent::Real(parent_id) = tmp_ntd_node_rels.parent.get(&bag.id).unwrap()
-                {
-                    let parent = &ntd.bags[*parent_id];
-                    println!("\tParent: ({parent_id}) {:?}", parent.vertex_set);
-                    // Calculate the intersection with the parent bag.
-                    let intersection = get_bag_intersection(bag, parent);
-                    println!(
-                        "\tB({parent_id}) ∩ B({}) = {{{}}} ∩ {{{}}} = {{{}}}",
-                        bag.id,
-                        vertex_set_to_string(parent.vertex_set.iter()),
-                        vertex_set_to_string(bag.vertex_set.iter()),
-                        vertex_set_to_string(intersection.iter()),
-                    );
-                    for i in (intersection.len()..parent.vertex_set.len()) {}
-
-                    // Introduce and forget until the intersection is met.
-                }
-            }
-
-            if children.len() == 0 {
-                // Leaf node.
-                println!("Leaf node: ({}) {:?}", bag.id, bag.vertex_set);
-
-                // Introduce bags from a set of one element to the leaf set.
-            }
-        }
-        */
-
-        /*
-        for bag in BfsIter::new(&self) {
-            let parent = node_relations.parent.get(&bag.id).unwrap();
-            let children = node_relations.children.get(&bag.id).unwrap();
-
-            if children.len() < 2 {
-                continue;
-            }
-
-            let mut diff = false;
-
-            // TODO: Think about if we need to clone for all children when we finde one difference
-            // or if we just need to clone for the children that actually have a different vertex
-            // set.
-            for &child_id in children.iter() {
-                let child = &self.bags[child_id];
-                let intersection = child
-                    .vertex_set
-                    .intersection(&bag.vertex_set)
-                    .map(|&v| v)
-                    .collect::<Vec<usize>>();
-
-                if intersection.len() < bag.vertex_set.len() {
-                    diff = true;
-                    break;
-                }
-            }
-
-            // When we do not find any difference in the child sets
-            if !diff {
-                continue;
-            }
-
-            if children.is_empty() {
-                continue;
-            }
-
-            let clone_count = children.len() - 1;
-            for i in 0..clone_count {}
-        }
-
-        // 2. Introduces and forgets
-        // For each bag that is not a leaf do
-        //   Calculate the intersection with the parent bag.
-        //   Introduce and forget until the intersection is met.
-
-        for bag in BfsIter::new(&self) {
-            match node_relations.parent.get(&bag.id).unwrap() {
-                NodeParent::Fake => {} // Nothing to do for the fake root parent.
-                NodeParent::Real(parent_id) => {
-                    let parent = &self.bags[*parent_id];
-                    let intersection = get_bag_intersection(bag, parent);
-                    let bag_size = bag.vertex_set.len();
-                    let parent_size = parent.vertex_set.len();
-                    let forget_count = bag_size - intersection.len();
-                    let introduce_count = parent_size - intersection.len();
-
-                    // Remove the neighbors mutually in the result tree decomposition.
-                    // Since there is no `remove_edge` we have to do it on the set itself.
-                    ntd
-                        .bags
-                        .get_mut(bag.id)
-                        .unwrap()
-                        .neighbors
-                        .remove(&parent.id);
-                    ntd
-                        .bags
-                        .get_mut(*parent_id)
-                        .unwrap()
-                        .neighbors
-                        .remove(&bag.id);
-
-                    let mut last_bag_id = bag.id;
-                    for i in 1..forget_count + 1 {
-                        let new_vertex_set = FxHashSet::from_iter(
-                            self.bags[last_bag_id]
-                                .vertex_set
-                                .iter()
-                                .take(bag_size - i) // Drop the last i values.
-                                .copied(),
-                        );
-                        let new_bag_id = ntd.add_bag(new_vertex_set);
-                        ntd.add_edge(last_bag_id, new_bag_id);
-                        last_bag_id = new_bag_id;
-                    }
-
-                    for i in 1..introduce_count {}
-                }
-            }
-        }
-
-        // 3. Introduces
-        // For each leaf:
-        //   Introduce bags from a set of one element to the leaf set.
-
-        for bag in self.bags.iter() {
-            let mut pred_id = bag.id;
-            let vertices = bag.vertex_set.iter().copied().collect::<Vec<usize>>();
-
-            for i in (1..bag.vertex_set.len()).rev() {
-                let mut vs: FxHashSet<usize> = FxHashSet::default();
-                for v2 in vertices[0..i].iter() {
-                    vs.insert(*v2);
-                }
-                let new_id = ntd.add_bag(vs);
-                ntd.add_edge(pred_id, new_id);
-                pred_id = new_id;
-            }
-        }
-        */
 
         ntd
     }
