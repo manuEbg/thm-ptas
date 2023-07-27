@@ -4,7 +4,7 @@ use crate::graph::dcel::vertex::VertexId;
 use crate::graph::DcelBuilder;
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
-use crate::graph::reductions::{merge_vertices_and_update_indices, remove_vertex_and_update_indices, update_vertex_indices};
+use crate::graph::reductions::{ApplicableReduction, merge_vertices_and_update_indices, remove_vertex_and_update_indices, update_vertex_indices};
 
 #[derive(Debug)]
 pub struct TwinReduction {
@@ -14,8 +14,8 @@ pub struct TwinReduction {
     pub(crate) adjacent_neighbors: bool
 }
 
-impl TwinReduction {
-    pub fn reduce_dcel_builder(
+impl ApplicableReduction for TwinReduction {
+    fn reduce_dcel_builder(
         &self,
         dcel_builder: &mut DcelBuilder,
         vertex_ids: &mut HashMap<VertexId, VertexId>) {

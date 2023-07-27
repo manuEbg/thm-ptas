@@ -18,6 +18,13 @@ pub struct Reductions {
     nodal_fold_reductions: Vec<NodalFold>
 }
 
+pub trait ApplicableReduction {
+    fn reduce_dcel_builder(&self,
+                           dcel_builder: &mut DcelBuilder,
+                           vertex_indices: &mut HashMap<VertexId, VertexId>
+    );
+}
+
 impl Reductions {
     pub fn reduce_quick_graph(mut quick_graph: &mut QuickGraph) -> Self {
         let isolated_cliques: Vec<IsolatedClique> = do_isolated_clique_reductions(&mut quick_graph);

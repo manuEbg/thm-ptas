@@ -4,7 +4,7 @@ use crate::graph::dcel::vertex::VertexId;
 use crate::graph::DcelBuilder;
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
-use crate::graph::reductions::{remove_vertex_and_update_indices, update_vertex_indices};
+use crate::graph::reductions::{ApplicableReduction, remove_vertex_and_update_indices, update_vertex_indices};
 
 #[derive(Debug)]
 pub struct IsolatedClique {
@@ -12,8 +12,8 @@ pub struct IsolatedClique {
     pub(crate) members: Vec<usize>
 }
 
-impl IsolatedClique {
-    pub fn reduce_dcel_builder(
+impl ApplicableReduction for IsolatedClique {
+    fn reduce_dcel_builder(
         &self,
         dcel_builder: &mut DcelBuilder,
         vertex_ids: &mut HashMap<VertexId, VertexId>,
