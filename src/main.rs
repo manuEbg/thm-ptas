@@ -260,8 +260,9 @@ fn main() {
 */
 
     let mut quick_graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
+    let mut dcel_builder: DcelBuilder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
     let reductions: Reductions = Reductions::reduce_quick_graph(&mut quick_graph);
-    println!("{:?}", reductions);
-    println!("{:?}", quick_graph);
+    println!("{:?}", reductions.reduce_dcel_builder(&mut dcel_builder));
+    println!("{:?}", dcel_builder.build());
 }
 

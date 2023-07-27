@@ -26,11 +26,31 @@ impl Reductions {
         Reductions {isolated_cliques, twin_reductions, nodal_fold_reductions}
     }
 
-    pub fn reduce_dcel_builder(&self, dcel_builder: &mut DcelBuilder) -> HashMap<usize, usize> {
-        HashMap::new()
-    }
+    pub fn reduce_dcel_builder(&self, mut dcel_builder: &mut DcelBuilder) -> HashMap<VertexId, VertexId> {
+        /* initialize map with vertex indices */
+        let mut result: HashMap<VertexId, VertexId> = HashMap::new();
+        for vertex in 0..dcel_builder.vertex_count() {
+            result.insert(vertex, vertex);
+        }
 
+        /* do isolated clique reductions */
+        for isolated_clique in &self.isolated_cliques {
+            isolated_clique.reduce_dcel_builder(&mut dcel_builder, &mut result);
+        }
+
+        /* do twin reductions */
+        for twin_reduction in &self.twin_reductions {
+            twin_reduction.reduce_dcel_builder(&mut dcel_builder, &mut result);
+        }
+
+        /* do nodal fold reductions */
+        for nodal_fold_reduction in &self.nodal_fold_reductions {
+            nodal_fold_reduction.reduce_dcel_builder(&mut dcel_builder, &mut result);
+        }
+        result
+    }
 }
+
 
 pub fn update_vertex_indices(
     vertex_indices: &mut HashMap<VertexId, VertexId>,

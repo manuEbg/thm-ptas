@@ -24,6 +24,10 @@ impl DcelBuilder {
         }
     }
 
+    pub fn vertex_count(&self) -> usize {
+        self.vertices.len()
+    }
+
     pub fn push_arc(&mut self, src: usize, dst: usize) {
         self.arcs.push(Arc::new(src, dst));
         let current_arc = self.arcs.len() - 1;
