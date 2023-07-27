@@ -19,7 +19,7 @@ use graph::quick_graph::QuickGraph;
 use graph::reducible::Reducible;
 use graph::reductions::*;
 use crate::graph::reductions::isolated_clique_reduction::{do_isolated_clique_reductions, IsolatedClique, transfer_isolated_clique};
-use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, NodalFold, transfer_nodal_fold_reduction};
+use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, NodalFold, transfer_nodal_fold_reductions};
 use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions, TwinReduction};
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
@@ -261,8 +261,11 @@ fn main() {
 
     let mut quick_graph: QuickGraph = read_graph_file_into_quick_graph("example_graph.txt").unwrap();
     let mut dcel_builder: DcelBuilder = read_graph_file_into_dcel_builder("example_graph.txt").unwrap();
-    let reductions: Reductions = Reductions::reduce_quick_graph(&mut quick_graph);
-    println!("{:?}", reductions.reduce_dcel_builder(&mut dcel_builder));
+    let mut reductions: Reductions = Reductions::reduce_quick_graph(&mut quick_graph);
+    let mut vertex_indices: HashMap<VertexId, VertexId> = reductions.reduce_dcel_builder(&mut dcel_builder);
+    println!("{:?}", vertex_indices);
     println!("{:?}", dcel_builder.build());
+    let mut independence_set: Vec<VertexId> = Vec::new();
+    reductions.transfer_independence_set(&mut vertex_indices, &mut independence_set);
+    println!("{:?}", independence_set);
 }
-

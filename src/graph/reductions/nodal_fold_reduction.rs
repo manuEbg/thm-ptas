@@ -64,9 +64,9 @@ pub fn do_nodal_fold_reductions(graph: &mut QuickGraph) -> Vec<NodalFold> {
 }
 
 /* restore solution from solution after nodal fold reductions */
-pub fn transfer_nodal_fold_reduction(
-    mut independence_set: Vec<usize>,
-    mut reductions: Vec<NodalFold>
+pub fn transfer_nodal_fold_reductions(
+    mut independence_set: &mut Vec<usize>,
+    mut reductions: &mut Vec<NodalFold>
 ) {
     while let Some(reduction) = reductions.pop() {
         /* decide if the inner vertex or the neighbors should be taken into the solution */

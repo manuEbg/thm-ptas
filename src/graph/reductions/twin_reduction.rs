@@ -113,8 +113,8 @@ pub fn do_twin_reductions(graph: &mut QuickGraph) -> Vec<TwinReduction> {
 }
 
 pub fn transfer_twin_reductions(
-    reductions: &mut Vec<TwinReduction>,
-    mut independence_set: &mut Vec<usize>
+    mut independence_set: &mut Vec<usize>,
+    mut reductions: &mut Vec<TwinReduction>
 ) {
     while let Some(reduction) = reductions.pop() {
         /* decide which vertices should be taken into the solution */

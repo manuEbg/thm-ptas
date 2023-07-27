@@ -58,8 +58,8 @@ solution for the graph after isolated clique reductions
  */
 
 pub fn transfer_isolated_clique(
-    isolated_cliques: Vec<IsolatedClique>,
-    mut independence_set: &mut Vec<usize>
+    mut independence_set: &mut Vec<usize>,
+    isolated_cliques: &Vec<IsolatedClique>
 ) {
     independence_set.extend(isolated_cliques.iter().map(|isolated_clique|
         isolated_clique.isolated_vertex)
