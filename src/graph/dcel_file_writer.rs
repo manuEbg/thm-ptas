@@ -1,7 +1,11 @@
+use super::approximated_td::ApproximatedTD;
+use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
+use super::dcel::vertex::VertexId;
 use super::dcel::*;
-use super::dual_graph::DualGraph;
 use super::Dcel;
+use std::collections::HashMap;
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
 
@@ -215,26 +219,34 @@ impl<'a> WebFileWriter for SpanningTree<'a> {
 
 impl WebFileWriter for SubDcel {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
-        let mapped_arcs = self.get_untriangulated_arcs().iter().enumerate().map(|(i, _)| { *self.get_original_arc(i).unwrap() }).collect::<Vec<_>>();
+        let mapped_arcs = self
+            .get_untriangulated_arcs()
+            .iter()
+            .enumerate()
+            .map(|(i, _)| *self.get_original_arc(i).unwrap())
+            .collect::<Vec<_>>();
 
-        let triangulated_arcs = self.get_triangulated_arcs().iter().map(|arc| {
-            let original_dst = self.get_original_vertex(arc.dst()).unwrap();
-            let original_src = self.get_original_vertex(arc.src()).unwrap();
+        let triangulated_arcs = self
+            .get_triangulated_arcs()
+            .iter()
+            .map(|arc| {
+                let original_dst = self.get_original_vertex(arc.dst()).unwrap();
+                let original_src = self.get_original_vertex(arc.src()).unwrap();
 
-            JsValues::new(vec![
-                JsValue::new("dst", original_dst),
-                JsValue::new("src", original_src),
-            ])
-        })
-        .collect::<Vec<_>>();
+                JsValues::new(vec![
+                    JsValue::new("dst", original_dst),
+                    JsValue::new("src", original_src),
+                ])
+            })
+            .collect::<Vec<_>>();
 
-        let objs = triangulated_arcs.iter().map(|arcs| JsObject::new(arcs)).collect();
+        let objs = triangulated_arcs
+            .iter()
+            .map(|arcs| JsObject::new(arcs))
+            .collect();
 
         JsObject::new(&JsValues::new(vec![
-            JsValue::new(
-                "arcs",
-                &JsArray::new(&mapped_arcs),
-            ),
+            JsValue::new("arcs", &JsArray::new(&mapped_arcs)),
             //JsValue::new("triangulated_arcs", &JsArray::new(&triangulated_arcs)),
             JsValue::new("triangulated_arcs", &JsArray::new(&objs)),
         ]))
@@ -242,16 +254,30 @@ impl WebFileWriter for SubDcel {
     }
 }
 
-impl<'a> WebFileWriter for DualGraph<'a> {
+impl<'a> WebFileWriter for HashSet<VertexId> {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        JsArray::new(
+            &self
+                .iter()
+                .collect::<Vec<&VertexId>>()
+                .iter()
+                .map(|m| JsVertex::new(**m))
+                .collect::<Vec<JsVertex>>(),
+        )
+        .write_to_file(file, id, level)
+    }
+}
+
+impl<'a> WebFileWriter for ApproximatedTD<'a> {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         fn build_js_verticies(n: usize) -> Vec<JsVertex> {
             (0..n).map(|id| JsVertex::new(id)).collect()
         }
-        fn build_js_arcs(dg: &DualGraph) -> Vec<JsArc> {
+        fn build_js_arcs(dg: &ApproximatedTD) -> Vec<JsArc> {
             let mut arc_count: usize = 0;
             let mut arcs = vec![];
 
-            for (v, adj) in dg.get_adjacent().iter().enumerate() {
+            for (v, adj) in dg.adjacent().iter().enumerate() {
                 for u in adj.iter() {
                     arcs.push(JsArc::new(arc_count, v, *u, false));
                     arc_count += 1;
@@ -263,9 +289,10 @@ impl<'a> WebFileWriter for DualGraph<'a> {
         JsObject::new(&JsValues::new(vec![
             JsValue::new(
                 "vertices",
-                &JsArray::new(&build_js_verticies(self.num_vertices())),
+                &JsArray::new(&build_js_verticies(self.num_bags())),
             ),
             JsValue::new("arcs", &JsArray::new(&build_js_arcs(self))),
+            JsValue::new("bags", &JsArray::new(self.bags())),
         ]))
         .write_to_file(file, id, level)
     }
@@ -280,8 +307,8 @@ impl WebFileWriter for Dcel {
             .map(|(i, _v)| JsVertex::new(i))
             .collect();
         let st = self.spanning_tree(0);
-        let mut dual_graph = DualGraph::new(&st);
-        dual_graph.build();
+        let mut b = TDBuilder::new(&st);
+        let approx_td = ApproximatedTD::from(&mut b);
         let s = st.arcs();
         let a = self
             .arcs()
@@ -328,15 +355,12 @@ impl WebFileWriter for Dcel {
                     JsValue::new("arcs", &JsArray::new(&a)),
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
-                    JsValue::new("dualgraph", &dual_graph),
+                    JsValue::new("dualgraph", &approx_td), // TODO rename JS entry
                     JsValue::new(
                         "rings",
                         &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
                     ),
-                    JsValue::new(
-                        "donuts",
-                        &JsArray::new(&donuts)
-                    ),
+                    JsValue::new("donuts", &JsArray::new(&donuts)),
                 ],
             },
         }

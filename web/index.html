@@ -20,9 +20,12 @@
     <div id="graph"></div>
     
     <div class="button-container">
-      <button type="button" onclick="g.highlightNextFace()">Next face</button>
-      <button type="button" onclick="g.highlightNextFace(false)">Prev face</button>
-      <button type="button" onclick="g.toggleSpanningTree()">Spanning tree</button>
+      <button type="button" onclick="g.toggleTD()">Toggle Tree Decomposition</button>
+      <button type="button" onclick="g.highlightNextBag()" class="small"> Bags + </button>
+      <button type="button" onclick="g.highlightNextBag(false)" class="small"> Bags - </button>
+      <button type="button" onclick="g.highlightNextFace()" class="small"> Faces + </button>
+      <button type="button" onclick="g.highlightNextFace(false)" class="small"> Faces - </button>
+      <button type="button" onclick="g.toggleSpanningTree()">Toggle Spanning tree</button>
       <button type="button" onclick="g.toggleAdditionalEdges()">AdditionalEdges</button>
       <button type="button" onclick="g.highlightPrevRing()">Prev Ring</button>
       <button type="button" onclick="g.highlightNextRing()">Next Ring</button>
