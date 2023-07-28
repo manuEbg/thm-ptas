@@ -252,7 +252,7 @@ impl NiceTreeDecomposition for TreeDecomposition {
                             &old_bag.vertex_set,
                             &old_child.vertex_set,
                             left_clone_id,
-                            Some(old_child.id)
+                            Some(old_child.id),
                         );
 
                         right_clone_id
@@ -305,6 +305,29 @@ impl NiceTreeDecomposition for TreeDecomposition {
 
         ntd
     }
+}
+
+fn validate_nice_td(ntd: &TreeDecomposition, relations: &NodeRelations) -> bool {
+    ntd.bags.iter().all(|bag| {
+        let children = &relations.children[&bag.id];
+        match children.len() {
+            0 => bag.vertex_set.len() == 1,
+            1 => {
+                let child = &ntd.bags[children[0]];
+                let parent_to_child_intersection = bag.vertex_set.difference(&child.vertex_set);
+                let child_to_parent_intersection = child.vertex_set.difference(&bag.vertex_set);
+                parent_to_child_intersection.count() == 1
+                    || child_to_parent_intersection.count() == 1
+            }
+            2 => {
+                let left_child = &ntd.bags[children[0]];
+                let right_child = &ntd.bags[children[1]];
+                bag.vertex_set.difference(&left_child.vertex_set).count() == 0
+                    && bag.vertex_set.difference(&right_child.vertex_set).count() == 0
+            }
+            _ => false,
+        }
+    })
 }
 
 fn vertex_set_to_string<'a, T>(vs: T) -> String
@@ -395,6 +418,7 @@ fn td_write_to_dot(
 
         let nice_td = td.make_nice(&td_rels);
         let ntd_rels = NodeRelations::new(&nice_td);
+        assert!(validate_nice_td(&nice_td, &ntd_rels));
 
         let ntd_path = "ntd.dot";
         let mut ntd_out = File::create(ntd_path)?;
