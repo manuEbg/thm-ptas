@@ -307,8 +307,21 @@ impl NiceTreeDecomposition for TreeDecomposition {
     }
 }
 
-fn validate_nice_td(ntd: &TreeDecomposition, relations: &NodeRelations) -> bool {
+fn validate_nice_td(
+    otd: &TreeDecomposition,
+    ntd: &TreeDecomposition,
+    relations: &NodeRelations,
+) -> bool {
+    let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
     ntd.bags.iter().all(|bag| {
+        if let Some(b) = otd
+            .bags
+            .iter()
+            .filter(|obag| obag.vertex_set.eq(&bag.vertex_set))
+            .nth(0)
+        {
+            present[b.id] = true;
+        }
         let children = &relations.children[&bag.id];
         match children.len() {
             0 => bag.vertex_set.len() == 1,
@@ -327,7 +340,7 @@ fn validate_nice_td(ntd: &TreeDecomposition, relations: &NodeRelations) -> bool 
             }
             _ => false,
         }
-    })
+    }) && present.iter().all(|&v| v)
 }
 
 fn vertex_set_to_string<'a, T>(vs: T) -> String
@@ -418,7 +431,7 @@ fn td_write_to_dot(
 
         let nice_td = td.make_nice(&td_rels);
         let ntd_rels = NodeRelations::new(&nice_td);
-        assert!(validate_nice_td(&nice_td, &ntd_rels));
+        assert!(validate_nice_td(&td, &nice_td, &ntd_rels));
 
         let ntd_path = "ntd.dot";
         let mut ntd_out = File::create(ntd_path)?;
