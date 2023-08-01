@@ -515,6 +515,7 @@ impl std::fmt::Display for FindMisError {
     }
 }
 
+<<<<<<< HEAD
 fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> isize {
     entry
         .sets
@@ -531,6 +532,15 @@ pub fn find_mis(
     ntd: &TreeDecomposition,
     node_relations: &NodeRelations,
 ) -> Result<(FxHashSet<usize>, isize), FindMisError> {
+=======
+// TODO:
+// 1. Maybe change data structure for the nice tree decomposition.
+// 2. Add the original graph to the parameters so we can check whether two vertices are neighbors.
+pub fn find_mis(
+    ntd: &TreeDecomposition,
+    node_relations: &NodeRelations,
+) -> Result<(HashSet<usize>, isize), FindMisError> {
+>>>>>>> 162911e (Add error message for mis failure.)
     type DynTable = HashMap<usize, DynTableValue>;
     let mut dyn_table: DynTable = HashMap::new();
 
@@ -854,8 +864,13 @@ pub mod tests {
             .spawn()
             .expect("dot command did not work.");
 
+<<<<<<< HEAD
         let (bag_content, size) = find_mis(&nice_td, &ntd_rels)?;
         println!("{:?} with size = {}", bag_content, size);
+=======
+        let mis = find_mis(&nice_td, &ntd_rels)?;
+        println!("{:?} with size = {}", mis.0, mis.1);
+>>>>>>> 162911e (Add error message for mis failure.)
 
         Ok(())
     }
