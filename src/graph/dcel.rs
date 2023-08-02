@@ -159,6 +159,16 @@ impl Dcel {
         }
     }
 
+    pub fn adjacency_matrix(&self) -> Vec<Vec<bool>> {
+        let mut matrix = vec![vec![false; self.num_vertices()]; self.num_vertices()];
+        for (i, v) in self.vertices.iter().enumerate() {
+            for a in v.arcs().iter() {
+                matrix[i][self.arc(*a).dst()] = true;
+            }
+        }
+        matrix
+    }
+
     pub fn push_vertex(&mut self, v: Vertex) {
         self.vertices.push(v);
     }
@@ -445,5 +455,18 @@ impl Dcel {
 
     pub fn pre_triangulation_arc_count(&self) -> usize {
         self.pre_triangulation_arc_count
+    }
+}
+#[cfg(test)]
+mod tests {
+    use crate::read_graph_file_into_dcel_builder;
+
+    use super::*;
+    #[test]
+    fn adjacency_matrix() {
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/tree.graph").unwrap();
+        let dcel = dcel_b.build();
+        let am = dcel.adjacency_matrix();
+        println!("{:?}", am)
     }
 }
