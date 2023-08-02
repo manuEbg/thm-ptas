@@ -6,12 +6,11 @@ use std::hash::Hash;
 
 // TODO: Split this file into multiple and a separate directory.
 
+// TODO: @cleanup This can probably be removed.
 /// This function is used to create a tree decomposition on one of the rings
 /// in a DCEL data structure.
 impl From<&ApproximatedTD<'_>> for TreeDecomposition {
     fn from(atd: &ApproximatedTD) -> Self {
-        let dcel = atd.graph();
-        let faces = &dcel.faces();
         let mut result = TreeDecomposition {
             bags: vec![],
             root: None,
@@ -20,23 +19,13 @@ impl From<&ApproximatedTD<'_>> for TreeDecomposition {
 
         let mut max_bag_size = 0;
 
-        for face in *faces {
-            let mut vertices: FxHashSet<usize> = FxHashSet::default();
-
-            for arc in face.walk_face(&dcel) {
-                vertices.insert(dcel.arc(arc).src());
+        atd.bags().iter().for_each(|bag| {
+            if bag.len() > max_bag_size {
+                max_bag_size = bag.len();
             }
-
-            if max_bag_size < vertices.len() {
-                max_bag_size = vertices.len();
-            }
-
-            result.add_bag(vertices);
-
-            if result.bags.len() == 1 {
-                result.root = Some(0);
-            }
-        }
+            result
+                .add_bag(FxHashSet::from_iter(bag.iter().copied()));
+        });
 
         for i in 0..atd.adjacent().len() {
             let neighbors = &atd.adjacent()[i];
@@ -167,21 +156,30 @@ fn insert_between_bags(
     let mut sets = Vec::new();
     let (intersection, b1_diff, b2_diff) = get_bag_intersection(s1, s2);
 
+    let ins_len = intersection.len();
+
+    println!("Insert between bags for new {new_parent_id} and old {old_child_id:?}");
+    println!("Intersection = {intersection:?}, introduces = {b1_diff:?}, forgets = {b2_diff:?}");
+
     // Build introduces.
-    for last_idx in (intersection.len()..b1_diff.len()).rev() {
+    for last_idx in (0..b1_diff.len()).rev() {
         // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b1_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
+        println!("(Introduce) Add {set:?}");
         sets.push(set);
     }
 
+    let mut insert_last_child = false;
     // Build forgets.
     // We skip the first because this would just be the same as the last in the loop above.
-    for last_idx in intersection.len() + 1..b2_diff.len() {
+    for last_idx in 1..b2_diff.len() {
         // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b2_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
+        println!("(Forget) Add {set:?}");
         sets.push(set);
+        insert_last_child = true;
     }
 
     let mut last_parent = new_parent_id;
@@ -192,8 +190,14 @@ fn insert_between_bags(
         last_parent = between_bag;
     }
 
-    let child_id = ntd.add_bag(s2.clone());
-    ntd.add_edge(last_parent, child_id);
+    let child_id = if insert_last_child {
+        let child_id = ntd.add_bag(s2.clone());
+        ntd.add_edge(last_parent, child_id);
+        child_id
+    } else {
+        last_parent
+    };
+
     if let Some(id) = old_child_id {
         bag_relations.to_old.insert(child_id, id);
         bag_relations.to_new.insert(id, child_id);
@@ -467,28 +471,74 @@ impl std::fmt::Display for DynTableValue {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+enum MisSize {
+    Invalid,
+    Valid(usize),
+}
+
+impl MisSize {
+    fn get(&self) -> usize {
+        match self {
+            MisSize::Invalid => panic!("Mis size is invalid!"),
+            MisSize::Valid(s) => *s,
+        }
+    }
+}
+
+impl std::ops::Add for MisSize {
+    type Output = MisSize;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        match self {
+            MisSize::Invalid => MisSize::Invalid,
+            MisSize::Valid(l) => match rhs {
+                MisSize::Invalid => MisSize::Invalid,
+                MisSize::Valid(r) => MisSize::Valid(l + r),
+            },
+        }
+    }
+}
+
+impl std::ops::Sub for MisSize {
+    type Output = MisSize;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        match self {
+            MisSize::Invalid => MisSize::Invalid,
+            MisSize::Valid(l) => match rhs {
+                MisSize::Invalid => MisSize::Invalid,
+                MisSize::Valid(r) => MisSize::Valid(l - r),
+            },
+        }
+    }
+}
+
+impl std::fmt::Display for MisSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MisSize::Invalid => write!(f, "-infinity"),
+            MisSize::Valid(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 // TODO: Maybe change to a tuple struct.
 #[derive(Debug)]
 struct DynTableValueItem {
     mis: FxHashSet<usize>,
-    size: isize,
+    size: MisSize,
 }
 
 impl DynTableValueItem {
-    fn new(mis: FxHashSet<usize>, size: isize) -> Self {
+    fn new(mis: FxHashSet<usize>, size: MisSize) -> Self {
         DynTableValueItem { mis, size }
     }
 }
 
 impl std::fmt::Display for DynTableValueItem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "|{:?}| = {}",
-            self.mis,
-            // vertex_set_to_string(self.mis.iter()),
-            self.size
-        )
+        write!(f, "{:?}, {}", self.mis, self.size)
     }
 }
 
@@ -515,7 +565,7 @@ impl std::fmt::Display for FindMisError {
     }
 }
 
-fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> isize {
+fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> MisSize {
     entry
         .sets
         .iter()
@@ -524,13 +574,18 @@ fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> isize {
         .size
 }
 
+fn is_independent(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &FxHashSet<usize>) -> bool {
+    set.iter().all(|u| !adjaceny_matrix[v][*u])
+}
+
 // TODO:
 // 1. Maybe change data structure for the nice tree decomposition.
 // 2. Add an adjaceny matrix/list to check whether two vertices are connected or not.
 pub fn find_mis(
+    adjaceny_matrix: Vec<Vec<bool>>,
     ntd: &TreeDecomposition,
     node_relations: &NodeRelations,
-) -> Result<(FxHashSet<usize>, isize), FindMisError> {
+) -> Result<(FxHashSet<usize>, usize), FindMisError> {
     type DynTable = HashMap<usize, DynTableValue>;
     let mut dyn_table: DynTable = HashMap::new();
 
@@ -542,11 +597,11 @@ pub fn find_mis(
             0 => {
                 entry.add(DynTableValueItem::new(
                     FxHashSet::from_iter(Vec::new().into_iter()),
-                    0,
+                    MisSize::Valid(0),
                 ));
                 entry.add(DynTableValueItem::new(
                     FxHashSet::from_iter(bag.vertex_set.iter().copied()),
-                    1,
+                    MisSize::Valid(1),
                 ));
             }
 
@@ -561,20 +616,23 @@ pub fn find_mis(
                     );
 
                     for subset in SubsetIter::new(&bag.vertex_set) {
-                        if false {
-                            // TODO: Independence check.
-                            entry.sets.push(DynTableValueItem::new(subset, std::isize::MIN));
-                        } else if !subset.contains(&v) {
+                        if !subset.contains(&v) {
                             let value = find_child_size(&child_entry, &subset);
                             entry.sets.push(DynTableValueItem::new(subset, value));
-                        } else {
+                        } else if is_independent(&adjaceny_matrix, v, &subset) {
                             // @speed This clone could be expensive.
                             let mut clone = subset.clone();
                             clone.remove(&v);
+                            println!("{subset:?} + 1");
                             entry.sets.push(DynTableValueItem::new(
                                 subset,
-                                find_child_size(&child_entry, &clone) + 1,
+                                find_child_size(&child_entry, &clone) + MisSize::Valid(1),
                             ));
+                        } else {
+                            println!("{subset:?} is not independent.");
+                            entry
+                                .sets
+                                .push(DynTableValueItem::new(subset, MisSize::Invalid));
                         }
                     }
                 } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
@@ -615,8 +673,9 @@ pub fn find_mis(
                 for subset in SubsetIter::new(&bag.vertex_set) {
                     let left_value = find_child_size(&left_entry, &subset);
                     let right_value = find_child_size(&right_entry, &subset);
-                    let len = subset.len() as isize;
+                    let len = MisSize::Valid(subset.len());
 
+                    println!("{left_value} + {right_value} - {len}");
                     entry.sets.push(DynTableValueItem::new(
                         subset,
                         left_value + right_value - len,
@@ -640,9 +699,9 @@ pub fn find_mis(
             .unwrap()
     }
 
-    // TODO: Is this the correct recovery of the maximum independent set?
-    // This is not because with this we just find the contents of the bag.and not the actual
-    // independent set.
+    // TODO: Reconstruction
+    // 1. Remember for each set from what it was constructed.
+    // 2. Find the entry with the largest value and then walk the constructions bag.
     let mut result: Option<&DynTableValueItem> = None;
     for entry in dyn_table.values() {
         match result {
@@ -660,7 +719,7 @@ pub fn find_mis(
 
     result
         .ok_or(FindMisError::NoMisFound)
-        .map(|i| (i.mis.clone(), i.size))
+        .map(|i| (i.mis.clone(), i.size.get()))
 }
 
 fn validate_nice_td(
@@ -747,8 +806,8 @@ fn td_write_to_dot(
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::graph::dcel::spanning_tree::SpanningTree;
     use crate::graph::approximated_td::{ApproximatedTD, TDBuilder};
+    use crate::graph::dcel::spanning_tree::SpanningTree;
     use crate::read_graph_file_into_dcel_builder;
     use std::io::Error;
     use std::process::Command;
@@ -854,10 +913,47 @@ pub mod tests {
             .spawn()
             .expect("dot command did not work.");
 
-        let (bag_content, size) = find_mis(&nice_td, &ntd_rels)?;
+        let (bag_content, size) = find_mis(vec![vec![false; 6]; 6], &nice_td, &ntd_rels)?;
         println!("{:?} with size = {}", bag_content, size);
 
         Ok(())
+    }
+
+    #[test]
+    fn real() {
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        let adjacency_matrix = dcel.adjacency_matrix();
+        // dcel.triangulate();
+        let mut spanning_tree = SpanningTree::new(&dcel);
+        spanning_tree.build(0);
+        let mut td_builder = TDBuilder::new(&spanning_tree);
+        let atd = ApproximatedTD::from(&mut td_builder);
+        let td = TreeDecomposition::from(&atd);
+        let td_rels = NodeRelations::new(&td);
+        let ntd = td.make_nice(&td_rels);
+        let ntd_rels = NodeRelations::new(&ntd);
+
+        validate_nice_td(&td, &ntd, &ntd_rels);
+
+        let td_path = "td.dot";
+        let mut td_out = File::create(td_path).unwrap();
+        td_write_to_dot("td", &mut td_out, &td, &td_rels).unwrap();
+        Command::new("dot")
+            .args(["-Tpdf", td_path, "-o", "td.pdf"])
+            .spawn()
+            .expect("dot command did not work.");
+
+        let ntd_path = "ntd.dot";
+        let mut ntd_out = File::create(ntd_path).unwrap();
+        td_write_to_dot("ntd", &mut ntd_out, &ntd, &ntd_rels).unwrap();
+        Command::new("dot")
+            .args(["-Tpdf", ntd_path, "-o", "ntd.pdf"])
+            .spawn()
+            .expect("dot command did not work.");
+
+        let (bag_content, size) = find_mis(adjacency_matrix, &ntd, &ntd_rels).unwrap();
+        println!("{:?} with size = {}", bag_content, size);
     }
 
     #[test]
