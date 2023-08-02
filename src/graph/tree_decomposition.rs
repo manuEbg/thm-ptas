@@ -388,13 +388,31 @@ fn td_write_to_dot(
     Ok(())
 }
 
-    use crate::read_graph_file_into_dcel;
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::graph::dcel::spanning_tree::SpanningTree;
+    use crate::graph::approximated_td::{ApproximatedTD, TDBuilder};
+    use crate::read_graph_file_into_dcel_builder;
     use std::io::Error;
     use std::process::Command;
-        let dcel = read_graph_file_into_dcel("data/exp.graph").unwrap();
-        let dcel = read_graph_file_into_dcel("data/exp.graph").unwrap();
-        /*
-        */
+
+    #[test]
+    pub fn test_tree_decomposition() {
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+        let dcel = dcel_b.build();
+        let mut spanning_tree = SpanningTree::new(&dcel);
+        spanning_tree.build(0);
+        let mut td_builder = TDBuilder::new(&spanning_tree);
+        let atd = ApproximatedTD::from(&mut td_builder);
+        let tree_decomposition = TreeDecomposition::from(&atd);
+
+        println!("Normal tree decomposition:");
+        for bag in tree_decomposition.bags.iter() {
+            println!("{:?}", bag);
+        }
+
+        assert_eq!(tree_decomposition.bags.len(), 4);
     }
 
     #[test]
@@ -442,3 +460,5 @@ fn td_write_to_dot(
             .expect("dot command did not work.");
 
         Ok(())
+    }
+}
