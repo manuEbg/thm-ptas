@@ -2,40 +2,50 @@ use crate::graph::approximated_td::ApproximatedTD;
 use arboretum_td::tree_decomposition::{Bag, TreeDecomposition};
 use fxhash::FxHashSet;
 use std::collections::{HashMap, VecDeque};
+use std::hash::Hash;
+
+// TODO: Split this file into multiple and a separate directory.
 
 /// This function is used to create a tree decomposition on one of the rings
 /// in a DCEL data structure.
 impl From<&ApproximatedTD<'_>> for TreeDecomposition {
-    fn from(approx_td: &ApproximatedTD) -> Self {
-        let dcel = approx_td.graph();
+    fn from(atd: &ApproximatedTD) -> Self {
+        let dcel = atd.graph();
         let faces = &dcel.faces();
         let mut result = TreeDecomposition {
             bags: vec![],
             root: None,
-            max_bag_size: faces // TODO: Remove and count.
-                .iter()
-                .map(|face| face.walk_face(dcel).len())
-                .fold(0, Ord::max),
+            max_bag_size: 0,
         };
+
+        let mut max_bag_size = 0;
 
         for face in *faces {
             let mut vertices: FxHashSet<usize> = FxHashSet::default();
+
             for arc in face.walk_face(&dcel) {
                 vertices.insert(dcel.arc(arc).src());
             }
+
+            if max_bag_size < vertices.len() {
+                max_bag_size = vertices.len();
+            }
+
             result.add_bag(vertices);
+
             if result.bags.len() == 1 {
                 result.root = Some(0);
             }
         }
 
-        for i in 0..approx_td.num_bags() {
-            let neighbors = &approx_td.adjacent()[i];
+        for i in 0..atd.adjacent().len() {
+            let neighbors = &atd.adjacent()[i];
             for n in neighbors {
                 result.add_edge(i, *n);
             }
         }
 
+        result.max_bag_size = max_bag_size;
         result
     }
 }
@@ -209,6 +219,12 @@ impl BagRelations {
     }
 }
 
+struct NTD {
+    td: TreeDecomposition,
+    relations: NodeRelations,
+    bag_types: usize,
+}
+
 impl NiceTreeDecomposition for TreeDecomposition {
     fn make_nice(&self, node_relations: &NodeRelations) -> TreeDecomposition {
         let mut ntd = TreeDecomposition {
@@ -305,6 +321,346 @@ impl NiceTreeDecomposition for TreeDecomposition {
 
         ntd
     }
+}
+
+struct PostOrderIter<'a> {
+    td: &'a TreeDecomposition,
+    stack: Vec<usize>,  // Just bag IDs.
+    visited: Vec<bool>, // Improvement: Use a bitset.
+}
+
+impl<'a> PostOrderIter<'a> {
+    pub fn new(td: &'a TreeDecomposition) -> Self {
+        PostOrderIter {
+            td,
+            stack: vec![td.root.unwrap()],
+            visited: vec![false; td.bags.len()],
+        }
+    }
+
+    /// Recursively traverse the subtrees.
+    /// We push the child nodes first from left to right.
+    /// It is assumed that the sub root is already on the stack.
+    fn traverse_subtrees(&mut self, sub_root: &Bag) {
+        for &child_id in sub_root.neighbors.iter() {
+            if !self.visited[child_id] {
+                let child = &self.td.bags[child_id];
+                self.stack.push(child_id);
+                self.visited[child_id] = true;
+                self.traverse_subtrees(child);
+            }
+        }
+    }
+}
+
+impl<'a> Iterator for PostOrderIter<'a> {
+    type Item = &'a Bag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // Traverse subtrees until we find a leaf node to return.
+        while let Some(&current_id) = self.stack.last() {
+            let current = &self.td.bags[current_id];
+            if current.neighbors.len() == 0 || self.visited[current_id] {
+                self.stack.pop();
+                return Some(current);
+            }
+
+            self.visited[current_id] = true;
+            self.traverse_subtrees(current);
+        }
+        None
+    }
+}
+
+struct SubsetIter<T: Eq + Hash + Copy> {
+    set: Vec<T>, // We want to get the elements one by another, so a vector is useful.
+    element_index: usize,
+    subsets: Vec<FxHashSet<T>>,
+    subset_index: usize,
+}
+
+impl<T: Eq + Hash + Copy> SubsetIter<T> {
+    fn new(set: &FxHashSet<T>) -> Self {
+        let items = set.iter().copied().collect::<Vec<T>>();
+        SubsetIter {
+            set: items,
+            element_index: 0,
+            subsets: vec![FxHashSet::from_iter(Vec::new().into_iter())],
+            subset_index: 0,
+        }
+    }
+}
+
+impl<T: Eq + Hash + Copy> Iterator for SubsetIter<T> {
+    type Item = FxHashSet<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.subset_index < self.subsets.len() {
+            self.subset_index += 1;
+            return self
+                .subsets
+                .get(self.subset_index - 1)
+                .map(|subset| subset.clone());
+        }
+
+        if self.element_index >= self.set.len() {
+            return None;
+        }
+
+        let new_subsets = self
+            .subsets
+            .iter()
+            .map(|subset| {
+                let mut clone = subset.clone();
+                clone.insert(self.set[self.element_index]);
+                clone
+            })
+            .collect::<Vec<FxHashSet<T>>>();
+
+        new_subsets
+            .into_iter()
+            .for_each(|set| self.subsets.push(set));
+
+        self.element_index += 1;
+
+        self.next()
+    }
+}
+
+/* New dynamic table idea: @speed
+ * - Bit set as subset.
+ */
+
+#[derive(Debug)]
+struct DynTableValue {
+    sets: Vec<DynTableValueItem>,
+}
+
+impl DynTableValue {
+    fn add(&mut self, item: DynTableValueItem) {
+        self.sets.push(item);
+    }
+}
+
+impl Default for DynTableValue {
+    fn default() -> Self {
+        DynTableValue { sets: Vec::new() }
+    }
+}
+
+impl std::fmt::Display for DynTableValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.sets
+            .iter()
+            .enumerate()
+            .fold(Ok(()), |result, (index, set)| {
+                result.and_then(|()| {
+                    write!(f, "{}", set)?;
+
+                    if index < self.sets.len() - 1 {
+                        write!(f, ", ")?;
+                    }
+
+                    Ok(())
+                })
+            })
+    }
+}
+
+// TODO: Maybe change to a tuple struct.
+#[derive(Debug)]
+struct DynTableValueItem {
+    mis: FxHashSet<usize>,
+    size: isize,
+}
+
+impl DynTableValueItem {
+    fn new(mis: FxHashSet<usize>, size: isize) -> Self {
+        DynTableValueItem { mis, size }
+    }
+}
+
+impl std::fmt::Display for DynTableValueItem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "|{:?}| = {}",
+            self.mis,
+            // vertex_set_to_string(self.mis.iter()),
+            self.size
+        )
+    }
+}
+
+fn print_dyn_table(table: &HashMap<usize, DynTableValue>) {
+    for (key, val) in table.iter() {
+        println!("M[{key}] = {val}");
+    }
+}
+
+#[derive(Debug)]
+pub enum FindMisError {
+    InvalidNiceTD,
+    NoMisFound,
+}
+
+impl std::error::Error for FindMisError {}
+
+impl std::fmt::Display for FindMisError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FindMisError::InvalidNiceTD => write!(f, "Invalid nice tree decomposition!"),
+            FindMisError::NoMisFound => write!(f, "Could not find an maximum independent set!"),
+        }
+    }
+}
+
+fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> isize {
+    entry
+        .sets
+        .iter()
+        .find(|item| item.mis == *set)
+        .unwrap()
+        .size
+}
+
+// TODO:
+// 1. Maybe change data structure for the nice tree decomposition.
+// 2. Add an adjaceny matrix/list to check whether two vertices are connected or not.
+pub fn find_mis(
+    ntd: &TreeDecomposition,
+    node_relations: &NodeRelations,
+) -> Result<(FxHashSet<usize>, isize), FindMisError> {
+    type DynTable = HashMap<usize, DynTableValue>;
+    let mut dyn_table: DynTable = HashMap::new();
+
+    for bag in PostOrderIter::new(&ntd) {
+        let children = &node_relations.children[&bag.id];
+        let mut entry = DynTableValue::default();
+
+        match children.len() {
+            0 => {
+                entry.add(DynTableValueItem::new(
+                    FxHashSet::from_iter(Vec::new().into_iter()),
+                    0,
+                ));
+                entry.add(DynTableValueItem::new(
+                    FxHashSet::from_iter(bag.vertex_set.iter().copied()),
+                    1,
+                ));
+            }
+
+            1 => {
+                let child = &ntd.bags[children[0]];
+                let child_entry = dyn_table.get(&child.id).unwrap();
+                if let Some(&v) = bag.vertex_set.difference(&child.vertex_set).nth(0) {
+                    // Introduce node.
+                    println!(
+                        "Introduce {v}: B{} -> B{} = {:?} -> {:?}",
+                        &child.id, &bag.id, &child.vertex_set, &bag.vertex_set
+                    );
+
+                    for subset in SubsetIter::new(&bag.vertex_set) {
+                        if false {
+                            // TODO: Independence check.
+                            entry.sets.push(DynTableValueItem::new(subset, std::isize::MIN));
+                        } else if !subset.contains(&v) {
+                            let value = find_child_size(&child_entry, &subset);
+                            entry.sets.push(DynTableValueItem::new(subset, value));
+                        } else {
+                            // @speed This clone could be expensive.
+                            let mut clone = subset.clone();
+                            clone.remove(&v);
+                            entry.sets.push(DynTableValueItem::new(
+                                subset,
+                                find_child_size(&child_entry, &clone) + 1,
+                            ));
+                        }
+                    }
+                } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
+                    // Forget node.
+                    // forall subsets of bag: M[bag, subset] = max { ... }.
+
+                    println!(
+                        "Forget: B{} -> B{} = {:?} -> {:?}",
+                        &child.id, &bag.id, &child.vertex_set, &bag.vertex_set
+                    );
+
+                    for subset in SubsetIter::new(&bag.vertex_set) {
+                        // @speed This clone could be expensive.
+                        let mut clone = subset.clone();
+                        clone.insert(v);
+
+                        let without_value = find_child_size(&child_entry, &subset);
+                        let with_value = find_child_size(&child_entry, &clone);
+
+                        // Reconstruction: Take the set that has a greater size.
+                        entry.sets.push(DynTableValueItem::new(
+                            subset,
+                            std::cmp::max(without_value, with_value),
+                        ));
+                    }
+                }
+            }
+
+            2 => {
+                // Join node.
+                // forall subsets of bag: M[bag, subset] = M[lc, subset] + M[rc, subset] - |subset|
+
+                let left_child = &ntd.bags[children[0]];
+                let right_child = &ntd.bags[children[1]];
+                let left_entry = dyn_table.get(&left_child.id).unwrap();
+                let right_entry = dyn_table.get(&right_child.id).unwrap();
+
+                for subset in SubsetIter::new(&bag.vertex_set) {
+                    let left_value = find_child_size(&left_entry, &subset);
+                    let right_value = find_child_size(&right_entry, &subset);
+                    let len = subset.len() as isize;
+
+                    entry.sets.push(DynTableValueItem::new(
+                        subset,
+                        left_value + right_value - len,
+                    ));
+                }
+            }
+
+            _ => assert!(false, "Unreachable"),
+        }
+
+        dyn_table.insert(bag.id.clone(), entry);
+    }
+
+    print_dyn_table(&dyn_table);
+
+    fn find_largest_mis_in_bag<'a>(entry: &'a DynTableValue) -> &'a DynTableValueItem {
+        entry
+            .sets
+            .iter()
+            .max_by(|&x, &y| x.size.cmp(&y.size))
+            .unwrap()
+    }
+
+    // TODO: Is this the correct recovery of the maximum independent set?
+    // This is not because with this we just find the contents of the bag.and not the actual
+    // independent set.
+    let mut result: Option<&DynTableValueItem> = None;
+    for entry in dyn_table.values() {
+        match result {
+            None => {
+                result = Some(find_largest_mis_in_bag(&entry));
+            }
+            Some(e) => {
+                let max = find_largest_mis_in_bag(&entry);
+                if max.size > e.size {
+                    result = Some(max);
+                }
+            }
+        }
+    }
+
+    result
+        .ok_or(FindMisError::NoMisFound)
+        .map(|i| (i.mis.clone(), i.size))
 }
 
 fn validate_nice_td(
@@ -416,7 +772,7 @@ pub mod tests {
     }
 
     #[test]
-    pub fn test_dot() -> Result<(), Error> {
+    pub fn test_nice_tree_decomposition() -> Result<(), Error> {
         let mut td = TreeDecomposition {
             bags: Vec::new(),
             root: None,
@@ -460,5 +816,55 @@ pub mod tests {
             .expect("dot command did not work.");
 
         Ok(())
+    }
+
+    #[test]
+    fn test_find_mis() -> Result<(), Box<dyn std::error::Error>> {
+        let mut td = TreeDecomposition {
+            bags: Vec::new(),
+            root: None,
+            max_bag_size: 2,
+        };
+
+        let b0 = td.add_bag(FxHashSet::from_iter(vec![0, 1]));
+        let b1 = td.add_bag(FxHashSet::from_iter(vec![2, 3]));
+        let b2 = td.add_bag(FxHashSet::from_iter(vec![4, 5]));
+        td.add_edge(b0, b1);
+        td.add_edge(b0, b2);
+
+        let td_rels = NodeRelations::new(&td);
+
+        let td_path = "td.dot";
+        let mut td_out = File::create(td_path)?;
+        td_write_to_dot("td", &mut td_out, &td, &td_rels)?;
+        Command::new("dot")
+            .args(["-Tpdf", td_path, "-o", "td.pdf"])
+            .spawn()
+            .expect("dot command did not work.");
+
+        let nice_td = td.make_nice(&td_rels);
+        let ntd_rels = NodeRelations::new(&nice_td);
+        assert!(validate_nice_td(&td, &nice_td, &ntd_rels));
+
+        let ntd_path = "ntd.dot";
+        let mut ntd_out = File::create(ntd_path)?;
+        td_write_to_dot("ntd", &mut ntd_out, &nice_td, &ntd_rels)?;
+        Command::new("dot")
+            .args(["-Tpdf", ntd_path, "-o", "ntd.pdf"])
+            .spawn()
+            .expect("dot command did not work.");
+
+        let (bag_content, size) = find_mis(&nice_td, &ntd_rels)?;
+        println!("{:?} with size = {}", bag_content, size);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_subsets() {
+        let set = FxHashSet::from_iter(vec![1, 2, 3, 4].into_iter());
+        for (i, subset) in SubsetIter::new(&set).enumerate() {
+            println!("{i}. {:?}", subset);
+        }
     }
 }
