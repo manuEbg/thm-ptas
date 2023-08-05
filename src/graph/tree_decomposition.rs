@@ -23,8 +23,7 @@ impl From<&ApproximatedTD<'_>> for TreeDecomposition {
             if bag.len() > max_bag_size {
                 max_bag_size = bag.len();
             }
-            result
-                .add_bag(FxHashSet::from_iter(bag.iter().copied()));
+            result.add_bag(FxHashSet::from_iter(bag.iter().copied()));
         });
 
         for i in 0..atd.adjacent().len() {
@@ -156,8 +155,6 @@ fn insert_between_bags(
     let mut sets = Vec::new();
     let (intersection, b1_diff, b2_diff) = get_bag_intersection(s1, s2);
 
-    let ins_len = intersection.len();
-
     println!("Insert between bags for new {new_parent_id} and old {old_child_id:?}");
     println!("Intersection = {intersection:?}, introduces = {b1_diff:?}, forgets = {b2_diff:?}");
 
@@ -223,6 +220,7 @@ impl BagRelations {
     }
 }
 
+// TODO: Refactoring idea.
 struct NTD {
     td: TreeDecomposition,
     relations: NodeRelations,
@@ -477,15 +475,6 @@ enum MisSize {
     Valid(usize),
 }
 
-impl MisSize {
-    fn get(&self) -> usize {
-        match self {
-            MisSize::Invalid => panic!("Mis size is invalid!"),
-            MisSize::Valid(s) => *s,
-        }
-    }
-}
-
 impl std::ops::Add for MisSize {
     type Output = MisSize;
 
@@ -565,17 +554,110 @@ impl std::fmt::Display for FindMisError {
     }
 }
 
-fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> MisSize {
+fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> (usize, MisSize) {
     entry
         .sets
         .iter()
-        .find(|item| item.mis == *set)
+        .enumerate()
+        .find(|tup| tup.1.mis == *set)
+        .map(|(i, item)| (i, item.size))
         .unwrap()
-        .size
 }
 
 fn is_independent(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &FxHashSet<usize>) -> bool {
     set.iter().all(|u| !adjaceny_matrix[v][*u])
+}
+
+type DynTable = HashMap<usize, DynTableValue>;
+type ConstructionTable = Vec<Vec<(Option<usize>, Option<usize>)>>;
+
+fn reconstruct_mis(
+    table: &DynTable,
+    root_id: usize,
+    constr_table: &ConstructionTable,
+    node_relations: &NodeRelations,
+) -> FxHashSet<usize> {
+    let result = FxHashSet::from_iter(Vec::new());
+
+    // This function recursively traverses the table and finds the maximum independent set.
+    fn rec(
+        table: &DynTable,
+        bag_id: usize,
+        set_index: usize,
+        constr_table: &ConstructionTable,
+        mut mis: FxHashSet<usize>, // We move the set every time.
+        node_relations: &NodeRelations,
+    ) -> FxHashSet<usize> {
+        let item = &table[&bag_id].sets[set_index];
+
+        item.mis.iter().for_each(|&v| {
+            mis.insert(v);
+        });
+
+        let children = &node_relations.children[&bag_id];
+
+        match children.len() {
+            // Leaf node: We're finished.
+            0 => mis,
+
+            // Check the child.
+            1 => rec(
+                &table,
+                children[0],
+                constr_table[bag_id][set_index].0.unwrap(),
+                &constr_table,
+                mis,
+                &node_relations,
+            ),
+
+            // Find the maximum from the left and right child.
+            2 => {
+                let left_mis = mis.clone();
+                let right_mis = mis.clone();
+
+                let left = rec(
+                    &table,
+                    children[0],
+                    constr_table[bag_id][set_index].0.unwrap(),
+                    &constr_table,
+                    left_mis,
+                    &node_relations,
+                );
+
+                let right = rec(
+                    &table,
+                    children[1],
+                    constr_table[bag_id][set_index].1.unwrap(),
+                    &constr_table,
+                    right_mis,
+                    &node_relations,
+                );
+
+                std::cmp::max_by(left, right, |l, r| l.len().cmp(&r.len()))
+            }
+
+            _ => panic!("Unreachable"),
+        }
+    }
+
+    // Find the largest set in the root node. This begins the table traversal.
+    let (set_index, _) = &table[&root_id]
+        .sets
+        .iter()
+        .enumerate()
+        .max_by(|(_, l), (_, r)| l.size.cmp(&r.size))
+        .unwrap();
+
+    let result = rec(
+        &table,
+        root_id,
+        *set_index,
+        &constr_table,
+        result,
+        &node_relations,
+    );
+
+    result
 }
 
 // TODO:
@@ -586,8 +668,12 @@ pub fn find_mis(
     ntd: &TreeDecomposition,
     node_relations: &NodeRelations,
 ) -> Result<(FxHashSet<usize>, usize), FindMisError> {
-    type DynTable = HashMap<usize, DynTableValue>;
     let mut dyn_table: DynTable = HashMap::new();
+
+    // TODO: @speed Don't use dynamic vectors, instead compute the maximum size required with
+    // `max_bag_size`? This should be at max something like the length of the spanning tree.
+    // Idea: The i-th set was constructed by the j-th child set.
+    let mut constr_table: ConstructionTable = vec![Vec::new(); ntd.bags().len()];
 
     for bag in PostOrderIter::new(&ntd) {
         let children = &node_relations.children[&bag.id];
@@ -617,22 +703,25 @@ pub fn find_mis(
 
                     for subset in SubsetIter::new(&bag.vertex_set) {
                         if !subset.contains(&v) {
-                            let value = find_child_size(&child_entry, &subset);
+                            let (i, value) = find_child_size(&child_entry, &subset);
                             entry.sets.push(DynTableValueItem::new(subset, value));
+                            constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                         } else if is_independent(&adjaceny_matrix, v, &subset) {
                             // @speed This clone could be expensive.
                             let mut clone = subset.clone();
                             clone.remove(&v);
                             println!("{subset:?} + 1");
-                            entry.sets.push(DynTableValueItem::new(
-                                subset,
-                                find_child_size(&child_entry, &clone) + MisSize::Valid(1),
-                            ));
+                            let (i, value) = find_child_size(&child_entry, &clone);
+                            entry
+                                .sets
+                                .push(DynTableValueItem::new(subset, value + MisSize::Valid(1)));
+                            constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                         } else {
                             println!("{subset:?} is not independent.");
                             entry
                                 .sets
                                 .push(DynTableValueItem::new(subset, MisSize::Invalid));
+                            constr_table[bag.id].push((None, None)); // Reconstruction.
                         }
                     }
                 } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
@@ -649,14 +738,13 @@ pub fn find_mis(
                         let mut clone = subset.clone();
                         clone.insert(v);
 
-                        let without_value = find_child_size(&child_entry, &subset);
-                        let with_value = find_child_size(&child_entry, &clone);
+                        let without = find_child_size(&child_entry, &subset);
+                        let with = find_child_size(&child_entry, &clone);
 
-                        // Reconstruction: Take the set that has a greater size.
-                        entry.sets.push(DynTableValueItem::new(
-                            subset,
-                            std::cmp::max(without_value, with_value),
-                        ));
+                        let (i, value) = std::cmp::max_by(with, without, |w, wo| w.1.cmp(&wo.1));
+
+                        entry.sets.push(DynTableValueItem::new(subset, value));
+                        constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                     }
                 }
             }
@@ -671,8 +759,8 @@ pub fn find_mis(
                 let right_entry = dyn_table.get(&right_child.id).unwrap();
 
                 for subset in SubsetIter::new(&bag.vertex_set) {
-                    let left_value = find_child_size(&left_entry, &subset);
-                    let right_value = find_child_size(&right_entry, &subset);
+                    let (i, left_value) = find_child_size(&left_entry, &subset);
+                    let (j, right_value) = find_child_size(&right_entry, &subset);
                     let len = MisSize::Valid(subset.len());
 
                     println!("{left_value} + {right_value} - {len}");
@@ -680,6 +768,7 @@ pub fn find_mis(
                         subset,
                         left_value + right_value - len,
                     ));
+                    constr_table[bag.id].push((Some(i), Some(j))); // Reconstruction.
                 }
             }
 
@@ -691,116 +780,14 @@ pub fn find_mis(
 
     print_dyn_table(&dyn_table);
 
-    fn find_largest_mis_in_bag<'a>(entry: &'a DynTableValue) -> &'a DynTableValueItem {
-        entry
-            .sets
-            .iter()
-            .max_by(|&x, &y| x.size.cmp(&y.size))
-            .unwrap()
-    }
+    let result = reconstruct_mis(
+        &dyn_table,
+        ntd.root.unwrap(),
+        &constr_table,
+        &node_relations,
+    );
 
-    // TODO: Reconstruction
-    // 1. Remember for each set from what it was constructed.
-    // 2. Find the entry with the largest value and then walk the constructions bag.
-    let mut result: Option<&DynTableValueItem> = None;
-    for entry in dyn_table.values() {
-        match result {
-            None => {
-                result = Some(find_largest_mis_in_bag(&entry));
-            }
-            Some(e) => {
-                let max = find_largest_mis_in_bag(&entry);
-                if max.size > e.size {
-                    result = Some(max);
-                }
-            }
-        }
-    }
-
-    result
-        .ok_or(FindMisError::NoMisFound)
-        .map(|i| (i.mis.clone(), i.size.get()))
-}
-
-fn validate_nice_td(
-    otd: &TreeDecomposition,
-    ntd: &TreeDecomposition,
-    relations: &NodeRelations,
-) -> bool {
-    let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
-    ntd.bags.iter().all(|bag| {
-        if let Some(b) = otd
-            .bags
-            .iter()
-            .filter(|obag| obag.vertex_set.eq(&bag.vertex_set))
-            .nth(0)
-        {
-            present[b.id] = true;
-        }
-        let children = &relations.children[&bag.id];
-        match children.len() {
-            0 => bag.vertex_set.len() == 1,
-            1 => {
-                let child = &ntd.bags[children[0]];
-                let parent_to_child_intersection = bag.vertex_set.difference(&child.vertex_set);
-                let child_to_parent_intersection = child.vertex_set.difference(&bag.vertex_set);
-                parent_to_child_intersection.count() == 1
-                    || child_to_parent_intersection.count() == 1
-            }
-            2 => {
-                let left_child = &ntd.bags[children[0]];
-                let right_child = &ntd.bags[children[1]];
-                bag.vertex_set.difference(&left_child.vertex_set).count() == 0
-                    && bag.vertex_set.difference(&right_child.vertex_set).count() == 0
-            }
-            _ => false,
-        }
-    }) && present.iter().all(|&v| v)
-}
-
-fn vertex_set_to_string<'a, T>(vs: T) -> String
-where
-    T: Iterator<Item = &'a usize>,
-{
-    vs.map(|&a| a.to_string())
-        .collect::<Vec<String>>()
-        .join(", ")
-}
-
-use std::fs::File;
-use std::io::{Error, Write};
-fn td_write_to_dot(
-    title: &str,
-    file: &mut File,
-    td: &TreeDecomposition,
-    node_relations: &NodeRelations,
-) -> Result<(), Error> {
-    writeln!(file, "graph {title} {{")?;
-
-    let iter = BfsIter::new(&td);
-    for bag in iter {
-        let parent = node_relations.parent.get(&bag.id).unwrap();
-        // let children = node_relations.children.get(&bag.id).unwrap();
-
-        writeln!(
-            file,
-            "\tB{} [label=\"B{} {{{}}}\"];",
-            bag.id,
-            bag.id,
-            vertex_set_to_string(bag.vertex_set.iter())
-        )?;
-
-        match parent {
-            NodeParent::Fake => {}
-            NodeParent::Real(parent) => {
-                writeln!(file, "\tB{} -- B{};", parent, bag.id)?;
-            }
-        }
-    }
-
-    writeln!(file, "}}")?;
-
-    Ok(())
+    Ok((result.clone(), result.len()))
 }
 
 #[cfg(test)]
@@ -809,8 +796,129 @@ pub mod tests {
     use crate::graph::approximated_td::{ApproximatedTD, TDBuilder};
     use crate::graph::dcel::spanning_tree::SpanningTree;
     use crate::read_graph_file_into_dcel_builder;
-    use std::io::Error;
     use std::process::Command;
+
+    fn validate_nice_td(
+        otd: &TreeDecomposition,
+        ntd: &TreeDecomposition,
+        relations: &NodeRelations,
+    ) -> bool {
+        let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
+        ntd.bags.iter().all(|bag| {
+            if let Some(b) = otd
+                .bags
+                .iter()
+                .filter(|obag| obag.vertex_set.eq(&bag.vertex_set))
+                .nth(0)
+            {
+                present[b.id] = true;
+            }
+            let children = &relations.children[&bag.id];
+            match children.len() {
+                0 => bag.vertex_set.len() == 1,
+                1 => {
+                    let child = &ntd.bags[children[0]];
+                    let parent_to_child_intersection = bag.vertex_set.difference(&child.vertex_set);
+                    let child_to_parent_intersection = child.vertex_set.difference(&bag.vertex_set);
+                    parent_to_child_intersection.count() == 1
+                        || child_to_parent_intersection.count() == 1
+                }
+                2 => {
+                    let left_child = &ntd.bags[children[0]];
+                    let right_child = &ntd.bags[children[1]];
+                    bag.vertex_set.difference(&left_child.vertex_set).count() == 0
+                        && bag.vertex_set.difference(&right_child.vertex_set).count() == 0
+                }
+                _ => false,
+            }
+        }) && present.iter().all(|&v| v)
+    }
+
+    fn vertex_set_to_string<'a, T>(vs: T) -> String
+    where
+        T: Iterator<Item = &'a usize>,
+    {
+        vs.map(|&a| a.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+    }
+
+    use std::fs::File;
+    use std::io::{Error, Write};
+    fn td_write_to_dot(
+        title: &str,
+        file: &mut File,
+        td: &TreeDecomposition,
+        node_relations: &NodeRelations,
+    ) -> Result<(), Error> {
+        writeln!(file, "graph {title} {{")?;
+
+        let iter = BfsIter::new(&td);
+        for bag in iter {
+            let parent = node_relations.parent.get(&bag.id).unwrap();
+
+            writeln!(
+                file,
+                "\tB{} [label=\"B{} {{{}}}\"];",
+                bag.id,
+                bag.id,
+                vertex_set_to_string(bag.vertex_set.iter())
+            )?;
+
+            match parent {
+                NodeParent::Fake => {}
+                NodeParent::Real(parent) => {
+                    writeln!(file, "\tB{} -- B{};", parent, bag.id)?;
+                }
+            }
+        }
+
+        writeln!(file, "}}")?;
+
+        Ok(())
+    }
+
+    fn print_constr_table(
+        constr_table: &ConstructionTable,
+        dyn_table: &DynTable,
+        node_relations: &NodeRelations,
+    ) {
+        constr_table
+            .iter()
+            .enumerate()
+            .for_each(|(bag_id, preds)| {
+                preds
+                    .iter()
+                    .enumerate()
+                    .for_each(|(set_id, preds)| match preds {
+                        (None, None) => {},
+
+                        (Some(p), None) => {
+                            let child_id = node_relations.children[&bag_id][0];
+                            let item = &dyn_table[&bag_id].sets[set_id];
+                            let child_item = &dyn_table[&child_id].sets[*p];
+                            println!(
+                                "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
+                                item.mis, item.size,
+                                child_item.mis, child_item.size,
+                            )
+                        },
+
+                        (Some(l), Some(r)) => {
+                            let left_id = node_relations.children[&bag_id][0];
+                            let right_id = node_relations.children[&bag_id][1];
+                            println!(
+                                "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
+                                dyn_table[&bag_id].sets[set_id].mis,
+                                dyn_table[&left_id].sets[*l].mis,
+                                dyn_table[&right_id].sets[*r].mis,
+                            )
+                        },
+
+                        _ => panic!("Unreachable"),
+                    })
+            });
+    }
 
     #[test]
     pub fn test_tree_decomposition() {
