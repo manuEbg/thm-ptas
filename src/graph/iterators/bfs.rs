@@ -1,3 +1,5 @@
+use arboretum_td::tree_decomposition::{Bag, TreeDecomposition};
+
 use super::dcel::arc::ArcId;
 use super::dcel::vertex::VertexId;
 
@@ -65,5 +67,45 @@ impl<'a> Iterator for BfsIter<'a> {
             return Some(it);
         }
         None
+    }
+}
+
+pub struct TreeDecompBfsIter<'a> {
+    td: &'a TreeDecomposition,
+    queue: VecDeque<usize>, // Bag IDs.
+    visited: Vec<bool>,     // @speed Use a bitset.
+}
+
+impl<'a> TreeDecompBfsIter<'a> {
+    pub fn new(td: &'a TreeDecomposition) -> Self {
+        TreeDecompBfsIter {
+            td,
+            queue: VecDeque::from([td.root.unwrap()]),
+            visited: vec![false; td.bags.len()],
+        }
+    }
+}
+
+// TODO: Remove initialization of the node relations from the iterator.
+impl<'a> Iterator for TreeDecompBfsIter<'a> {
+    type Item = &'a Bag;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let front = self.queue.pop_front();
+        if front.is_none() {
+            return None;
+        }
+
+        let v = front.unwrap();
+        self.visited[v] = true;
+        let bag = &self.td.bags[v];
+
+        // Find all unvisited neighbors.
+        bag.neighbors
+            .iter()
+            .filter(|&&n| !self.visited[n])
+            .for_each(|&n| self.queue.push_back(n));
+
+        Some(bag)
     }
 }

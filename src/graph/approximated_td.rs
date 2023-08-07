@@ -52,6 +52,10 @@ impl<'a> ApproximatedTD<'a> {
     pub fn bags(&self) -> &Vec<HashSet<BagId>> {
         &self.bags
     }
+
+    pub fn root_bag(&self) -> usize {
+        self.root_bag
+    }
 }
 
 pub struct TDBuilder<'a> {
