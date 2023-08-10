@@ -3,43 +3,56 @@
  */
 
 use bit_set::BitSet;
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    rc::Rc,
+};
 
 use crate::graph::mis_finder::{DynTable, MisSize};
 
 /// This type is essentially a 2D matrix where the first value of the tuple is the bag ID and the
 /// second index is a subset of vertices from the current subgraph (donut).
 #[derive(Debug)]
-pub struct FastDynTable<'a> {
-    map: HashMap<(usize, &'a BitSet), MisSize>,
-    set_ids: HashMap<(usize, &'a BitSet), usize>,
+pub struct FastDynTable {
+    map: HashMap<(usize, BitSet), MisSize>,
+    set_ids: HashMap<(usize, BitSet), usize>,
     set_count: HashMap<usize, usize>,
-    subsets: HashSet<BitSet>,
+    // subsets: HashSet<BitSet>, // This could be a cache but it caused borrow checker errors.
 }
 
-impl FastDynTable<'_> {
+impl FastDynTable {
     pub fn new(subset_count: usize) -> Self {
         FastDynTable {
             map: HashMap::default(),
             set_ids: HashMap::default(),
             set_count: HashMap::default(),
-            subsets: HashSet::with_capacity(subset_count),
+            // subsets: HashSet::with_capacity(subset_count),
         }
     }
 }
 
-impl<'a> DynTable<'a, BitSet> for FastDynTable<'a> {
+/* The problem with the implementation that uses referenes:
+table.put(1, set.clone(), MisSize::Valid(6));
+----- mutable borrow occurs here
+
+let (set_index, size) = table.get(2, &set);
+^^^^^
+|
+immutable borrow occurs here
+mutable borrow later used here
+*/
+impl<'a> DynTable<'a, BitSet> for FastDynTable {
     fn get(&self, bag_id: usize, subset: &BitSet) -> (usize, MisSize) {
-        (self.set_ids[&(bag_id, subset)], self.map[&(bag_id, subset)])
+        // TODO: @speed Get rid of these copies.
+        (self.set_ids[&(bag_id, subset.clone())], self.map[&(bag_id, subset.clone())])
     }
 
-    // No data is copied :).
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: BitSet, size: MisSize) {
-        let subset_ref = self.subsets.get_or_insert(subset);
         let set_count = self.set_count.entry(bag_id).or_insert(0);
         *set_count += 1;
-        self.map.insert((bag_id, subset_ref), size);
-        self.set_ids.insert((bag_id, subset_ref), set_count.clone());
+        // TODO: @speed Get rid of these copies.
+        self.map.insert((bag_id, subset.clone()), size);
+        self.set_ids.insert((bag_id, subset), set_count.clone());
     }
 }
 
@@ -62,16 +75,6 @@ pub mod tests {
         }
     }
 
-    /*
-    table.put(1, set.clone(), MisSize::Valid(6));
-    ----- mutable borrow occurs here
-
-    let (set_index, size) = table.get(2, &set);
-                            ^^^^^
-                            |
-                            immutable borrow occurs here
-                            mutable borrow later used here
-     */
     #[test]
     fn bitset() {
         let mut table: FastDynTable = FastDynTable::new(3);
@@ -79,12 +82,10 @@ pub mod tests {
         set.insert(1);
         set.insert(3);
         let set2 = set.clone();
-        table.put(1, set, MisSize::Valid(6));
-        // table.map.insert((2, &set.clone()), MisSize::Valid(6));
+        table.put(2, set, MisSize::Valid(6));
 
-        // dbg!(table);
+        dbg!(&table);
         let (set_index, size) = table.get(2, &set2);
-        println!("Size = {size}");
+        println!("Set = {set_index}, size = {size}");
     }
 }
-
