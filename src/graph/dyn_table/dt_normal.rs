@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use fxhash::FxHashSet;
 use crate::graph::mis_finder::{MisSize, DynTable};
 
@@ -10,13 +10,13 @@ impl Default for NormalDynTable {
     }
 }
 
-impl DynTable for NormalDynTable {
+impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
     fn get(&self, bag_id: usize, subset: &FxHashSet<usize>) -> (usize, MisSize) {
         let entry = &self.0[&bag_id];
         find_child_size(&entry, &subset)
     }
 
-    fn put(&mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {
+    fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {
         if self.0.get(&bag_id).is_none() {
             self.0.insert(bag_id, DynTableValue::default());
         }

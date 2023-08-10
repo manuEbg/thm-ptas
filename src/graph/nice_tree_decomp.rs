@@ -11,11 +11,7 @@ pub struct NiceTreeDecomposition {
 }
 
 impl NiceTreeDecomposition {
-    pub fn validate(
-        &self,
-        otd: &TreeDecomposition,
-        relations: &NodeRelations,
-    ) -> bool {
+    pub fn validate(&self, otd: &TreeDecomposition, relations: &NodeRelations) -> bool {
         let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
         self.td.bags.iter().all(|bag| {
             if let Some(b) = otd
@@ -251,7 +247,10 @@ pub mod tests {
     use arboretum_td::tree_decomposition::TreeDecomposition;
     use fxhash::FxHashSet;
 
-    use crate::graph::{node_relations::NodeRelations, tree_decomposition::td_write_to_dot, nice_tree_decomp::NiceTreeDecomposition};
+    use crate::graph::{
+        nice_tree_decomp::NiceTreeDecomposition, node_relations::NodeRelations,
+        tree_decomposition::td_write_to_dot,
+    };
 
     #[test]
     pub fn test_nice_tree_decomposition() {

@@ -20,10 +20,14 @@ pub enum MisSize {
     Invalid,
     Valid(usize),
 }
+// fn get_all(&self, bag_id: usize) -> &Vec<
 
-pub trait DynTable {
-    fn get(&self, bag_id: usize, subset: &FxHashSet<usize>) -> (usize, MisSize);
-    fn put(&mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize);
+pub trait DynTable<'a, Set>
+where
+    Set: Default + Clone + Eq,
+{
+    fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
+    fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
 }
 
 impl std::ops::Add for MisSize {
@@ -302,50 +306,92 @@ pub fn find_mis(
     Ok((result.clone(), result.len()))
 }
 
-// TODO:
+fn is_independent_fast(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &BitSet) -> bool {
+    set.iter().all(|u| !adjaceny_matrix[v][u])
+}
+
+// TODO: If possible, merge the two `find_mis` algorithms.
+
 /*
 pub fn find_mis_fast(
     adjaceny_matrix: Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
-) -> Result<(FxHashSet<usize>, usize), FindMisError> {
-    let mut table: FastDynTable = HashMap::new();
+) -> Result<(HashSet<usize>, usize), FindMisError> {
+    let mut table: FastDynTable = FastDynTable::default();
 
     // TODO: @speed Don't use dynamic vectors, instead compute the maximum size required with
     // `max_bag_size`? This should be at max something like the length of the spanning tree.
     // Idea: The i-th set was constructed by the j-th child set.
-    let mut constr_table: ConstructionTable = vec![Vec::new(); ntd.bags().len()];
+    let mut constr_table: ConstructionTable = vec![Vec::new(); ntd.td.bags().len()];
 
-    for bag in PostOrderIter::new(&ntd) {
+    for bag in PostOrderIter::new(&ntd.td) {
         let children = &ntd.relations.children[&bag.id];
 
         match children.len() {
             0 => {
-                table.insert((bag.id, BitSet::new()), 0);
-                table.insert(
-                    (bag.id, BitSet::from_iter(bag.vertex_set.iter().copied())),
+                table.put(bag.id, BitSet::new(), 0, MisSize::Valid(0));
+                table.put(
+                    bag.id,
+                    BitSet::from_iter(bag.vertex_set.iter().copied()),
                     1,
+                    MisSize::Valid(1),
                 );
             }
 
             1 => {
-                let child = &ntd.bags[children[0]];
+                let child = &ntd.td.bags[children[0]];
                 if let Some(&v) = bag.vertex_set.difference(&child.vertex_set).nth(0) {
                     // Introduce node.
                     for subset in SubBitSetIter::new(&bag.vertex_set) {
+                        let set_index = constr_table[bag.id].len();
                         if !subset.contains(v) {
-                            table.insert((bag.id, subset), table[(bag.id, subset)]);
-                        } else if is_independent2(&adjaceny_matrix, v, &subset) {
-
+                            let (child_set_index, size) = table.get(child.id, &subset);
+                            table.put(bag.id, subset, set_index, size);
+                            constr_table[bag.id].push((Some(child_set_index), None));
+                        } else if is_independent_fast(&adjaceny_matrix, v, &subset) {
+                            let mut clone = subset.clone();
+                            clone.remove(v);
+                            let (child_set_index, size) = table.get(child.id, &clone);
+                            table.put(bag.id, subset, set_index, size);
+                            constr_table[bag.id].push((Some(child_set_index), None));
                         } else {
-
+                            table.put(bag.id, subset, set_index, MisSize::Invalid);
+                            constr_table[bag.id].push((None, None));
                         }
                     }
                 } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
                     // Forget node.
+                    for subset in SubBitSetIter::new(&bag.vertex_set) {
+                        let set_index = constr_table[bag.id].len();
+                        let mut clone = subset.clone();
+                        clone.insert(v);
+
+                        let with = table.get(child.id, &clone);
+                        let without = table.get(child.id, &subset);
+
+                        let (child_set_index, size) =
+                            std::cmp::max_by(with, without, |w, wo| w.1.cmp(&wo.1));
+
+                        table.put(bag.id, subset, set_index, size);
+                        constr_table[bag.id].push((Some(child_set_index), None));
+                    }
                 }
             }
 
-            2 => {}
+            2 => {
+                // Join node.
+                let left_child = &ntd.td.bags[children[0]];
+                let right_child = &ntd.td.bags[children[1]];
+
+                for subset in SubBitSetIter::new(&bag.vertex_set) {
+                    let set_index = constr_table[bag.id].len();
+                    let (i, left_size) = table.get(left_child.id, &subset);
+                    let (j, right_size) = table.get(right_child.id, &subset);
+                    let len = MisSize::Valid(subset.len());
+                    table.put(bag.id, subset, set_index, left_size + right_size - len);
+                    constr_table[bag.id].push((Some(i), Some(j))); // Reconstruction.
+                }
+            }
 
             _ => panic!("Unreachable"),
         }
@@ -353,9 +399,51 @@ pub fn find_mis_fast(
 
     // TODO: Reconstruction.
 
-    Ok((FxHashSet::from_iter(vec![]), 0))
+    Ok((HashSet::new(), 0))
 }
 */
+
+fn print_constr_table<Set>(
+    constr_table: &ConstructionTable,
+    table: &NormalDynTable, // &dyn DynTable<Set>,
+    node_relations: &NodeRelations,
+) {
+    constr_table
+        .iter()
+        .enumerate()
+        .for_each(|(bag_id, preds)| {
+            preds
+                .iter()
+                .enumerate()
+                .for_each(|(set_id, preds)| match preds {
+                    (None, None) => {},
+
+                    (Some(p), None) => {
+                        let child_id = node_relations.children[&bag_id][0];
+                        let item = &table.0[&bag_id].sets[set_id];
+                        let child_item = &table.0[&child_id].sets[*p];
+                        println!(
+                            "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
+                            item.mis, item.size,
+                            child_item.mis, child_item.size,
+                        )
+                    },
+
+                    (Some(l), Some(r)) => {
+                        let left_id = node_relations.children[&bag_id][0];
+                        let right_id = node_relations.children[&bag_id][1];
+                        println!(
+                            "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
+                            table.0[&bag_id].sets[set_id].mis,
+                            table.0[&left_id].sets[*l].mis,
+                            table.0[&right_id].sets[*r].mis,
+                        )
+                    },
+
+                    _ => panic!("Unreachable"),
+                })
+        });
+}
 
 #[cfg(test)]
 pub mod tests {
@@ -363,17 +451,17 @@ pub mod tests {
         graph::{
             approximated_td::{ApproximatedTD, TDBuilder},
             dcel::spanning_tree::SpanningTree,
-            dyn_table::dt_normal::NormalDynTable,
-            iterators::bfs::TreeDecompBfsIter,
+            // mis_finder::{find_mis, find_mis_fast},
             mis_finder::find_mis,
             nice_tree_decomp::NiceTreeDecomposition,
-            node_relations::{NodeParent, NodeRelations}, tree_decomposition::td_write_to_dot,
+            node_relations::NodeRelations,
+            tree_decomposition::td_write_to_dot,
         },
         read_graph_file_into_dcel_builder,
     };
     use arboretum_td::tree_decomposition::TreeDecomposition;
     use fxhash::FxHashSet;
-    use std::{fs::File, io::Error, io::Write, process::Command};
+    use std::{fs::File, process::Command};
 
     use super::ConstructionTable;
 
@@ -454,45 +542,39 @@ pub mod tests {
         println!("MIS: {:?} with size = {}", bag_content, size);
     }
 
-    fn print_constr_table(
-        constr_table: &ConstructionTable,
-        table: &NormalDynTable,
-        node_relations: &NodeRelations,
-    ) {
-        constr_table
-            .iter()
-            .enumerate()
-            .for_each(|(bag_id, preds)| {
-                preds
-                    .iter()
-                    .enumerate()
-                    .for_each(|(set_id, preds)| match preds {
-                        (None, None) => {},
+    fn fast() {
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        let adjacency_matrix = dcel.adjacency_matrix();
+        // dcel.triangulate();
+        let mut spanning_tree = SpanningTree::new(&dcel);
+        spanning_tree.build(0);
+        let mut td_builder = TDBuilder::new(&spanning_tree);
+        let atd = ApproximatedTD::from(&mut td_builder);
+        let td = TreeDecomposition::from(&atd);
+        let td_rels = NodeRelations::new(&td);
+        let ntd = NiceTreeDecomposition::from(&td);
+        let ntd_rels = NodeRelations::new(&ntd.td);
 
-                        (Some(p), None) => {
-                            let child_id = node_relations.children[&bag_id][0];
-                            let item = &table.0[&bag_id].sets[set_id];
-                            let child_item = &table.0[&child_id].sets[*p];
-                            println!(
-                                "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
-                                item.mis, item.size,
-                                child_item.mis, child_item.size,
-                            )
-                        },
+        ntd.validate(&td, &ntd_rels);
 
-                        (Some(l), Some(r)) => {
-                            let left_id = node_relations.children[&bag_id][0];
-                            let right_id = node_relations.children[&bag_id][1];
-                            println!(
-                                "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
-                                table.0[&bag_id].sets[set_id].mis,
-                                table.0[&left_id].sets[*l].mis,
-                                table.0[&right_id].sets[*r].mis,
-                            )
-                        },
+        let td_path = "td.dot";
+        let mut td_out = File::create(td_path).unwrap();
+        td_write_to_dot("td", &mut td_out, &td, &td_rels).unwrap();
+        Command::new("dot")
+            .args(["-Tpdf", td_path, "-o", "td.pdf"])
+            .spawn()
+            .expect("dot command did not work.");
 
-                        _ => panic!("Unreachable"),
-                    })
-            });
+        let ntd_path = "ntd.dot";
+        let mut ntd_out = File::create(ntd_path).unwrap();
+        td_write_to_dot("ntd", &mut ntd_out, &ntd.td, &ntd_rels).unwrap();
+        Command::new("dot")
+            .args(["-Tpdf", ntd_path, "-o", "ntd.pdf"])
+            .spawn()
+            .expect("dot command did not work.");
+
+        // let (bag_content, size) = find_mis_fast(adjacency_matrix, &ntd).unwrap();
+        // println!("MIS: {:?} with size = {}", bag_content, size);
     }
 }

@@ -10,3 +10,6 @@ arboretum-td = "*"
 fxhash = "*"
 clap = { version = "4.0", features = ["derive"] }
 bit-set = "*"
+
+[toolchain]
+channel = "nightly"
