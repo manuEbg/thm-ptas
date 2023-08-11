@@ -20,13 +20,14 @@ pub enum MisSize {
     Invalid,
     Valid(usize),
 }
-// fn get_all(&self, bag_id: usize) -> &Vec<
 
 pub trait DynTable<'a, Set>
 where
-    Set: Default + Clone + Eq,
+    Set: Default + Clone + Eq + std::fmt::Debug,
 {
     fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
+    // TODO: @cleanup This function may only be needed for debugging purposes.
+    fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&Set, MisSize);
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
 }
 
@@ -311,13 +312,13 @@ fn is_independent_fast(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &BitSet)
 }
 
 // TODO: If possible, merge the two `find_mis` algorithms.
+// TODO: Would it be a nice idea to log the steps of the algorithm (print to a string buffer)?
 
-/*
 pub fn find_mis_fast(
     adjaceny_matrix: Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
-    let mut table: FastDynTable = FastDynTable::default();
+    let mut table: FastDynTable = FastDynTable::new(usize::pow(2, adjaceny_matrix.len() as u32));
 
     // TODO: @speed Don't use dynamic vectors, instead compute the maximum size required with
     // `max_bag_size`? This should be at max something like the length of the spanning tree.
@@ -329,11 +330,10 @@ pub fn find_mis_fast(
 
         match children.len() {
             0 => {
-                table.put(bag.id, BitSet::new(), 0, MisSize::Valid(0));
+                table.put(bag.id, BitSet::new(), MisSize::Valid(0));
                 table.put(
                     bag.id,
                     BitSet::from_iter(bag.vertex_set.iter().copied()),
-                    1,
                     MisSize::Valid(1),
                 );
             }
@@ -346,18 +346,31 @@ pub fn find_mis_fast(
                         let set_index = constr_table[bag.id].len();
                         if !subset.contains(v) {
                             let (child_set_index, size) = table.get(child.id, &subset);
-                            table.put(bag.id, subset, set_index, size);
+                            println!(
+                                "{v} notin {subset:?} => M[{}, {subset:?}] = M[{}, {subset:?}] = {size}",
+                                bag.id, child.id
+                            );
+                            table.put(bag.id, subset, size);
                             constr_table[bag.id].push((Some(child_set_index), None));
                         } else if is_independent_fast(&adjaceny_matrix, v, &subset) {
                             let mut clone = subset.clone();
                             clone.remove(v);
                             let (child_set_index, size) = table.get(child.id, &clone);
-                            table.put(bag.id, subset, set_index, size);
+                            println!(
+                                "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
+                                bag.id, child.id
+                            );
+                            table.put(bag.id, subset, size + MisSize::Valid(1));
                             constr_table[bag.id].push((Some(child_set_index), None));
                         } else {
-                            table.put(bag.id, subset, set_index, MisSize::Invalid);
+                            println!(
+                                "{subset:?} is not independent => M[{}, S] = -infinity",
+                                bag.id
+                            );
+                            table.put(bag.id, subset, MisSize::Invalid);
                             constr_table[bag.id].push((None, None));
                         }
+                        // println!("CT[{}, {}] = {:?}", bag.id, constr_table[bag.id].len(), constr_table[bag.id][set_index]);
                     }
                 } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
                     // Forget node.
@@ -372,7 +385,7 @@ pub fn find_mis_fast(
                         let (child_set_index, size) =
                             std::cmp::max_by(with, without, |w, wo| w.1.cmp(&wo.1));
 
-                        table.put(bag.id, subset, set_index, size);
+                        table.put(bag.id, subset, size);
                         constr_table[bag.id].push((Some(child_set_index), None));
                     }
                 }
@@ -388,7 +401,8 @@ pub fn find_mis_fast(
                     let (i, left_size) = table.get(left_child.id, &subset);
                     let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
-                    table.put(bag.id, subset, set_index, left_size + right_size - len);
+                    println!("M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
+                    table.put(bag.id, subset, left_size + right_size - len);
                     constr_table[bag.id].push((Some(i), Some(j))); // Reconstruction.
                 }
             }
@@ -397,17 +411,20 @@ pub fn find_mis_fast(
         }
     }
 
+    println!("Construction table:");
+    print_constr_table(&constr_table, &table, &ntd.relations);
     // TODO: Reconstruction.
 
     Ok((HashSet::new(), 0))
 }
-*/
 
 fn print_constr_table<Set>(
     constr_table: &ConstructionTable,
-    table: &NormalDynTable, // &dyn DynTable<Set>,
+    table: &dyn DynTable<Set>,
     node_relations: &NodeRelations,
-) {
+) where
+    Set: Eq + std::fmt::Debug + Clone + Default,
+{
     constr_table
         .iter()
         .enumerate()
@@ -420,12 +437,13 @@ fn print_constr_table<Set>(
 
                     (Some(p), None) => {
                         let child_id = node_relations.children[&bag_id][0];
-                        let item = &table.0[&bag_id].sets[set_id];
-                        let child_item = &table.0[&child_id].sets[*p];
+                        // println!("Bag ID: {bag_id}, set ID: {set_id}, child ID: {child_id}, child set ID: {p}");
+                        let (subset, size) = table.get_by_index(bag_id, set_id); // &table.0[&bag_id].sets[set_id];
+                        let (child_subset, child_size) = table.get_by_index(child_id, *p); // &table.0[&child_id].sets[*p];
                         println!(
                             "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
-                            item.mis, item.size,
-                            child_item.mis, child_item.size,
+                            subset, size,
+                            child_subset, child_size,
                         )
                     },
 
@@ -434,9 +452,9 @@ fn print_constr_table<Set>(
                         let right_id = node_relations.children[&bag_id][1];
                         println!(
                             "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
-                            table.0[&bag_id].sets[set_id].mis,
-                            table.0[&left_id].sets[*l].mis,
-                            table.0[&right_id].sets[*r].mis,
+                            table.get_by_index(bag_id, set_id).0,
+                            table.get_by_index(left_id, *l).0,
+                            table.get_by_index(right_id, *r).0,
                         )
                     },
 
@@ -452,7 +470,7 @@ pub mod tests {
             approximated_td::{ApproximatedTD, TDBuilder},
             dcel::spanning_tree::SpanningTree,
             // mis_finder::{find_mis, find_mis_fast},
-            mis_finder::find_mis,
+            mis_finder::{find_mis, find_mis_fast},
             nice_tree_decomp::NiceTreeDecomposition,
             node_relations::NodeRelations,
             tree_decomposition::td_write_to_dot,
@@ -542,6 +560,7 @@ pub mod tests {
         println!("MIS: {:?} with size = {}", bag_content, size);
     }
 
+    #[test]
     fn fast() {
         let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
         let mut dcel = dcel_b.build();
@@ -574,7 +593,7 @@ pub mod tests {
             .spawn()
             .expect("dot command did not work.");
 
-        // let (bag_content, size) = find_mis_fast(adjacency_matrix, &ntd).unwrap();
-        // println!("MIS: {:?} with size = {}", bag_content, size);
+        let (bag_content, size) = find_mis_fast(adjacency_matrix, &ntd).unwrap();
+        println!("MIS: {:?} with size = {}", bag_content, size);
     }
 }

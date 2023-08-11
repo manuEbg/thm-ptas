@@ -16,6 +16,11 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
         find_child_size(&entry, &subset)
     }
 
+    fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&FxHashSet<usize>, MisSize) {
+        let item = &self.0[&bag_id].sets[subset_index];
+        (&item.mis, item.size.clone())
+    }
+
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {
         if self.0.get(&bag_id).is_none() {
             self.0.insert(bag_id, DynTableValue::default());

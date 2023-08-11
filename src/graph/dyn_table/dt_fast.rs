@@ -3,33 +3,9 @@
  */
 
 use bit_set::BitSet;
-use std::{
-    collections::{HashMap, HashSet},
-    rc::Rc,
-};
+use std::collections::HashMap;
 
 use crate::graph::mis_finder::{DynTable, MisSize};
-
-/// This type is essentially a 2D matrix where the first value of the tuple is the bag ID and the
-/// second index is a subset of vertices from the current subgraph (donut).
-#[derive(Debug)]
-pub struct FastDynTable {
-    map: HashMap<(usize, BitSet), MisSize>,
-    set_ids: HashMap<(usize, BitSet), usize>,
-    set_count: HashMap<usize, usize>,
-    // subsets: HashSet<BitSet>, // This could be a cache but it caused borrow checker errors.
-}
-
-impl FastDynTable {
-    pub fn new(subset_count: usize) -> Self {
-        FastDynTable {
-            map: HashMap::default(),
-            set_ids: HashMap::default(),
-            set_count: HashMap::default(),
-            // subsets: HashSet::with_capacity(subset_count),
-        }
-    }
-}
 
 /* The problem with the implementation that uses referenes:
 table.put(1, set.clone(), MisSize::Valid(6));
@@ -41,18 +17,56 @@ let (set_index, size) = table.get(2, &set);
 immutable borrow occurs here
 mutable borrow later used here
 */
+/// This type is essentially a 2D matrix where the first value of the tuple is the bag ID and the
+/// second index is a subset of vertices from the current subgraph (donut).
+#[derive(Debug)]
+pub struct FastDynTable {
+    /// (bag ID, subset index) -> size
+    map: HashMap<(usize, usize), MisSize>,
+    /// (bag ID, subset set) -> subset index
+    set_indices: HashMap<(usize, BitSet), usize>,
+    /// (bag ID, subset index) -> subset
+    set_indices_back: HashMap<(usize, usize), BitSet>,
+    /// bag ID -> number of subsets
+    set_count: HashMap<usize, usize>,
+    // subsets: HashSet<BitSet>, // This could be a cache but it caused borrow checker errors.
+}
+
+impl FastDynTable {
+    pub fn new(subset_count: usize) -> Self {
+        FastDynTable {
+            map: HashMap::default(),
+            set_indices: HashMap::default(),
+            set_indices_back: HashMap::default(),
+            set_count: HashMap::default(),
+            // subsets: HashSet::with_capacity(subset_count),
+        }
+    }
+}
+
 impl<'a> DynTable<'a, BitSet> for FastDynTable {
     fn get(&self, bag_id: usize, subset: &BitSet) -> (usize, MisSize) {
-        // TODO: @speed Get rid of these copies.
-        (self.set_ids[&(bag_id, subset.clone())], self.map[&(bag_id, subset.clone())])
+        // TODO: @speed Get rid of this copy.
+        let subset_index = self.set_indices[&(bag_id, subset.clone())];
+        (subset_index, self.map[&(bag_id, subset_index)])
+    }
+
+    fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&BitSet, MisSize) {
+        (
+            &self.set_indices_back[&(bag_id, subset_index)],
+            self.map[&(bag_id, subset_index)],
+        )
     }
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: BitSet, size: MisSize) {
         let set_count = self.set_count.entry(bag_id).or_insert(0);
+        self.map.insert((bag_id, set_count.clone()), size);
+        self.set_indices
+            .insert((bag_id, subset.clone()), set_count.clone());
+        // TODO: @speed Get rid of this copy.
+        self.set_indices_back
+            .insert((bag_id, set_count.clone()), subset);
         *set_count += 1;
-        // TODO: @speed Get rid of these copies.
-        self.map.insert((bag_id, subset.clone()), size);
-        self.set_ids.insert((bag_id, subset), set_count.clone());
     }
 }
 
@@ -87,5 +101,7 @@ pub mod tests {
         dbg!(&table);
         let (set_index, size) = table.get(2, &set2);
         println!("Set = {set_index}, size = {size}");
+        let (subset, size2) = table.get_by_index(2, 1);
+        println!("Subset = {subset:?}, size = {size2}");
     }
 }
