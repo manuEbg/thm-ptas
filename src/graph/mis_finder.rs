@@ -28,7 +28,9 @@ where
     fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
     // TODO: @cleanup This function may only be needed for debugging purposes.
     fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&Set, MisSize);
+    fn get_max_root_set_index(&self, root_id: usize) -> usize;
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
+    fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>);
 }
 
 impl std::ops::Add for MisSize {
@@ -91,28 +93,30 @@ fn is_independent(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &FxHashSet<us
     set.iter().all(|u| !adjaceny_matrix[v][*u])
 }
 
-fn reconstruct_mis(
-    table: &NormalDynTable,
+fn reconstruct_mis<Set>(
+    table: &dyn DynTable<Set>,
     root_id: usize,
     constr_table: &ConstructionTable,
     node_relations: &NodeRelations,
-) -> FxHashSet<usize> {
-    let result = FxHashSet::from_iter(Vec::new());
+) -> HashSet<usize>
+where
+    Set: Eq + std::fmt::Debug + Clone + Default,
+{
+    let result = HashSet::from_iter(Vec::new());
 
     // This function recursively traverses the table and finds the maximum independent set.
-    fn rec(
-        table: &NormalDynTable,
+    fn rec<Set>(
+        table: &dyn DynTable<Set>,
         bag_id: usize,
         set_index: usize,
         constr_table: &ConstructionTable,
-        mut mis: FxHashSet<usize>, // We move the set every time.
+        mut mis: HashSet<usize>, // We move the set every time.
         node_relations: &NodeRelations,
-    ) -> FxHashSet<usize> {
-        let item = &table.0[&bag_id].sets[set_index];
-
-        item.mis.iter().for_each(|&v| {
-            mis.insert(v);
-        });
+    ) -> HashSet<usize>
+    where
+        Set: Eq + std::fmt::Debug + Clone + Default,
+    {
+        table.add_to_mis(bag_id, set_index, &mut mis);
 
         let children = &node_relations.children[&bag_id];
 
@@ -122,7 +126,7 @@ fn reconstruct_mis(
 
             // Check the child.
             1 => rec(
-                &table,
+                table,
                 children[0],
                 constr_table[bag_id][set_index].0.unwrap(),
                 &constr_table,
@@ -136,7 +140,7 @@ fn reconstruct_mis(
                 let right_mis = mis.clone();
 
                 let left = rec(
-                    &table,
+                    table,
                     children[0],
                     constr_table[bag_id][set_index].0.unwrap(),
                     &constr_table,
@@ -145,7 +149,7 @@ fn reconstruct_mis(
                 );
 
                 let right = rec(
-                    &table,
+                    table,
                     children[1],
                     constr_table[bag_id][set_index].1.unwrap(),
                     &constr_table,
@@ -161,17 +165,12 @@ fn reconstruct_mis(
     }
 
     // Find the largest set in the root node. This begins the table traversal.
-    let (set_index, _) = &table.0[&root_id]
-        .sets
-        .iter()
-        .enumerate()
-        .max_by(|(_, l), (_, r)| l.size.cmp(&r.size))
-        .unwrap();
+    let root_set_index = table.get_max_root_set_index(root_id);
 
     let result = rec(
-        &table,
+        table,
         root_id,
-        *set_index,
+        root_set_index,
         &constr_table,
         result,
         &node_relations,
@@ -186,7 +185,7 @@ fn reconstruct_mis(
 pub fn find_mis(
     adjaceny_matrix: Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
-) -> Result<(FxHashSet<usize>, usize), FindMisError> {
+) -> Result<(HashSet<usize>, usize), FindMisError> {
     let mut dyn_table = NormalDynTable::default();
 
     // TODO: @speed Don't use dynamic vectors, instead compute the maximum size required with
@@ -413,9 +412,15 @@ pub fn find_mis_fast(
 
     println!("Construction table:");
     print_constr_table(&constr_table, &table, &ntd.relations);
-    // TODO: Reconstruction.
 
-    Ok((HashSet::new(), 0))
+    let result = reconstruct_mis(
+        &table,
+        ntd.td.root.unwrap(),
+        &constr_table,
+        &ntd.relations,
+    );
+
+    Ok((result.clone(), result.len()))
 }
 
 fn print_constr_table<Set>(
@@ -438,8 +443,8 @@ fn print_constr_table<Set>(
                     (Some(p), None) => {
                         let child_id = node_relations.children[&bag_id][0];
                         // println!("Bag ID: {bag_id}, set ID: {set_id}, child ID: {child_id}, child set ID: {p}");
-                        let (subset, size) = table.get_by_index(bag_id, set_id); // &table.0[&bag_id].sets[set_id];
-                        let (child_subset, child_size) = table.get_by_index(child_id, *p); // &table.0[&child_id].sets[*p];
+                        let (subset, size) = table.get_by_index(bag_id, set_id);
+                        let (child_subset, child_size) = table.get_by_index(child_id, *p);
                         println!(
                             "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
                             subset, size,

@@ -3,7 +3,7 @@
  */
 
 use bit_set::BitSet;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::graph::mis_finder::{DynTable, MisSize};
 
@@ -58,6 +58,19 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
         )
     }
 
+    fn get_max_root_set_index(&self, root_id: usize) -> usize {
+        (0..self.set_count[&root_id])
+            .fold((0 as usize, MisSize::Valid(0)), |result, set_index| {
+                let set_size = self.map[&(root_id, set_index)];
+                if result.1 < set_size {
+                    (set_index, set_size)
+                } else {
+                    result
+                }
+            })
+            .0
+    }
+
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: BitSet, size: MisSize) {
         let set_count = self.set_count.entry(bag_id).or_insert(0);
         self.map.insert((bag_id, set_count.clone()), size);
@@ -67,6 +80,14 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
         self.set_indices_back
             .insert((bag_id, set_count.clone()), subset);
         *set_count += 1;
+    }
+
+    fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>) {
+        self.set_indices_back[&(bag_id, subset_index)]
+            .iter()
+            .for_each(|v| {
+                mis.insert(v);
+            });
     }
 }
 

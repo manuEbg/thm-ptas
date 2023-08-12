@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use crate::graph::mis_finder::{DynTable, MisSize};
 use fxhash::FxHashSet;
-use crate::graph::mis_finder::{MisSize, DynTable};
+use std::collections::{HashMap, HashSet};
 
 pub struct NormalDynTable(pub HashMap<usize, DynTableValue>);
 
@@ -21,11 +21,33 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
         (&item.mis, item.size.clone())
     }
 
+    fn get_max_root_set_index(&self, root_id: usize) -> usize {
+        self.0[&root_id]
+            .sets
+            .iter()
+            .enumerate()
+            .max_by(|(_, l), (_, r)| l.size.cmp(&r.size))
+            .unwrap()
+            .0
+    }
+
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {
         if self.0.get(&bag_id).is_none() {
             self.0.insert(bag_id, DynTableValue::default());
         }
-        self.0.get_mut(&bag_id).unwrap().add(DynTableValueItem::new(subset, size));
+        self.0
+            .get_mut(&bag_id)
+            .unwrap()
+            .add(DynTableValueItem::new(subset, size));
+    }
+
+    fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>) {
+        self.0[&bag_id].sets[subset_index]
+            .mis
+            .iter()
+            .for_each(|&v| {
+                mis.insert(v);
+            });
     }
 }
 
