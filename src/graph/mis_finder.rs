@@ -264,6 +264,17 @@ pub fn find_mis(
                         entry.sets.push(DynTableValueItem::new(subset, value));
                         constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                     }
+                } else if child.vertex_set == bag.vertex_set {
+                    // Some weird edge case. Is this a problem from an earlier phase or can we handle
+                    // it this way?
+                    for subset in SubsetIter::new(&bag.vertex_set) {
+                        let (child_set_index, size) = dyn_table.get(child.id, &subset);
+                        entry.sets.push(DynTableValueItem::new(subset, size));
+                        // dyn_table.put(bag.id, subset, size);
+                        constr_table[bag.id].push((Some(child_set_index), None));
+                    }
+                } else {
+                    panic!("Unreachable");
                 }
             }
 
@@ -339,6 +350,8 @@ pub fn find_mis_fast(
 
             1 => {
                 let child = &ntd.td.bags[children[0]];
+
+
                 if let Some(&v) = bag.vertex_set.difference(&child.vertex_set).nth(0) {
                     // Introduce node.
                     for subset in SubBitSetIter::new(&bag.vertex_set) {
@@ -387,6 +400,16 @@ pub fn find_mis_fast(
                         table.put(bag.id, subset, size);
                         constr_table[bag.id].push((Some(child_set_index), None));
                     }
+                } else if child.vertex_set == bag.vertex_set {
+                    // Some weird edge case. Is this a problem from an earlier phase or can we handle
+                    // it this way?
+                    for subset in SubBitSetIter::new(&bag.vertex_set) {
+                        let (child_set_index, size) = table.get(child.id, &subset);
+                        table.put(bag.id, subset, size);
+                        constr_table[bag.id].push((Some(child_set_index), None));
+                    }
+                } else {
+                    panic!("Unreachable");
                 }
             }
 
@@ -413,15 +436,46 @@ pub fn find_mis_fast(
     println!("Construction table:");
     print_constr_table(&constr_table, &table, &ntd.relations);
 
-    let result = reconstruct_mis(
-        &table,
-        ntd.td.root.unwrap(),
-        &constr_table,
-        &ntd.relations,
-    );
+    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
 
     Ok((result.clone(), result.len()))
 }
+
+/*
+pub struct AlgorithmData<Set>
+where
+    Set: Eq + std::fmt::Debug + Clone + Default,
+{
+    new_set: dyn Fn(dyn Iterator<Item = usize> + 'static) -> Set,
+}
+
+pub fn find_mis_merged<Set>(
+    adjaceny_matrix: Vec<Vec<bool>>,
+    ntd: &NiceTreeDecomposition,
+    table: &mut dyn DynTable<Set>,
+    algo_data: &AlgorithmData<Set>,
+) -> Result<(HashSet<usize>, usize), FindMisError>
+where
+    Set: Eq + std::fmt::Debug + Clone + Default,
+{
+    for bag in PostOrderIter::new(&ntd.td) {
+        let children = &ntd.relations.children[&bag.id];
+
+        match children.len() {
+            0 => {
+                table.put(bag.id, algo_data.new_set.call(vec![].iter()), MisSize::Valid(0));
+            }
+
+            1 => {}
+
+            2 => {}
+
+            _ => panic!("Unreachable"),
+        }
+    }
+    todo!()
+}
+*/
 
 fn print_constr_table<Set>(
     constr_table: &ConstructionTable,
@@ -530,7 +584,7 @@ pub mod tests {
 
     #[test]
     fn real() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/problem.graph").unwrap();
         let mut dcel = dcel_b.build();
         let adjacency_matrix = dcel.adjacency_matrix();
         // dcel.triangulate();
@@ -542,8 +596,6 @@ pub mod tests {
         let td_rels = NodeRelations::new(&td);
         let ntd = NiceTreeDecomposition::from(&td);
         let ntd_rels = NodeRelations::new(&ntd.td);
-
-        ntd.validate(&td, &ntd_rels);
 
         let td_path = "td.dot";
         let mut td_out = File::create(td_path).unwrap();
@@ -560,6 +612,8 @@ pub mod tests {
             .args(["-Tpdf", ntd_path, "-o", "ntd.pdf"])
             .spawn()
             .expect("dot command did not work.");
+
+        assert!(ntd.validate(&td, &ntd_rels));
 
         let (bag_content, size) = find_mis(adjacency_matrix, &ntd).unwrap();
         println!("MIS: {:?} with size = {}", bag_content, size);
@@ -567,7 +621,7 @@ pub mod tests {
 
     #[test]
     fn fast() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/problem.graph").unwrap();
         let mut dcel = dcel_b.build();
         let adjacency_matrix = dcel.adjacency_matrix();
         // dcel.triangulate();
@@ -579,8 +633,6 @@ pub mod tests {
         let td_rels = NodeRelations::new(&td);
         let ntd = NiceTreeDecomposition::from(&td);
         let ntd_rels = NodeRelations::new(&ntd.td);
-
-        ntd.validate(&td, &ntd_rels);
 
         let td_path = "td.dot";
         let mut td_out = File::create(td_path).unwrap();
@@ -597,6 +649,8 @@ pub mod tests {
             .args(["-Tpdf", ntd_path, "-o", "ntd.pdf"])
             .spawn()
             .expect("dot command did not work.");
+
+        assert!(ntd.validate(&td, &ntd_rels));
 
         let (bag_content, size) = find_mis_fast(adjacency_matrix, &ntd).unwrap();
         println!("MIS: {:?} with size = {}", bag_content, size);

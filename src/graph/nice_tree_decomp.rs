@@ -14,14 +14,11 @@ impl NiceTreeDecomposition {
     pub fn validate(&self, otd: &TreeDecomposition, relations: &NodeRelations) -> bool {
         let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
         self.td.bags.iter().all(|bag| {
-            if let Some(b) = otd
-                .bags
+            otd.bags
                 .iter()
                 .filter(|obag| obag.vertex_set.eq(&bag.vertex_set))
-                .nth(0)
-            {
-                present[b.id] = true;
-            }
+                .for_each(|obag| present[obag.id] = true);
+
             let children = &relations.children[&bag.id];
             match children.len() {
                 0 => bag.vertex_set.len() == 1,
@@ -29,8 +26,8 @@ impl NiceTreeDecomposition {
                     let child = &self.td.bags[children[0]];
                     let parent_to_child_intersection = bag.vertex_set.difference(&child.vertex_set);
                     let child_to_parent_intersection = child.vertex_set.difference(&bag.vertex_set);
-                    parent_to_child_intersection.count() == 1
-                        || child_to_parent_intersection.count() == 1
+                    parent_to_child_intersection.count() <= 1
+                        || child_to_parent_intersection.count() <= 1
                 }
                 2 => {
                     let left_child = &self.td.bags[children[0]];
@@ -58,6 +55,8 @@ impl From<&TreeDecomposition> for NiceTreeDecomposition {
         ntd.add_bag(FxHashSet::from_iter(
             td.bags[td.root.unwrap()].vertex_set.iter().copied(),
         ));
+
+        assert!(ntd.bags.len() > 0);
 
         for old_bag in TreeDecompBfsIter::new(&td) {
             let bag_id = bag_relations.to_new[&old_bag.id];
@@ -207,13 +206,15 @@ fn insert_between_bags(
         last_parent = between_bag;
     }
 
-    let child_id = if insert_last_child {
+    let child_id = if last_parent == new_parent_id || b2_diff.len() > 0 {
         let child_id = ntd.add_bag(s2.clone());
         ntd.add_edge(last_parent, child_id);
         child_id
     } else {
         last_parent
     };
+
+    assert!(child_id != 0);
 
     if let Some(id) = old_child_id {
         bag_relations.to_old.insert(child_id, id);
