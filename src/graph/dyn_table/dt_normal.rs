@@ -21,14 +21,14 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
         (&item.mis, item.size.clone())
     }
 
-    fn get_max_root_set_index(&self, root_id: usize) -> usize {
+    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize) {
         self.0[&root_id]
             .sets
             .iter()
             .enumerate()
             .max_by(|(_, l), (_, r)| l.size.cmp(&r.size))
+            .map(|(i, item)| (i, item.size))
             .unwrap()
-            .0
     }
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {

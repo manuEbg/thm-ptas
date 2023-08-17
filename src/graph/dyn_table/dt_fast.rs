@@ -58,17 +58,15 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
         )
     }
 
-    fn get_max_root_set_index(&self, root_id: usize) -> usize {
-        (0..self.set_count[&root_id])
-            .fold((0 as usize, MisSize::Valid(0)), |result, set_index| {
-                let set_size = self.map[&(root_id, set_index)];
-                if result.1 < set_size {
-                    (set_index, set_size)
-                } else {
-                    result
-                }
-            })
-            .0
+    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize) {
+        (0..self.set_count[&root_id]).fold((0 as usize, MisSize::Valid(0)), |result, set_index| {
+            let set_size = self.map[&(root_id, set_index)];
+            if result.1 < set_size {
+                (set_index, set_size)
+            } else {
+                result
+            }
+        })
     }
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: BitSet, size: MisSize) {

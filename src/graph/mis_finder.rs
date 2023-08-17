@@ -28,7 +28,7 @@ where
     fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
     // TODO: @cleanup This function may only be needed for debugging purposes.
     fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&Set, MisSize);
-    fn get_max_root_set_index(&self, root_id: usize) -> usize;
+    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize);
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
     fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>);
 }
@@ -93,6 +93,8 @@ fn is_independent(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &FxHashSet<us
     set.iter().all(|u| !adjaceny_matrix[v][*u])
 }
 
+// TODO: Maybe this reconstruction is not correct.
+// The reconstructed set is smaller than the size in the table.
 fn reconstruct_mis<Set>(
     table: &dyn DynTable<Set>,
     root_id: usize,
@@ -165,7 +167,9 @@ where
     }
 
     // Find the largest set in the root node. This begins the table traversal.
-    let root_set_index = table.get_max_root_set_index(root_id);
+    let (root_set_index, size) = table.get_max_root_set_index(root_id);
+
+    println!("MIS size according to table: {size}");
 
     let result = rec(
         table,
@@ -183,7 +187,7 @@ where
 // 1. Remove the `.0` for the `dyn_table` and use the common interface.
 // 2. Add an adjaceny matrix/list to check whether two vertices are connected or not.
 pub fn find_mis(
-    adjaceny_matrix: Vec<Vec<bool>>,
+    adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
     let mut dyn_table = NormalDynTable::default();
@@ -318,14 +322,22 @@ pub fn find_mis(
 }
 
 fn is_independent_fast(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &BitSet) -> bool {
-    set.iter().all(|u| !adjaceny_matrix[v][u])
+    let result = set.iter().all(|u| {
+        println!("Check {v} -- {u}");
+        !adjaceny_matrix[u][v]
+    });
+    if v == 15 {
+        println!("BitSet: {:?}", set);
+        println!("{}", result);
+    }
+    result
 }
 
 // TODO: If possible, merge the two `find_mis` algorithms.
 // TODO: Would it be a nice idea to log the steps of the algorithm (print to a string buffer)?
 
 pub fn find_mis_fast(
-    adjaceny_matrix: Vec<Vec<bool>>,
+    adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
     let mut table: FastDynTable = FastDynTable::new(usize::pow(2, adjaceny_matrix.len() as u32));
@@ -434,7 +446,7 @@ pub fn find_mis_fast(
     }
 
     println!("Construction table:");
-    print_constr_table(&constr_table, &table, &ntd.relations);
+    // print_constr_table(&constr_table, &table, &ntd.relations);
 
     let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
 
@@ -522,6 +534,19 @@ fn print_constr_table<Set>(
         });
 }
 
+pub fn find_connected_vertices(set: &HashSet<usize>, adjaceny_matrix: &Vec<Vec<bool>>) -> Vec<usize> {
+    let mut result = Vec::new();
+    for &u in set.iter() {
+        for &v in set.iter() {
+            if adjaceny_matrix[u][v] {
+                result.push(u);
+                result.push(v);
+            }
+        }
+    }
+    result
+}
+
 #[cfg(test)]
 pub mod tests {
     use crate::{
@@ -529,7 +554,7 @@ pub mod tests {
             approximated_td::{ApproximatedTD, TDBuilder},
             dcel::spanning_tree::SpanningTree,
             // mis_finder::{find_mis, find_mis_fast},
-            mis_finder::{find_mis, find_mis_fast},
+            mis_finder::{find_mis, find_mis_fast, find_connected_vertices},
             nice_tree_decomp::NiceTreeDecomposition,
             node_relations::NodeRelations,
             tree_decomposition::td_write_to_dot,
@@ -578,7 +603,7 @@ pub mod tests {
             .spawn()
             .expect("dot command did not work.");
 
-        let (bag_content, size) = find_mis(vec![vec![false; 6]; 6], &ntd).unwrap();
+        let (bag_content, size) = find_mis(&vec![vec![false; 6]; 6], &ntd).unwrap();
         println!("{:?} with size = {}", bag_content, size);
     }
 
@@ -615,8 +640,10 @@ pub mod tests {
 
         assert!(ntd.validate(&td, &ntd_rels));
 
-        let (bag_content, size) = find_mis(adjacency_matrix, &ntd).unwrap();
+        let (bag_content, size) = find_mis(&adjacency_matrix, &ntd).unwrap();
         println!("MIS: {:?} with size = {}", bag_content, size);
+        let connected_vertices = find_connected_vertices(&bag_content, &adjacency_matrix);
+        assert!(connected_vertices.len() == 0, "Set is not independet: {:?}", connected_vertices);
     }
 
     #[test]
@@ -652,7 +679,9 @@ pub mod tests {
 
         assert!(ntd.validate(&td, &ntd_rels));
 
-        let (bag_content, size) = find_mis_fast(adjacency_matrix, &ntd).unwrap();
+        let (bag_content, size) = find_mis_fast(&adjacency_matrix, &ntd).unwrap();
         println!("MIS: {:?} with size = {}", bag_content, size);
+        let connected_vertices = find_connected_vertices(&bag_content, &adjacency_matrix);
+        assert!(connected_vertices.len() == 0, "Set is not independet: {:?}", connected_vertices);
     }
 }
