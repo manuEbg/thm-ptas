@@ -111,3 +111,19 @@ impl Iterator for SubBitSetIter {
         self.next()
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use fxhash::FxHashSet;
+
+    #[test]
+    fn sub_bitsets() {
+        println!("Sub bitsets!");
+        let set = FxHashSet::from_iter(vec![1, 3, 10]);
+
+        for (i, subset) in SubBitSetIter::new(&set).enumerate() {
+            println!("{i}. Subset: {:?}", subset);
+        }
+    }
+}
