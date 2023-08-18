@@ -121,23 +121,51 @@ where
         table.add_to_mis(bag_id, set_index, &mut mis);
 
         let children = &node_relations.children[&bag_id];
+        println!("{bag_id}'s children: {children:?}");
 
         match children.len() {
             // Leaf node: We're finished.
-            0 => mis,
+            0 => {
+                println!("{bag_id} is a leaf node => MIS = {mis:?}");
+                mis
+            }
 
             // Check the child.
-            1 => rec(
-                table,
-                children[0],
-                constr_table[bag_id][set_index].0.unwrap(),
-                &constr_table,
-                mis,
-                &node_relations,
-            ),
+            1 => {
+                let child_index = constr_table[bag_id][set_index].0.unwrap();
+                println!(
+                    "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?}",
+                    table.get_by_index(bag_id, set_index),
+                    children[0],
+                    child_index,
+                    table.get_by_index(children[0], child_index),
+                );
+
+                rec(
+                    table,
+                    children[0],
+                    constr_table[bag_id][set_index].0.unwrap(),
+                    &constr_table,
+                    mis,
+                    &node_relations,
+                )
+            }
 
             // Find the maximum from the left and right child.
             2 => {
+                let left = constr_table[bag_id][set_index].0.unwrap();
+                let right = constr_table[bag_id][set_index].1.unwrap();
+                println!(
+                    "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?} or {}'s {} {:?}",
+                    table.get_by_index(bag_id, set_index),
+                    children[0],
+                    constr_table[bag_id][set_index].0.unwrap(),
+                    table.get_by_index(children[0], left),
+                    children[1],
+                    constr_table[bag_id][set_index].1.unwrap(),
+                    table.get_by_index(children[1], right),
+                );
+
                 let left_mis = mis.clone();
                 let right_mis = mis.clone();
 
@@ -159,7 +187,9 @@ where
                     &node_relations,
                 );
 
-                std::cmp::max_by(left, right, |l, r| l.len().cmp(&r.len()))
+                // std::cmp::max_by(left, right, |l, r| l.len().cmp(&r.len()))
+                mis = HashSet::from_iter(left.union(&right).into_iter().copied());
+                mis
             }
 
             _ => panic!("Unreachable"),
@@ -190,7 +220,7 @@ pub fn find_mis(
     adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
-    let mut dyn_table = NormalDynTable::default();
+    let mut table = NormalDynTable::default();
 
     // TODO: @speed Don't use dynamic vectors, instead compute the maximum size required with
     // `max_bag_size`? This should be at max something like the length of the spanning tree.
@@ -215,31 +245,36 @@ pub fn find_mis(
 
             1 => {
                 let child = &ntd.td.bags[children[0]];
-                let child_entry = dyn_table.0.get(&child.id).unwrap();
+                let child_entry = table.0.get(&child.id).unwrap();
                 if let Some(&v) = bag.vertex_set.difference(&child.vertex_set).nth(0) {
                     // Introduce node.
-                    println!(
-                        "Introduce {v}: B{} -> B{} = {:?} -> {:?}",
-                        &child.id, &bag.id, &child.vertex_set, &bag.vertex_set
-                    );
-
                     for subset in SubsetIter::new(&bag.vertex_set) {
                         if !subset.contains(&v) {
-                            let (i, value) = dyn_table.get(child.id, &subset);
-                            entry.sets.push(DynTableValueItem::new(subset, value));
+                            let (i, size) = table.get(child.id, &subset);
+                            println!(
+                                "{v} notin {subset:?} => M[{}, {subset:?}] = M[{}, {subset:?}] = {size}",
+                                bag.id, child.id
+                            );
+                            entry.sets.push(DynTableValueItem::new(subset, size));
                             constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                         } else if is_independent(&adjaceny_matrix, v, &subset) {
                             // @speed This clone could be expensive.
                             let mut clone = subset.clone();
                             clone.remove(&v);
-                            println!("{subset:?} + 1");
-                            let (i, value) = dyn_table.get(child.id, &clone);
+                            // println!(
+                            //     "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
+                            //     bag.id, child.id
+                            // );
+                            let (i, size) = table.get(child.id, &clone);
                             entry
                                 .sets
-                                .push(DynTableValueItem::new(subset, value + MisSize::Valid(1)));
+                                .push(DynTableValueItem::new(subset, size + MisSize::Valid(1)));
                             constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                         } else {
-                            println!("{subset:?} is not independent.");
+                            println!(
+                                "{subset:?} is not independent => M[{}, S] = -infinity",
+                                bag.id
+                            );
                             entry
                                 .sets
                                 .push(DynTableValueItem::new(subset, MisSize::Invalid));
@@ -260,8 +295,8 @@ pub fn find_mis(
                         let mut clone = subset.clone();
                         clone.insert(v);
 
-                        let without = dyn_table.get(child.id, &subset);
-                        let with = dyn_table.get(child.id, &clone);
+                        let without = table.get(child.id, &subset);
+                        let with = table.get(child.id, &clone);
 
                         let (i, value) = std::cmp::max_by(with, without, |w, wo| w.1.cmp(&wo.1));
 
@@ -272,9 +307,9 @@ pub fn find_mis(
                     // Some weird edge case. Is this a problem from an earlier phase or can we handle
                     // it this way?
                     for subset in SubsetIter::new(&bag.vertex_set) {
-                        let (child_set_index, size) = dyn_table.get(child.id, &subset);
+                        let (child_set_index, size) = table.get(child.id, &subset);
                         entry.sets.push(DynTableValueItem::new(subset, size));
-                        // dyn_table.put(bag.id, subset, size);
+                        // table.put(bag.id, subset, size);
                         constr_table[bag.id].push((Some(child_set_index), None));
                     }
                 } else {
@@ -290,15 +325,14 @@ pub fn find_mis(
                 let right_child = &ntd.td.bags[children[1]];
 
                 for subset in SubsetIter::new(&bag.vertex_set) {
-                    let (i, left_value) = dyn_table.get(left_child.id, &subset);
-                    let (j, right_value) = dyn_table.get(right_child.id, &subset);
+                    let (i, left_size) = table.get(left_child.id, &subset);
+                    let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
 
-                    println!("{left_value} + {right_value} - {len}");
-                    entry.sets.push(DynTableValueItem::new(
-                        subset,
-                        left_value + right_value - len,
-                    ));
+                    println!("M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
+                    entry
+                        .sets
+                        .push(DynTableValueItem::new(subset, left_size + right_size - len));
                     constr_table[bag.id].push((Some(i), Some(j))); // Reconstruction.
                 }
             }
@@ -306,17 +340,12 @@ pub fn find_mis(
             _ => assert!(false, "Unreachable"),
         }
 
-        dyn_table.0.insert(bag.id.clone(), entry);
+        table.0.insert(bag.id.clone(), entry);
     }
 
-    println!("{}", &dyn_table);
+    println!("{}", &table);
 
-    let result = reconstruct_mis(
-        &dyn_table,
-        ntd.td.root.unwrap(),
-        &constr_table,
-        &ntd.relations,
-    );
+    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
 
     Ok((result.clone(), result.len()))
 }
@@ -362,7 +391,6 @@ pub fn find_mis_fast(
 
             1 => {
                 let child = &ntd.td.bags[children[0]];
-
 
                 if let Some(&v) = bag.vertex_set.difference(&child.vertex_set).nth(0) {
                     // Introduce node.
@@ -445,12 +473,38 @@ pub fn find_mis_fast(
         }
     }
 
+    println!("Dynamic table:");
+    println!("{:?}", table);
+
     println!("Construction table:");
     // print_constr_table(&constr_table, &table, &ntd.relations);
 
     let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
 
     Ok((result.clone(), result.len()))
+}
+
+pub fn find_mis_exhaustive(
+    adjaceny_matrix: &Vec<Vec<bool>>,
+) -> Result<(HashSet<usize>, usize), FindMisError> {
+    let is_independent = |subset: &HashSet<usize>| {
+        subset.iter().all(|u| subset.iter().all(|v| !adjaceny_matrix[*u][*v]))
+    };
+
+    let mut max: HashSet<usize> = HashSet::new();
+    let combinations = u32::pow(2, adjaceny_matrix.len() as u32);
+    for (i, subset) in SubsetIter::new(&FxHashSet::from_iter(0..adjaceny_matrix.len())).enumerate() {
+        if i % 100000 == 0 {
+            println!("{i}/{combinations}, {}%", f64::from(i as u32)/f64::from(combinations) * 100.0);
+        }
+        let subset2 = HashSet::from_iter(subset.into_iter());
+        if is_independent(&subset2) && subset2.len() > max.len() {
+            max = subset2;
+        }
+    }
+
+    let len = max.len();
+    Ok((max, len))
 }
 
 /*
@@ -534,7 +588,10 @@ fn print_constr_table<Set>(
         });
 }
 
-pub fn find_connected_vertices(set: &HashSet<usize>, adjaceny_matrix: &Vec<Vec<bool>>) -> Vec<usize> {
+pub fn find_connected_vertices(
+    set: &HashSet<usize>,
+    adjaceny_matrix: &Vec<Vec<bool>>,
+) -> Vec<usize> {
     let mut result = Vec::new();
     for &u in set.iter() {
         for &v in set.iter() {
@@ -554,7 +611,7 @@ pub mod tests {
             approximated_td::{ApproximatedTD, TDBuilder},
             dcel::spanning_tree::SpanningTree,
             // mis_finder::{find_mis, find_mis_fast},
-            mis_finder::{find_mis, find_mis_fast, find_connected_vertices},
+            mis_finder::{find_connected_vertices, find_mis, find_mis_fast},
             nice_tree_decomp::NiceTreeDecomposition,
             node_relations::NodeRelations,
             tree_decomposition::td_write_to_dot,
@@ -565,7 +622,7 @@ pub mod tests {
     use fxhash::FxHashSet;
     use std::{fs::File, process::Command};
 
-    use super::ConstructionTable;
+    use super::{ConstructionTable, find_mis_exhaustive};
 
     #[test]
     fn simple() {
@@ -643,7 +700,11 @@ pub mod tests {
         let (bag_content, size) = find_mis(&adjacency_matrix, &ntd).unwrap();
         println!("MIS: {:?} with size = {}", bag_content, size);
         let connected_vertices = find_connected_vertices(&bag_content, &adjacency_matrix);
-        assert!(connected_vertices.len() == 0, "Set is not independet: {:?}", connected_vertices);
+        assert!(
+            connected_vertices.len() == 0,
+            "Set is not independet: {:?}",
+            connected_vertices
+        );
     }
 
     #[test]
@@ -682,6 +743,20 @@ pub mod tests {
         let (bag_content, size) = find_mis_fast(&adjacency_matrix, &ntd).unwrap();
         println!("MIS: {:?} with size = {}", bag_content, size);
         let connected_vertices = find_connected_vertices(&bag_content, &adjacency_matrix);
-        assert!(connected_vertices.len() == 0, "Set is not independet: {:?}", connected_vertices);
+        assert!(
+            connected_vertices.len() == 0,
+            "Set is not independet: {:?}",
+            connected_vertices
+        );
+    }
+
+    #[test]
+    fn exhaustive() {
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/problem.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        let adjacency_matrix = dcel.adjacency_matrix();
+
+        let result = find_mis_exhaustive(&adjacency_matrix);
+        println!("Exhaustive result: {result:?}");
     }
 }
