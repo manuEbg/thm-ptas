@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::dcel::arc::ArcId;
 use super::dcel::face::FaceId;
 use super::dcel::vertex::VertexId;
-use super::dcel::SubDcel;
+use super::sub_dcel::SubDcel;
 use super::{dcel::face::Face, dcel::spanning_tree::SpanningTree, Dcel};
 
 type BagId = usize;
@@ -171,6 +171,7 @@ pub struct SubTDBuilder<'a> {
     bags: Vec<HashSet<VertexId>>,
     min_level: usize,
     on_tree_path: Vec<Vec<VertexId>>,
+    tree_path_calculated: Vec<bool>,
 }
 
 impl<'a> TreeDecomposable for SubTDBuilder<'a> {
@@ -257,7 +258,39 @@ impl<'a> SubTDBuilder<'a> {
             bags: vec![HashSet::new(); donut.sub.num_faces()],
             min_level,
             on_tree_path: vec![vec![]; donut.sub.num_faces()],
+            tree_path_calculated: vec![false; donut.sub.num_vertices()],
         }
+    }
+
+    fn initialize_tree_paths(&mut self) {
+        self.tree_path_calculated[self.donut.fake_root()] = true;
+        for v in 0..self.donut.sub.num_vertices() {
+            self.tree_path(v);
+        }
+    }
+
+    fn tree_path(&mut self, v: VertexId) {
+        let mut stack = vec![v];
+        let mut current = v;
+        loop {
+            if self.tree_path_calculated[current] {
+                break;
+            }
+            let prev = self.spanning_tree.discovered_by(current).src();
+            stack.push(prev);
+            current = prev;
+        }
+        if stack.len() < 2 {
+            // root case
+            return;
+        }
+
+        (stack.len() - 2..=0).for_each(|i| {
+            let this_v = stack[i];
+            let prev_v = stack[i + 1];
+            self.on_tree_path[this_v] = [vec![prev_v], self.on_tree_path[prev_v].clone()].concat();
+            self.tree_path_calculated[this_v] = true;
+        });
     }
 }
 

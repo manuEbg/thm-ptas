@@ -3,6 +3,7 @@ use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
 use super::dcel::vertex::VertexId;
 use super::dcel::*;
+use super::sub_dcel::SubDcel;
 use super::Dcel;
 use std::collections::HashMap;
 use std::collections::HashSet;
