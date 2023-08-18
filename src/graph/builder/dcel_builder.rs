@@ -12,6 +12,50 @@ pub struct DcelBuilder {
     faces: Vec<Face>,
 }
 
+/// Duuuuuuuuuuuuuuuuuuuuude
+impl From<&Dcel> for DcelBuilder {
+    fn from(dcel: &Dcel) -> Self {
+        DcelBuilder {
+            vertices: dcel
+                .vertices()
+                .iter()
+                .map(|v| Vertex {
+                    arcs: v.arcs().iter().copied().collect(),
+                })
+                .collect(),
+            arcs: dcel
+                .arcs()
+                .iter()
+                .map(|a| Arc {
+                    src: a.src(),
+                    src_port: dcel
+                        .vertex(a.src())
+                        .arcs()
+                        .iter()
+                        .position(|a2| dcel.arc(*a2).dst() == a.dst()),
+                    dst: a.dst(),
+                    dst_port: dcel
+                        .vertex(a.dst())
+                        .arcs()
+                        .iter()
+                        .position(|a2| dcel.arc(*a2).dst() == a.src()),
+                    next: Some(a.next()),
+                    prev: Some(a.prev()),
+                    twin: Some(a.twin()),
+                    face: Some(a.face()),
+                })
+                .collect(),
+            faces: dcel
+                .faces()
+                .iter()
+                .map(|f| Face {
+                    start_arc: f.start_arc(),
+                })
+                .collect(),
+        }
+    }
+}
+
 impl DcelBuilder {
     pub fn new() -> Self {
         DcelBuilder {
@@ -182,6 +226,10 @@ impl DcelBuilder {
                 };
             }
         }
+    }
+
+    pub fn num_vertices(&self) -> usize {
+        self.vertices.len()
     }
 }
 

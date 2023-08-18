@@ -6,7 +6,10 @@ pub mod vertex;
 use std::{collections::HashSet, error::Error};
 
 use self::face::FaceIterator;
-use super::iterators::bfs::BfsIter;
+use super::{
+    iterators::bfs::BfsIter,
+    sub_dcel::{SubDcel, SubDcelBuilder},
+};
 use crate::graph::{builder::dcel_builder::DcelBuilder, dcel::spanning_tree::SpanningTree};
 use arc::{Arc, ArcId};
 use face::{Face, FaceId};
@@ -239,7 +242,7 @@ impl Dcel {
         for depth in 1..(spanning_tree.max_level() + 1) {
             let mut visited = vec![false; self.vertices.len()];
 
-            let mut builder = SubDcelBuilder::new(self.clone());
+            let mut builder = SubDcelBuilder::new(self.clone(), depth);
 
             for spanning_arc in spanning_tree.arcs() {
                 let arc = self.arc(*spanning_arc);
@@ -258,7 +261,7 @@ impl Dcel {
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
                         if dst_level == depth {
-                            builder.push_arc(outgoing_arc);
+                            builder.push_arc(outgoing_arc, src_level);
                         }
                     }
                 }
@@ -278,7 +281,9 @@ impl Dcel {
         }
 
         let mut visited = vec![false; self.vertices.len()];
-        let mut builder = SubDcelBuilder::new(self.clone());
+        let mut builder = SubDcelBuilder::new(self.clone(), start);
+
+        for vertex in 
 
         for vertex in 0..self.vertices().len() {
             let vertex_depth = spanning_tree.vertex_level()[vertex];
@@ -286,20 +291,28 @@ impl Dcel {
             if vertex_depth >= start && vertex_depth < end && !visited[vertex] {
                 /* This vertex is part of the donut, so add all its associated arcs in the
                  * donut */
-                let outgoing_arcs = self
+                let outgoing_arcs = self.vertices[vertex]
                     .arcs()
                     .iter()
-                    .filter(|a| a.src() == vertex)
-                    .filter(|a| {
-                        spanning_tree.vertex_level()[a.dst()] >= start
-                            && spanning_tree.vertex_level()[a.dst()] < end
-                    })
+                    .map(|arc_id| self.arc(*arc_id))
                     .collect::<Vec<_>>();
 
                 for arc in outgoing_arcs {
-                    builder.push_arc(arc);
+                    if spanning_tree.vertex_level()[arc.dst()] >= start
+                        && spanning_tree.vertex_level()[arc.dst()] < end
+                    {
+                        builder.push_arc(arc, false);
+                    } else if spanning_tree.discovered_by(vertex).src() == arc.dst() {
+                        let mut copy = arc.clone();
+                        copy.reset_dst(fake_root);
+                        builder.push_arc(&copy, true);
+                    }
                 }
 
+                    // TODO: 
+                    // 1. Dcel into Dcel BUilder 
+                    // 2. Merge all vertices inside the donut hole
+                    // 3. use result as fake root
                 visited[vertex] = true;
             }
         }

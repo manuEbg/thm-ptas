@@ -1,7 +1,10 @@
 use std::error::Error;
 
 use super::{
-    dcel::{arc, vertex},
+    dcel::{
+        arc,
+        vertex::{self, VertexId},
+    },
     Dcel, DcelBuilder,
 };
 
@@ -65,18 +68,40 @@ pub struct SubDcelBuilder {
     pub vertex_mapping: Vec<vertex::VertexId>,
     pub arc_mapping: Vec<arc::ArcId>,
     pub last_vertex_id: vertex::VertexId,
+    pub lowest_level: usize,
+    vertex_level: Vec<usize>,
 }
 
 impl SubDcelBuilder {
-    pub fn new(dcel: Dcel) -> Self {
+    pub fn new(dcel: Dcel, lowest_level: usize) -> Self {
         Self {
             dcel,
             dcel_builder: DcelBuilder::new(),
             vertex_mapping: vec![],
             arc_mapping: vec![],
             last_vertex_id: 0,
+            lowest_level,
+            vertex_level: vec![],
         }
     }
+
+    fn insert_fake_root(&mut self) -> VertexId {
+        let fake_root = self.dcel_builder.num_vertices();
+        self.push_vertex(fake_root);
+        self.connect_fake_root(fake_root);
+        fake_root
+    }
+
+    fn connect_fake_root(&mut self, fake_root: usize) {
+        // all vertices on the lowest level
+        for (v, level) in self.vertex_level.iter().enumerate() {
+            if *level == self.lowest_level {
+                self.connect_with_fake_root(fake_root, v);
+            }
+        }
+    }
+
+    fn connect_with_fake_root(&mut self, v: VertexId, fake_root: VertexId) {}
 
     /* Returns the mapped vertex id */
     pub fn push_vertex(&mut self, v: vertex::VertexId) -> vertex::VertexId {
@@ -95,7 +120,7 @@ impl SubDcelBuilder {
         self.last_vertex_id - 1
     }
 
-    pub fn push_arc(&mut self, a: &arc::Arc) {
+    pub fn push_arc(&mut self, a: &arc::Arc, dest_is_fake: bool) {
         let src = self.push_vertex(a.src());
         let dst = self.push_vertex(a.dst());
         self.dcel_builder.push_arc(src, dst);
