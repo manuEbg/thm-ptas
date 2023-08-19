@@ -164,7 +164,12 @@ impl DcelBuilder {
      */
     fn find_next_arc(&mut self, cur_arc_idx: usize) -> usize {
         let arc = &mut self.arcs[cur_arc_idx];
-        let dest_port = arc.dst_port.unwrap();
+        let dest_port = match arc.dst_port {
+            Some(v) => v,
+            None => {
+                panic!("Arc {cur_arc_idx} has no dst_port. Arc: {:?}", arc);
+            }
+        };
 
         let dest_v = &self.vertices[arc.dst];
 

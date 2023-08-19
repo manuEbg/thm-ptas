@@ -258,12 +258,16 @@ impl Dcel {
         self.arcs[an].set_prev(ap);
 
         let src = self.arc(id).src();
-        let twin = self.arc(an).twin();
-        self.arcs[twin].reset_dst(src);
+        let twin_n = self.arc(an).twin();
+        let twin_p = self.arc(ap).twin();
+        self.arcs[twin_n].reset_dst(src);
         if self.arc(ap).src() == self.arc(an).dst() {
             // we collapsed a triangle into a line
             self.invalid_arcs[ap] = true;
             self.invalid_arcs[an] = true;
+            // TODO: update Twins
+            self.arcs[twin_n].reset_twin(twin_p);
+            self.arcs[twin_p].reset_twin(twin_n);
             let face = self.arc(id).face();
             println!("Face {face} is invalid");
             self.invalid_faces[face] = true;
@@ -273,6 +277,9 @@ impl Dcel {
 
     /// merge vertex from into vertex into
     fn merge_vertices(&mut self, into: VertexId, from: VertexId) {
+        if into == from {
+            panic!("merging v{from} into v{into} is not allowed!");
+        }
         /* gather neighbors of u and v and the position of each other */
         let neighbors_of_into: Vec<VertexId> = self.neighbors(into);
         let neighbors_of_from: Vec<VertexId> = self.neighbors(from);
@@ -303,6 +310,10 @@ impl Dcel {
             self.arcs[a].reset_src(into);
             let twin = self.arcs[a].twin();
             self.arcs[twin].reset_dst(into);
+            if self.arc(a).dst() == into || self.neighbors(into).contains(&self.arc(a).dst()) {
+                self.invalid_arcs[a] = true;
+                continue;
+            }
             self.vertices[into].push_arc_at(a, position_of_from);
         }
         // remove u_v, v_u
@@ -355,8 +366,9 @@ impl Dcel {
         end: usize,
         // collapsed_dcel: &DcelBuilder,
         collapsed_root: VertexId,
+        spanning_tree: &SpanningTree,
     ) -> Result<SubDcel, Box<dyn Error>> {
-        let spanning_tree = self.spanning_tree(0);
+        // let spanning_tree = self.spanning_tree(0);
 
         if end > spanning_tree.max_level() + 1 {
             return Err("Donut is out of bounds".into());
@@ -366,11 +378,11 @@ impl Dcel {
         let mut builder = SubDcelBuilder::new(self.clone(), start);
 
         // add collapsed_root as fake_root and push all its arcs
-        // collapsed_dcel
-        //     .arcs(collapsed_root)
-        //     .iter()
-        //     .map(|id| Arc::from(collapsed_dcel.arc(*id)))
-        //     .for_each(|a| builder.push_arc(&a));
+        self.vertex(collapsed_root)
+            .arcs()
+            .iter()
+            .map(|id| self.arc(*id))
+            .for_each(|a| builder.push_arc(a));
 
         for vertex in 0..self.vertices().len() {
             let vertex_depth = spanning_tree.vertex_level()[vertex];
@@ -394,17 +406,11 @@ impl Dcel {
                             println!("pushing arc {:?}", arc);
                             builder.push_arc(arc);
                         }
-                    } else if spanning_tree.discovered_by(vertex).src() == arc.dst() {
-                        // let mut copy = arc.clone();
-                        // copy.reset_dst(collapsed_root);
-                        // builder.push_arc(&copy);
+                    } else if arc.dst() == collapsed_root {
+                        builder.push_arc(&arc);
                     }
                 }
 
-                // TODO:
-                // 1. Dcel into Dcel BUilder
-                // 2. Merge all vertices inside the donut hole
-                // 3. use result as fake root
                 visited[vertex] = true;
             }
         }
@@ -421,33 +427,36 @@ impl Dcel {
         let root = 0;
         let mut clone = self.clone();
         let spanning_tree = self.spanning_tree(root);
-        // let mut collapsed_dcel_builder = DcelBuilder::from(self);
 
         let mut last_level = 1;
 
         for n in 1..(spanning_tree.max_level() + 1) {
             println!("Find Donuts: Going through level {}", n);
-            // if n > 1 {
-            if false {
-                // Collapse all nodes on the level before into the root node
-                // to create a fake root
-                // spanning_tree
-                //     .on_level(n - 1)
-                //     .iter()
-                //     .for_each(|v| self.merge_vertices(root, *v));
-            }
             if n % k == 0 {
                 /* Current donut is from last_level -> n */
-                let mut donut = self.collect_donut(last_level, n, root)?;
+                let mut donut = clone.collect_donut(last_level, n, root, &spanning_tree)?;
                 donut.triangulate();
                 result.push(donut);
-                last_level = n + 1
+
+                // after creating the donut we merge it into the root of the tree to create a fake
+                // root for the following donut
+                for i in last_level..=n {
+                    spanning_tree
+                        .on_level(i)
+                        .iter()
+                        .for_each(|v| clone.merge_vertices(root, *v))
+                }
+                last_level = n + 1;
             }
         }
 
         if last_level != spanning_tree.max_level() {
-            let mut last_donut =
-                self.collect_donut(last_level, spanning_tree.max_level() + 1, root)?;
+            let mut last_donut = clone.collect_donut(
+                last_level,
+                spanning_tree.max_level() + 1,
+                root,
+                &spanning_tree,
+            )?;
             last_donut.triangulate();
             result.push(last_donut);
         }
@@ -459,6 +468,7 @@ impl Dcel {
         self.pre_triangulation_arc_count
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::{read_graph_file_into_dcel_builder, write_web_file};
@@ -478,12 +488,11 @@ mod tests {
         // dcel.merge_vertices(0, 7);
         let st = dcel.spanning_tree(0);
 
-        for level in 1..6 {
-            st.on_level(level)
-                .iter()
-                .for_each(|v| clone.merge_vertices(0, *v));
-        }
+        // for level in 1..6 {
+        //     st.on_level(level)
+        //         .iter()
+        //         .for_each(|v| clone.merge_vertices(0, *v));
+        // }
         write_web_file("data/test.js", &clone);
-        // TODO: merge v7 into v0
     }
 }

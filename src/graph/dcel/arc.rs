@@ -67,6 +67,9 @@ impl Arc {
     pub fn reset_dst(&mut self, dst: ArcId) {
         self.dst = dst;
     }
+    pub fn reset_twin(&mut self, twin: ArcId) {
+        self.twin = twin;
+    }
 
     pub fn twin(&self) -> ArcId {
         self.twin
