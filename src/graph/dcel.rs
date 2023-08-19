@@ -144,6 +144,7 @@ impl Dcel {
         let count = self.num_faces();
         for f in 0..count {
             if self.invalid_faces[f] {
+                println!("Skipping Face {f} ");
                 continue;
             }
             loop {
@@ -183,7 +184,7 @@ impl Dcel {
                     vec.push(a);
                 }
                 panic!(
-                    "FACE {} with {:?} edges iterated. Should never be here",
+                    "FACE {} with edges {:?} iterated. Should never be here",
                     f, vec
                 );
                 // FaceInfo::TriangulatedFace
@@ -261,11 +262,15 @@ impl Dcel {
         self.arcs[twin].reset_dst(src);
         if self.arc(ap).src() == self.arc(an).dst() {
             // we collapsed a triangle into a line
+            self.invalid_arcs[ap] = true;
+            self.invalid_arcs[an] = true;
             let face = self.arc(id).face();
+            println!("Face {face} is invalid");
             self.invalid_faces[face] = true;
         }
         self.invalid_arcs[id] = true;
     }
+
     /// merge vertex from into vertex into
     fn merge_vertices(&mut self, into: VertexId, from: VertexId) {
         /* gather neighbors of u and v and the position of each other */
@@ -286,24 +291,24 @@ impl Dcel {
             .unwrap();
 
         /* collect bend over and deleted arcs */
-        let mut bend_over_arcs: Vec<ArcId> = Vec::new();
-        let mut bend_over_twins: Vec<ArcId> = Vec::new();
         let into_to_from = self.vertices[into].arcs()[position_of_from];
         let from_to_into = self.vertices[from].arcs()[position_of_into];
 
         // update src of all remaining arcs of from
         // update dst of all their twins
         // Add them to into
-        let mut arcs = self.vertices[from].arcs().clone();
-        for a in arcs.into_iter() {
+        let arcs = self.vertices[from].arcs().clone();
+        self.vertices[into].remove_arc_at(position_of_from);
+        for a in arcs.into_iter().rev() {
             self.arcs[a].reset_src(into);
             let twin = self.arcs[a].twin();
             self.arcs[twin].reset_dst(into);
-            self.vertices[into].push_arc(a);
+            self.vertices[into].push_arc_at(a, position_of_from);
         }
         // remove u_v, v_u
         self.remove_arc(into_to_from);
         self.remove_arc(from_to_into);
+        self.vertices[from].remove_arcs();
     }
 
     pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
@@ -379,15 +384,20 @@ impl Dcel {
                     .map(|arc_id| self.arc(*arc_id))
                     .collect::<Vec<_>>();
 
-                for arc in outgoing_arcs {
+                for (i, arc) in outgoing_arcs.iter().enumerate() {
                     if spanning_tree.vertex_level()[arc.dst()] >= start
                         && spanning_tree.vertex_level()[arc.dst()] < end
                     {
-                        builder.push_arc(arc);
+                        if self.invalid_arcs[self.vertices[vertex].arcs()[i]] {
+                            println!("not pushing arc {}", self.vertices[vertex].arcs()[i]);
+                        } else {
+                            println!("pushing arc {:?}", arc);
+                            builder.push_arc(arc);
+                        }
                     } else if spanning_tree.discovered_by(vertex).src() == arc.dst() {
-                        let mut copy = arc.clone();
-                        copy.reset_dst(collapsed_root);
-                        builder.push_arc(&copy);
+                        // let mut copy = arc.clone();
+                        // copy.reset_dst(collapsed_root);
+                        // builder.push_arc(&copy);
                     }
                 }
 
@@ -400,13 +410,16 @@ impl Dcel {
         }
 
         let sub_dcel = builder.build(Some(collapsed_root))?;
+        for (i, a) in sub_dcel.dcel.arcs().iter().enumerate() {
+            println!("Subdcelarcs({i}) {:?}", a);
+        }
         Ok(sub_dcel)
     }
 
     pub fn find_donuts_for_k(&self, k: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
         let root = 0;
-        // let mut clone = self.clone();
+        let mut clone = self.clone();
         let spanning_tree = self.spanning_tree(root);
         // let mut collapsed_dcel_builder = DcelBuilder::from(self);
 
@@ -459,10 +472,18 @@ mod tests {
     }
     #[test]
     fn merge_vertices() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/merge_test.graph").unwrap();
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
         let mut dcel = dcel_b.build();
-        dcel.merge_vertices(0, 7);
-        write_web_file("data/test.js", &dcel);
+        let mut clone = dcel.clone();
+        // dcel.merge_vertices(0, 7);
+        let st = dcel.spanning_tree(0);
+
+        for level in 1..6 {
+            st.on_level(level)
+                .iter()
+                .for_each(|v| clone.merge_vertices(0, *v));
+        }
+        write_web_file("data/test.js", &clone);
         // TODO: merge v7 into v0
     }
 }

@@ -344,20 +344,20 @@ impl WebFileWriter for Dcel {
             ));
         }
 
-        // let rings = &self.find_rings().unwrap();
-        // let ring_array = rings
-        //     .iter()
-        //     .map(|ring| {
-        //         ring.sub
-        //             .arcs()
-        //             .iter()
-        //             .enumerate()
-        //             .map(|(i, _)| *ring.get_original_arc(i).unwrap())
-        //             .collect::<Vec<_>>()
-        //     })
-        //     .collect::<Vec<_>>();
+        let rings = &self.find_rings().unwrap();
+        let ring_array = rings
+            .iter()
+            .map(|ring| {
+                ring.sub
+                    .arcs()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
 
-        // let donuts = &self.find_donuts_for_k(4).unwrap();
+        let donuts = &self.find_donuts_for_k(4).unwrap();
 
         file.write_all(b"let data = ")?;
         JsObject {
@@ -368,16 +368,11 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &approx_td), // TODO rename JS entry
-                    // JsValue::new(
-                    //     "rings",
-                    //     &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
-                    // ),
                     JsValue::new(
                         "rings",
-                        &JsArray::new(&vec![JsArray::new(&vec![0 as usize])]),
+                        &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
                     ),
-                    // JsValue::new("donuts", &JsArray::new(&donuts)),
-                    JsValue::new("donuts", &JsArray::new(&Vec::<SubDcel>::new())),
+                    JsValue::new("donuts", &JsArray::new(&donuts)),
                 ],
             },
         }

@@ -128,6 +128,7 @@ impl DcelBuilder {
             let src_port = self.arcs[i].src_port;
 
             self.arcs[twin].dst_port = src_port;
+            println!("Set Dest{:?}", self.arc(twin));
         }
     }
 

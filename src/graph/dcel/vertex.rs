@@ -18,4 +18,16 @@ impl Vertex {
     pub fn push_arc(&mut self, a: ArcId) {
         self.arcs.push(a);
     }
+
+    pub fn push_arc_at(&mut self, a: ArcId, position: usize) {
+        self.arcs.insert(position, a);
+    }
+
+    pub fn remove_arc_at(&mut self, position: usize) {
+        self.arcs.remove(position);
+    }
+
+    pub fn remove_arcs(&mut self) {
+        self.arcs.clear();
+    }
 }
