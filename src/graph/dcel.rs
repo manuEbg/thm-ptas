@@ -291,13 +291,19 @@ impl Dcel {
         let into_to_from = self.vertices[into].arcs()[position_of_from];
         let from_to_into = self.vertices[from].arcs()[position_of_into];
 
+        // update src of all remaining arcs of from
+        // update dst of all their twins
+        // Add them to into
+        let mut arcs = self.vertices[from].arcs().clone();
+        for a in arcs.into_iter() {
+            self.arcs[a].reset_src(into);
+            let twin = self.arcs[a].twin();
+            self.arcs[twin].reset_dst(into);
+            self.vertices[into].push_arc(a);
+        }
         // remove u_v, v_u
         self.remove_arc(into_to_from);
         self.remove_arc(from_to_into);
-
-        // TODO:
-        // update src of all remaining arcs of from
-        // update dst of all their twins
     }
 
     pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
