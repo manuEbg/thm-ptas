@@ -2,10 +2,8 @@ use super::approximated_td::ApproximatedTD;
 use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
 use super::dcel::vertex::VertexId;
-use super::dcel::*;
 use super::sub_dcel::SubDcel;
 use super::Dcel;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
@@ -69,15 +67,17 @@ struct JsArc {
     src: usize,
     dst: usize,
     is_added: bool,
+    is_invalid: bool,
 }
 
 impl JsArc {
-    fn new(id: usize, src: usize, dst: usize, is_added: bool) -> Self {
+    fn new(id: usize, src: usize, dst: usize, is_added: bool, is_invalid: bool) -> Self {
         Self {
             id,
             src,
             dst,
             is_added,
+            is_invalid,
         }
     }
 }
@@ -196,6 +196,9 @@ impl WebFileWriter for JsFace {
 
 impl WebFileWriter for JsArc {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        if self.is_invalid {
+            return Ok(());
+        }
         self.tab(file, level)?;
         JsObject {
             item: &JsValues {
@@ -280,7 +283,7 @@ impl<'a> WebFileWriter for ApproximatedTD<'a> {
 
             for (v, adj) in dg.adjacent().iter().enumerate() {
                 for u in adj.iter() {
-                    arcs.push(JsArc::new(arc_count, v, *u, false));
+                    arcs.push(JsArc::new(arc_count, v, *u, false, false));
                     arc_count += 1;
                 }
             }
@@ -315,7 +318,15 @@ impl WebFileWriter for Dcel {
             .arcs()
             .iter()
             .enumerate()
-            .map(|(i, a)| JsArc::new(i, a.src(), a.dst(), i >= self.pre_triangulation_arc_count()))
+            .map(|(i, a)| {
+                JsArc::new(
+                    i,
+                    a.src(),
+                    a.dst(),
+                    i >= self.pre_triangulation_arc_count(),
+                    self.invalid_arcs[i],
+                )
+            })
             .collect();
         let faces = self.faces();
         let arcs_per_faces: Vec<Vec<usize>> =
@@ -333,20 +344,20 @@ impl WebFileWriter for Dcel {
             ));
         }
 
-        let rings = &self.find_rings().unwrap();
-        let ring_array = rings
-            .iter()
-            .map(|ring| {
-                ring.sub
-                    .arcs()
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+        // let rings = &self.find_rings().unwrap();
+        // let ring_array = rings
+        //     .iter()
+        //     .map(|ring| {
+        //         ring.sub
+        //             .arcs()
+        //             .iter()
+        //             .enumerate()
+        //             .map(|(i, _)| *ring.get_original_arc(i).unwrap())
+        //             .collect::<Vec<_>>()
+        //     })
+        //     .collect::<Vec<_>>();
 
-        let donuts = &self.find_donuts_for_k(4).unwrap();
+        // let donuts = &self.find_donuts_for_k(4).unwrap();
 
         file.write_all(b"let data = ")?;
         JsObject {
@@ -357,11 +368,16 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &approx_td), // TODO rename JS entry
+                    // JsValue::new(
+                    //     "rings",
+                    //     &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
+                    // ),
                     JsValue::new(
                         "rings",
-                        &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
+                        &JsArray::new(&vec![JsArray::new(&vec![0 as usize])]),
                     ),
-                    JsValue::new("donuts", &JsArray::new(&donuts)),
+                    // JsValue::new("donuts", &JsArray::new(&donuts)),
+                    JsValue::new("donuts", &JsArray::new(&Vec::<SubDcel>::new())),
                 ],
             },
         }

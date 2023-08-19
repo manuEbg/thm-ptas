@@ -1,4 +1,5 @@
 use super::{FaceId, VertexId};
+use crate::graph::builder::types;
 pub type ArcId = usize;
 
 #[derive(Debug, Copy, Clone)]
@@ -9,6 +10,19 @@ pub struct Arc {
     prev: ArcId,
     twin: ArcId,
     face: FaceId,
+}
+
+impl From<&types::Arc> for Arc {
+    fn from(arc: &types::Arc) -> Self {
+        Arc {
+            src: arc.src,
+            dst: arc.dst,
+            next: arc.next.unwrap(),
+            prev: arc.prev.unwrap(),
+            twin: arc.twin.unwrap(),
+            face: arc.face.unwrap(),
+        }
+    }
 }
 
 impl Arc {
@@ -42,8 +56,16 @@ impl Arc {
         self.src
     }
 
+    pub fn reset_src(&mut self, src: ArcId) {
+        self.src = src;
+    }
+
     pub fn dst(&self) -> VertexId {
         self.dst
+    }
+
+    pub fn reset_dst(&mut self, dst: ArcId) {
+        self.dst = dst;
     }
 
     pub fn twin(&self) -> ArcId {

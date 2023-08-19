@@ -69,6 +69,15 @@ impl<'a> SpanningTree<'a> {
         self.vertex_level.as_ref()
     }
 
+    pub fn on_level(&self, level: usize) -> Vec<VertexId> {
+        self.vertex_level
+            .iter()
+            .enumerate()
+            .filter(|e| *e.1 == level)
+            .map(|e| e.0)
+            .collect()
+    }
+
     pub fn max_level(&self) -> usize {
         self.max_level
     }

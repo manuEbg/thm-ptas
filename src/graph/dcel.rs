@@ -8,6 +8,7 @@ use std::{collections::HashSet, error::Error};
 use self::face::FaceIterator;
 use super::{
     iterators::bfs::BfsIter,
+    reducible::Reducible,
     sub_dcel::{SubDcel, SubDcelBuilder},
 };
 use crate::graph::{builder::dcel_builder::DcelBuilder, dcel::spanning_tree::SpanningTree};
@@ -22,6 +23,8 @@ pub struct Dcel {
     faces: Vec<Face>,
     arc_set: HashSet<String>,
     pub pre_triangulation_arc_count: usize,
+    invalid_faces: Vec<bool>,
+    pub invalid_arcs: Vec<bool>,
 }
 
 enum FaceInfo {
@@ -39,6 +42,8 @@ impl Dcel {
             faces: vec![],
             arc_set: HashSet::new(),
             pre_triangulation_arc_count: 0,
+            invalid_faces: vec![],
+            invalid_arcs: vec![],
         }
     }
 
@@ -60,10 +65,13 @@ impl Dcel {
         self.arc_set
             .insert([a.src().to_string(), a.dst().to_string()].join(" "));
         self.arcs.push(a);
+
+        self.invalid_arcs.push(false);
     }
 
     pub fn push_face(&mut self, f: Face) {
         self.faces.push(f);
+        self.invalid_faces.push(false);
     }
 
     pub fn walk_face(&self, face: FaceId) -> Vec<ArcId> {
@@ -135,6 +143,9 @@ impl Dcel {
         self.pre_triangulation_arc_count = self.num_arcs();
         let count = self.num_faces();
         for f in 0..count {
+            if self.invalid_faces[f] {
+                continue;
+            }
             loop {
                 if let FaceInfo::TriangulatedFace = self.triangulate_next_triangle(f) {
                     break;
@@ -235,6 +246,60 @@ impl Dcel {
         self.vertices[arc.src()].push_arc(id);
     }
 
+    fn remove_arc(&mut self, id: ArcId) {
+        let ap = self.arc(id).prev();
+        let an = self.arc(id).next();
+        let af = self.arc(id).face();
+        if self.face(af).start_arc() == id {
+            self.faces[af].set_start_arc(an);
+        }
+        self.arcs[ap].set_next(an);
+        self.arcs[an].set_prev(ap);
+
+        let src = self.arc(id).src();
+        let twin = self.arc(an).twin();
+        self.arcs[twin].reset_dst(src);
+        if self.arc(ap).src() == self.arc(an).dst() {
+            // we collapsed a triangle into a line
+            let face = self.arc(id).face();
+            self.invalid_faces[face] = true;
+        }
+        self.invalid_arcs[id] = true;
+    }
+    /// merge vertex from into vertex into
+    fn merge_vertices(&mut self, into: VertexId, from: VertexId) {
+        /* gather neighbors of u and v and the position of each other */
+        let neighbors_of_into: Vec<VertexId> = self.neighbors(into);
+        let neighbors_of_from: Vec<VertexId> = self.neighbors(from);
+        let position_of_into: usize = match neighbors_of_from
+            .iter()
+            .position(|&neighbor| neighbor == into)
+        {
+            Some(v) => v,
+            None => {
+                panic!("cannot merge not adjacent vertices into: {into} and from: {from}")
+            }
+        };
+        let position_of_from: usize = neighbors_of_into
+            .iter()
+            .position(|&neighbor| neighbor == from)
+            .unwrap();
+
+        /* collect bend over and deleted arcs */
+        let mut bend_over_arcs: Vec<ArcId> = Vec::new();
+        let mut bend_over_twins: Vec<ArcId> = Vec::new();
+        let into_to_from = self.vertices[into].arcs()[position_of_from];
+        let from_to_into = self.vertices[from].arcs()[position_of_into];
+
+        // remove u_v, v_u
+        self.remove_arc(into_to_from);
+        self.remove_arc(from_to_into);
+
+        // TODO:
+        // update src of all remaining arcs of from
+        // update dst of all their twins
+    }
+
     pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
         let spanning_tree = self.spanning_tree(0);
@@ -261,19 +326,25 @@ impl Dcel {
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
                         if dst_level == depth {
-                            builder.push_arc(outgoing_arc, src_level);
+                            builder.push_arc(outgoing_arc);
                         }
                     }
                 }
             }
-            let resulting_sub_dcel = builder.build()?;
+            let resulting_sub_dcel = builder.build(None)?;
             result.push(resulting_sub_dcel);
         }
 
         Ok(result)
     }
 
-    pub fn collect_donut(&self, start: usize, end: usize) -> Result<SubDcel, Box<dyn Error>> {
+    pub fn collect_donut(
+        &self,
+        start: usize,
+        end: usize,
+        // collapsed_dcel: &DcelBuilder,
+        collapsed_root: VertexId,
+    ) -> Result<SubDcel, Box<dyn Error>> {
         let spanning_tree = self.spanning_tree(0);
 
         if end > spanning_tree.max_level() + 1 {
@@ -283,7 +354,12 @@ impl Dcel {
         let mut visited = vec![false; self.vertices.len()];
         let mut builder = SubDcelBuilder::new(self.clone(), start);
 
-        for vertex in 
+        // add collapsed_root as fake_root and push all its arcs
+        // collapsed_dcel
+        //     .arcs(collapsed_root)
+        //     .iter()
+        //     .map(|id| Arc::from(collapsed_dcel.arc(*id)))
+        //     .for_each(|a| builder.push_arc(&a));
 
         for vertex in 0..self.vertices().len() {
             let vertex_depth = spanning_tree.vertex_level()[vertex];
@@ -301,36 +377,49 @@ impl Dcel {
                     if spanning_tree.vertex_level()[arc.dst()] >= start
                         && spanning_tree.vertex_level()[arc.dst()] < end
                     {
-                        builder.push_arc(arc, false);
+                        builder.push_arc(arc);
                     } else if spanning_tree.discovered_by(vertex).src() == arc.dst() {
                         let mut copy = arc.clone();
-                        copy.reset_dst(fake_root);
-                        builder.push_arc(&copy, true);
+                        copy.reset_dst(collapsed_root);
+                        builder.push_arc(&copy);
                     }
                 }
 
-                    // TODO: 
-                    // 1. Dcel into Dcel BUilder 
-                    // 2. Merge all vertices inside the donut hole
-                    // 3. use result as fake root
+                // TODO:
+                // 1. Dcel into Dcel BUilder
+                // 2. Merge all vertices inside the donut hole
+                // 3. use result as fake root
                 visited[vertex] = true;
             }
         }
 
-        let sub_dcel = builder.build()?;
+        let sub_dcel = builder.build(Some(collapsed_root))?;
         Ok(sub_dcel)
     }
 
     pub fn find_donuts_for_k(&self, k: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
-        let spanning_tree = self.spanning_tree(0);
+        let root = 0;
+        // let mut clone = self.clone();
+        let spanning_tree = self.spanning_tree(root);
+        // let mut collapsed_dcel_builder = DcelBuilder::from(self);
 
         let mut last_level = 1;
 
         for n in 1..(spanning_tree.max_level() + 1) {
+            println!("Find Donuts: Going through level {}", n);
+            // if n > 1 {
+            if false {
+                // Collapse all nodes on the level before into the root node
+                // to create a fake root
+                // spanning_tree
+                //     .on_level(n - 1)
+                //     .iter()
+                //     .for_each(|v| self.merge_vertices(root, *v));
+            }
             if n % k == 0 {
                 /* Current donut is from last_level -> n */
-                let mut donut = self.collect_donut(last_level, n)?;
+                let mut donut = self.collect_donut(last_level, n, root)?;
                 donut.triangulate();
                 result.push(donut);
                 last_level = n + 1
@@ -338,7 +427,8 @@ impl Dcel {
         }
 
         if last_level != spanning_tree.max_level() {
-            let mut last_donut = self.collect_donut(last_level, spanning_tree.max_level() + 1)?;
+            let mut last_donut =
+                self.collect_donut(last_level, spanning_tree.max_level() + 1, root)?;
             last_donut.triangulate();
             result.push(last_donut);
         }
@@ -352,14 +442,21 @@ impl Dcel {
 }
 #[cfg(test)]
 mod tests {
-    use crate::read_graph_file_into_dcel_builder;
+    use crate::{read_graph_file_into_dcel_builder, write_web_file};
 
-    use super::*;
     #[test]
     fn adjacency_matrix() {
         let mut dcel_b = read_graph_file_into_dcel_builder("data/tree.graph").unwrap();
         let dcel = dcel_b.build();
         let am = dcel.adjacency_matrix();
         println!("{:?}", am)
+    }
+    #[test]
+    fn merge_vertices() {
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/merge_test.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        dcel.merge_vertices(0, 7);
+        write_web_file("data/test.js", &dcel);
+        // TODO: merge v7 into v0
     }
 }

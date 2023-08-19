@@ -14,6 +14,7 @@ pub struct SubDcel {
     pub sub: Dcel,
     pub arc_mapping: Vec<arc::ArcId>,
     pub vertex_mapping: Vec<vertex::VertexId>,
+    fake_root: Option<VertexId>,
 }
 
 impl SubDcel {
@@ -22,12 +23,14 @@ impl SubDcel {
         sub: Dcel,
         arc_mapping: Vec<arc::ArcId>,
         vertex_mapping: Vec<vertex::VertexId>,
+        fake_root: Option<VertexId>,
     ) -> Self {
         Self {
             dcel,
             sub,
             arc_mapping,
             vertex_mapping,
+            fake_root,
         }
     }
 
@@ -58,6 +61,10 @@ impl SubDcel {
 
     pub fn was_triangulated(&self) -> bool {
         self.sub.pre_triangulation_arc_count() > 0
+    }
+
+    pub fn fake_root(&self) -> VertexId {
+        self.fake_root.unwrap()
     }
 }
 
@@ -96,7 +103,7 @@ impl SubDcelBuilder {
         // all vertices on the lowest level
         for (v, level) in self.vertex_level.iter().enumerate() {
             if *level == self.lowest_level {
-                self.connect_with_fake_root(fake_root, v);
+                // self.connect_with_fake_root(fake_root, v);
             }
         }
     }
@@ -120,13 +127,13 @@ impl SubDcelBuilder {
         self.last_vertex_id - 1
     }
 
-    pub fn push_arc(&mut self, a: &arc::Arc, dest_is_fake: bool) {
+    pub fn push_arc(&mut self, a: &arc::Arc) {
         let src = self.push_vertex(a.src());
         let dst = self.push_vertex(a.dst());
         self.dcel_builder.push_arc(src, dst);
     }
 
-    pub fn build(&mut self) -> Result<SubDcel, Box<dyn Error>> {
+    pub fn build(&mut self, fake_root: Option<VertexId>) -> Result<SubDcel, Box<dyn Error>> {
         let final_dcel = self.dcel_builder.build();
         let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
 
@@ -146,6 +153,7 @@ impl SubDcelBuilder {
             final_dcel,
             arc_mapping,
             self.vertex_mapping.clone(),
+            fake_root,
         ))
     }
 }

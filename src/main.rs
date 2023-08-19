@@ -3,29 +3,14 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use std::{env, result, string};
 pub mod graph;
 
-use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
-
-use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
 
-use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
-use graph::iterators::bfs::BfsIter;
 
-use crate::graph::reductions::isolated_clique_reduction::{
-    do_isolated_clique_reductions, transfer_isolated_clique,
-};
-use crate::graph::reductions::nodal_fold_reduction::{
-    do_nodal_fold_reductions, transfer_nodal_fold_reduction,
-};
-use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
 use graph::quick_graph::QuickGraph;
-use graph::reducible::Reducible;
-use graph::reductions::*;
 use graph::{Dcel, DcelBuilder};
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
