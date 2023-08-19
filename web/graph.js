@@ -71,15 +71,22 @@ class Graph {
 
     this.ringArcs = obj.rings.map(r => r.map(a => "a" + a));
     this.currentRing = -1
-    this.previousRing = -1
+    // this.previousRing = -1
 
     this.donuts = obj.donuts;
     this.donuts.forEach((donut) => {
       donut.arcElements = donut.arcs.map(a => "a" + a)
+      let idx = 0;
+      let triangulated_a = donut.triangulated_arcs.map(a => (
+        { data: { id: "ta-" + (idx++), source: "v" + a.src, target: "v" + a.dst } }
+      ))
+
+      donut.arcElements.concat(triangulated_a);
+
     })
 
     this.currentDonut = -1
-    this.previousDonut = -1
+    // this.previousDonut = -1
     this.showTriangulatedDonutArcs = false;
 
     this.spanningTree = obj.spantree.map(a => "a" + a);
@@ -115,15 +122,15 @@ class Graph {
 
   get_arcs() {
     let self = this;
-    if (this.currentDonut != -1 && this.showTriangulatedDonutArcs) {
-      let idx = 0;
-      const donutArcs = this.donuts[this.currentDonut].triangulated_arcs.map(a => (
-        { data: { id: "ta-" + (idx++), source: "v" + a.src, target: "v" + a.dst } }
-      ))
-      //console.log(this.donuts[this.currentDonut]);
-      //console.log(donutArcs);
-      return self.arcs.concat(self.dualgraph.arcs).concat(donutArcs);
-    }
+    // if (this.currentDonut != -1 && this.showTriangulatedDonutArcs) {
+    //   let idx = 0;
+    //   const donutArcs = this.donuts[this.currentDonut].triangulated_arcs.map(a => (
+    //     { data: { id: "ta-" + (idx++), source: "v" + a.src, target: "v" + a.dst } }
+    //   ))
+    //   //console.log(this.donuts[this.currentDonut]);
+    //   //console.log(donutArcs);
+    //   return self.arcs.concat(self.dualgraph.arcs).concat(donutArcs);
+    // }
 
     return self.arcs.concat(self.dualgraph.arcs);
   }
@@ -158,6 +165,7 @@ class Graph {
         .style(self.edgeStyleObject('#61bffc'))
         .selector('node.highlighted').style(self.vertexStyleObject('#61bffc'))
         .selector('edge.red').style(self.edgeStyleObject("#ff0000"))
+        .selector('edge.blue').style(self.edgeStyleObject("#0000ff"))
         .selector('node.bag').style(self.vertexStyleObject("#00ff00"))
         .selector('edge.cyan').style(self.edgeStyleObject("#00ffff"))
         .selector('node.td').style(self.vertexStyleObject("#ff00ff"))
@@ -305,6 +313,7 @@ class Graph {
     self.faces[idx].vertices.forEach(v => self.lowlight(v));
   }
 
+
   showAdditionalEdges() {
     self = this;
     self.arcs.forEach(a => {
@@ -373,86 +382,87 @@ class Graph {
     else self.showTD();
   }
 
-  highlightPrevRing() {
-    this.previousRing = this.currentRing;
-    this.currentRing--;
-    if (this.currentRing < 0) {
-      this.currentRing = this.ringArcs.length - 1;
-    }
-
-    this.highlightCurrentRing();
+  highlightRing(idx, self) {
+    self.ringArcs[idx].forEach(a => {
+      console.log(a)
+      self.addClassToElement(a, "blue");
+    })
   }
 
-  highlightNextRing() {
-    this.previousRing = this.currentRing;
-    this.currentRing++;
-    if (this.currentRing >= this.ringArcs.length) {
-      this.currentRing = 0;
-    }
-
-    this.highlightCurrentRing();
+  lowlightRing(idx, self) {
+    self.ringArcs[idx].forEach(a => {
+      console.log(a)
+      self.removeClassFromElement(a, "blue");
+    })
   }
 
-  highlightCurrentRing() {
+  highlightNextRing(up = true) {
     let self = this;
+    self.currentRing = self.highlightNext(
+      self.currentRing,
+      self.ringArcs.length - 1,
+      self.highlightRing,
+      self.lowlightRing,
+      up)
 
-    if (this.previousRing != -1) {
-      self.ringArcs[this.previousRing].forEach(el => {
-        this.cy.getElementById(el).removeClass('red');
-      })
-    }
+    console.log("Highlighting Ring" + self.currentRing);
+  }
+  highlightNextDonut(up = true) {
+    let self = this;
+    self.currentDonut = self.highlightNext(
+      self.currentDonut,
+      self.donuts.length - 1,
+      self.highlightDonut,
+      self.lowlightDonut,
+      up)
 
-    self.ringArcs[this.currentRing].forEach(el => {
-      this.cy.getElementById(el).addClass('red');
+    console.log("Highlighting Ring" + self.currentRing);
+  }
+
+  highlightDonut(idx, self) {
+    self.donuts[idx].arcElements.forEach(el => {
+      self.addClassToElement(el, "red");
+    })
+  }
+  lowlightDonut(idx, self) {
+    self.donuts[idx].arcElements.forEach(el => {
+      self.removeClassFromElement(el, "red");
     })
   }
 
 
-  highlightPrevDonut() {
-    this.previousDonut = this.currentDonut;
-    this.currentDonut--;
-    if (this.currentDonut < 0) {
-      this.currentDonut = this.donuts.length - 1;
-    }
 
-    this.highlightCurrentDonut();
-  }
+  // highlightCurrentDonut() {
+  //   let self = this;
 
-  highlightNextDonut() {
-    this.previousDonut = this.currentDonut;
-    this.currentDonut++;
-    if (this.currentDonut >= this.donuts.length) {
-      this.currentDonut = 0;
-    }
+  //   if (this.showTriangulatedDonutArcs) {
+  //     this.draw();
+  //   }
 
-    this.highlightCurrentDonut();
-  }
+  //   if (this.previousDonut != -1) {
+  //     self.donuts[this.previousDonut].arcElements.forEach(el => {
+  //       this.cy.getElementById(el).removeClass('red');
+  //     })
+  //   }
 
-  highlightCurrentDonut() {
-    let self = this;
+  //   self.donuts[this.currentDonut].arcElements.forEach(el => {
+  //     this.cy.getElementById(el).addClass('red');
+  //   })
 
-    if (this.showTriangulatedDonutArcs) {
-      this.draw();
-    }
-
-    if (this.previousDonut != -1) {
-      self.donuts[this.previousDonut].arcElements.forEach(el => {
-        this.cy.getElementById(el).removeClass('red');
-      })
-    }
-
-    self.donuts[this.currentDonut].arcElements.forEach(el => {
-      this.cy.getElementById(el).addClass('red');
-    })
-
-    for (let i = 0; i < self.donuts[this.currentDonut].triangulated_arcs.length; ++i) {
-      this.cy.getElementById("ta-" + i).addClass('red');
-    }
-  }
+  //   for (let i = 0; i < self.donuts[this.currentDonut].triangulated_arcs.length; ++i) {
+  //     this.cy.getElementById("ta-" + i).addClass('red');
+  //   }
+  // }
 
   toggleShowTriangulatedDonutArcs() {
     this.showTriangulatedDonutArcs = !this.showTriangulatedDonutArcs;
-    this.draw();
-    this.highlightCurrentDonut();
+    if (this.currentDonut >= 0) {
+      this.donuts[this.currentDonut].arcElements.forEach(a => {
+        if (a.data.id.startsWith("ta")) {
+          this.addClassToElement(a, "red");
+        }
+
+      })
+    }
   }
 }
