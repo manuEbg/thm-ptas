@@ -4,8 +4,10 @@
 
 use bit_set::BitSet;
 use std::collections::{HashMap, HashSet};
+use crate::graph::iterators::post_order::PostOrderIter;
 
-use crate::graph::mis_finder::{DynTable, MisSize};
+use crate::graph::iterators::subset::SubBitSetIter;
+use crate::graph::{mis_finder::{DynTable, MisSize}, nice_tree_decomp::NiceTreeDecomposition};
 
 /* The problem with the implementation that uses referenes:
 table.put(1, set.clone(), MisSize::Valid(6));
@@ -58,15 +60,16 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
         )
     }
 
-    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize) {
-        (0..self.set_count[&root_id]).fold((0 as usize, MisSize::Valid(0)), |result, set_index| {
+    fn get_max_root_set_indices(&self, root_id: usize) -> Vec<(usize, MisSize)> {
+        let max_size: MisSize = (0..self.set_count[&root_id]).map(|i| self.map[&(root_id, i)]).max_by(|l, r| l.cmp(&r)).unwrap();
+        let mut result = Vec::new();
+        for set_index in 0..self.set_count[&root_id] {
             let set_size = self.map[&(root_id, set_index)];
-            if result.1 < set_size {
-                (set_index, set_size)
-            } else {
-                result
+            if set_size == max_size {
+                result.push((set_index, set_size));
             }
-        })
+        }
+        result
     }
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: BitSet, size: MisSize) {
@@ -86,6 +89,23 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
             .for_each(|v| {
                 mis.insert(v);
             });
+    }
+}
+
+pub struct NtdAndFastTable<'a> {
+    pub ntd: &'a NiceTreeDecomposition,
+    pub table: &'a FastDynTable,
+}
+
+impl std::fmt::Display for NtdAndFastTable<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for bag in PostOrderIter::new(&self.ntd.td) {
+            for subset in SubBitSetIter::new(&bag.vertex_set) {
+                writeln!(f, "M[{}, {subset:?}] = {}", bag.id, self.table.get(bag.id, &subset).1)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
     }
 }
 

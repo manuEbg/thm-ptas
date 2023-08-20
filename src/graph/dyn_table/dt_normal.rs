@@ -1,4 +1,8 @@
-use crate::graph::mis_finder::{DynTable, MisSize};
+use crate::graph::{
+    iterators::{post_order::PostOrderIter, subset::SubsetIter},
+    mis_finder::{DynTable, MisSize},
+    nice_tree_decomp::NiceTreeDecomposition,
+};
 use fxhash::FxHashSet;
 use std::collections::{HashMap, HashSet};
 
@@ -21,14 +25,21 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
         (&item.mis, item.size.clone())
     }
 
-    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize) {
+    fn get_max_root_set_indices(&self, root_id: usize) -> Vec<(usize, MisSize)> {
+        let max_size = self.0[&root_id]
+            .sets
+            .iter()
+            .max_by(|l, r| l.size.cmp(&r.size))
+            .unwrap()
+            .size;
+        // println!("Normal max size in root: {max_size}");
         self.0[&root_id]
             .sets
             .iter()
             .enumerate()
-            .max_by(|(_, l), (_, r)| l.size.cmp(&r.size))
-            .map(|(i, item)| (i, item.size))
-            .unwrap()
+            .filter(|e| e.1.size == max_size)
+            .map(|(i, s)| (i, s.size))
+            .collect::<Vec<_>>()
     }
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {
@@ -85,6 +96,37 @@ impl std::fmt::Display for DynTableValue {
                 })
             })
     }
+}
+
+pub struct NtdAndNormalTable<'a> {
+    pub ntd: &'a NiceTreeDecomposition,
+    pub table: &'a NormalDynTable,
+}
+
+impl std::fmt::Display for NtdAndNormalTable<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for bag in PostOrderIter::new(&self.ntd.td) {
+            for subset in SubsetIter::new(&bag.vertex_set) {
+                let mut sorted_subset = Vec::from_iter(subset.iter().copied());
+                sorted_subset.sort();
+                writeln!(
+                    f,
+                    "M[{}, {}] = {}",
+                    bag.id,
+                    format_vec_as_set(sorted_subset),
+                    self.table.get(bag.id, &subset).1
+                )?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+fn format_vec_as_set(vec: Vec<usize>) -> String {
+    let vec_str = format!("{:?}", vec);
+    let inner_str = String::from(&vec_str[1..vec_str.len() - 1]);
+    format!("{{{inner_str}}}")
 }
 
 // TODO: Maybe change to a tuple struct.

@@ -1,9 +1,16 @@
-use std::collections::{HashMap, HashSet};
+use std::io::Write;
+use std::{
+    collections::{HashMap, HashSet},
+    fs::File,
+};
 
 use bit_set::BitSet;
 use fxhash::FxHashSet;
 
-use crate::graph::iterators::subset::SubsetIter;
+use crate::graph::{
+    dyn_table::{dt_fast::NtdAndFastTable, dt_normal::NtdAndNormalTable},
+    iterators::subset::SubsetIter,
+};
 
 use super::{
     dyn_table::{
@@ -28,7 +35,7 @@ where
     fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
     // TODO: @cleanup This function may only be needed for debugging purposes.
     fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&Set, MisSize);
-    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize);
+    fn get_max_root_set_indices(&self, root_id: usize) -> Vec<(usize, MisSize)>;
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
     fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>);
 }
@@ -100,12 +107,11 @@ fn reconstruct_mis<Set>(
     root_id: usize,
     constr_table: &ConstructionTable,
     node_relations: &NodeRelations,
+    adjaceny_matrix: &Vec<Vec<bool>>,
 ) -> HashSet<usize>
 where
     Set: Eq + std::fmt::Debug + Clone + Default,
 {
-    let result = HashSet::from_iter(Vec::new());
-
     // This function recursively traverses the table and finds the maximum independent set.
     fn rec<Set>(
         table: &dyn DynTable<Set>,
@@ -120,26 +126,29 @@ where
     {
         table.add_to_mis(bag_id, set_index, &mut mis);
 
+        let (subset, size) = table.get_by_index(bag_id, set_index);
+        println!("({set_index}): MIS at M[{bag_id}, {subset:?}] = {size}:\t{mis:?}");
+
         let children = &node_relations.children[&bag_id];
-        println!("{bag_id}'s children: {children:?}");
+        // println!("{bag_id}'s children: {children:?}");
 
         match children.len() {
             // Leaf node: We're finished.
             0 => {
-                println!("{bag_id} is a leaf node => MIS = {mis:?}");
+                // println!("{bag_id} is a leaf node => MIS = {mis:?}");
                 mis
             }
 
             // Check the child.
             1 => {
                 let child_index = constr_table[bag_id][set_index].0.unwrap();
-                println!(
-                    "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?}",
-                    table.get_by_index(bag_id, set_index),
-                    children[0],
-                    child_index,
-                    table.get_by_index(children[0], child_index),
-                );
+                // println!(
+                //     "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?}",
+                //     table.get_by_index(bag_id, set_index),
+                //     children[0],
+                //     child_index,
+                //     table.get_by_index(children[0], child_index),
+                // );
 
                 rec(
                     table,
@@ -155,16 +164,16 @@ where
             2 => {
                 let left = constr_table[bag_id][set_index].0.unwrap();
                 let right = constr_table[bag_id][set_index].1.unwrap();
-                println!(
-                    "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?} or {}'s {} {:?}",
-                    table.get_by_index(bag_id, set_index),
-                    children[0],
-                    constr_table[bag_id][set_index].0.unwrap(),
-                    table.get_by_index(children[0], left),
-                    children[1],
-                    constr_table[bag_id][set_index].1.unwrap(),
-                    table.get_by_index(children[1], right),
-                );
+                // println!(
+                //     "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?} and {}'s {} {:?}",
+                //     table.get_by_index(bag_id, set_index),
+                //     children[0],
+                //     constr_table[bag_id][set_index].0.unwrap(),
+                //     table.get_by_index(children[0], left),
+                //     children[1],
+                //     constr_table[bag_id][set_index].1.unwrap(),
+                //     table.get_by_index(children[1], right),
+                // );
 
                 let left_mis = mis.clone();
                 let right_mis = mis.clone();
@@ -187,7 +196,6 @@ where
                     &node_relations,
                 );
 
-                // std::cmp::max_by(left, right, |l, r| l.len().cmp(&r.len()))
                 mis = HashSet::from_iter(left.union(&right).into_iter().copied());
                 mis
             }
@@ -196,21 +204,30 @@ where
         }
     }
 
-    // Find the largest set in the root node. This begins the table traversal.
-    let (root_set_index, size) = table.get_max_root_set_index(root_id);
+    // We find all subsets with the largest number in the root entry.
+    let root_sets = table.get_max_root_set_indices(root_id);
+    println!("MIS size according to table: {}", root_sets[0].1);
 
-    println!("MIS size according to table: {size}");
+    // We try to reconstruction the independent sets until one is found.
+    for (index, size) in root_sets.into_iter() {
 
-    let result = rec(
-        table,
-        root_id,
-        root_set_index,
-        &constr_table,
-        result,
-        &node_relations,
-    );
+        let mut result = HashSet::new();
+        result = rec(
+            table,
+            root_id,
+            index,
+            &constr_table,
+            result,
+            &node_relations,
+        );
 
-    result
+        let connectes_vertices = find_connected_vertices(&result, &adjaceny_matrix);
+        if connectes_vertices.len() == 0 {
+            return result; // Return the found MIS.
+        }
+    }
+
+    HashSet::new() // No MIS found.
 }
 
 // TODO:
@@ -329,7 +346,7 @@ pub fn find_mis(
                     let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
 
-                    println!("M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
+                    println!("M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len} = {}", bag.id, left_child.id, right_child.id, left_size + right_size - len);
                     entry
                         .sets
                         .push(DynTableValueItem::new(subset, left_size + right_size - len));
@@ -343,9 +360,13 @@ pub fn find_mis(
         table.0.insert(bag.id.clone(), entry);
     }
 
-    println!("{}", &table);
+    let mut out = File::create("normal_table.txt").unwrap();
+    write!(out, "{}", NtdAndNormalTable { ntd, table: &table });
 
-    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
+    let mut constr_out = File::create("normal_constr_table.txt").unwrap();
+    dump_construction_table(constr_out, &constr_table, &table, &ntd.relations);
+
+    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations, &adjaceny_matrix);
 
     Ok((result.clone(), result.len()))
 }
@@ -473,13 +494,13 @@ pub fn find_mis_fast(
         }
     }
 
-    println!("Dynamic table:");
-    println!("{:?}", table);
+    let mut table_out = File::create("fast_table.txt").unwrap();
+    write!(table_out, "{}", NtdAndFastTable { ntd, table: &table });
 
-    println!("Construction table:");
-    // print_constr_table(&constr_table, &table, &ntd.relations);
+    let mut constr_out = File::create("fast_constr_table.txt").unwrap();
+    dump_construction_table(constr_out, &constr_table, &table, &ntd.relations);
 
-    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
+    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations, &adjaceny_matrix);
 
     Ok((result.clone(), result.len()))
 }
@@ -488,14 +509,19 @@ pub fn find_mis_exhaustive(
     adjaceny_matrix: &Vec<Vec<bool>>,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
     let is_independent = |subset: &HashSet<usize>| {
-        subset.iter().all(|u| subset.iter().all(|v| !adjaceny_matrix[*u][*v]))
+        subset
+            .iter()
+            .all(|u| subset.iter().all(|v| !adjaceny_matrix[*u][*v]))
     };
 
     let mut max: HashSet<usize> = HashSet::new();
     let combinations = u32::pow(2, adjaceny_matrix.len() as u32);
     for (i, subset) in SubsetIter::new(&FxHashSet::from_iter(0..adjaceny_matrix.len())).enumerate() {
         if i % 100000 == 0 {
-            println!("{i}/{combinations}, {}%", f64::from(i as u32)/f64::from(combinations) * 100.0);
+            println!(
+                "{i}/{combinations}, {}%",
+                f64::from(i as u32) / f64::from(combinations) * 100.0
+            );
         }
         let subset2 = HashSet::from_iter(subset.into_iter());
         if is_independent(&subset2) && subset2.len() > max.len() {
@@ -543,49 +569,63 @@ where
 }
 */
 
-fn print_constr_table<Set>(
+fn dump_construction_table<Set>(
+    mut file: File,
     constr_table: &ConstructionTable,
     table: &dyn DynTable<Set>,
     node_relations: &NodeRelations,
-) where
+) -> std::io::Result<()>
+where
     Set: Eq + std::fmt::Debug + Clone + Default,
 {
+    for (bag_id, preds) in constr_table.iter().enumerate() {
+        for (set_id, preds) in preds.iter().enumerate() {
+            match preds {
+                (None, None) => Ok(()),
+
+                (Some(p), None) => {
+                    let child_id = node_relations.children[&bag_id][0];
+                    // println!("Bag ID: {bag_id}, set ID: {set_id}, child ID: {child_id}, child set ID: {p}");
+                    let (subset, size) = table.get_by_index(bag_id, set_id);
+                    let (child_subset, child_size) = table.get_by_index(child_id, *p);
+                    writeln!(
+                        file,
+                        "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
+                        subset, size,
+                        child_subset, child_size,
+                    )
+                }
+
+                (Some(l), Some(r)) => {
+                    let left_id = node_relations.children[&bag_id][0];
+                    let right_id = node_relations.children[&bag_id][1];
+                    writeln!(
+                        file,
+                        "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
+                        table.get_by_index(bag_id, set_id).0,
+                        table.get_by_index(left_id, *l).0,
+                        table.get_by_index(right_id, *r).0,
+                    )
+                }
+
+                _ => panic!("Unreachable"),
+            };
+        }
+    }
+
+    /*
     constr_table
         .iter()
         .enumerate()
-        .for_each(|(bag_id, preds)| {
+        .map(|(bag_id, preds)| {
             preds
                 .iter()
                 .enumerate()
-                .for_each(|(set_id, preds)| match preds {
-                    (None, None) => {},
-
-                    (Some(p), None) => {
-                        let child_id = node_relations.children[&bag_id][0];
-                        // println!("Bag ID: {bag_id}, set ID: {set_id}, child ID: {child_id}, child set ID: {p}");
-                        let (subset, size) = table.get_by_index(bag_id, set_id);
-                        let (child_subset, child_size) = table.get_by_index(child_id, *p);
-                        println!(
-                            "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
-                            subset, size,
-                            child_subset, child_size,
-                        )
-                    },
-
-                    (Some(l), Some(r)) => {
-                        let left_id = node_relations.children[&bag_id][0];
-                        let right_id = node_relations.children[&bag_id][1];
-                        println!(
-                            "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
-                            table.get_by_index(bag_id, set_id).0,
-                            table.get_by_index(left_id, *l).0,
-                            table.get_by_index(right_id, *r).0,
-                        )
-                    },
-
-                    _ => panic!("Unreachable"),
+                .map(move |(set_id, preds)| match preds {
                 })
         });
+    */
+    Ok(())
 }
 
 pub fn find_connected_vertices(
@@ -622,7 +662,7 @@ pub mod tests {
     use fxhash::FxHashSet;
     use std::{fs::File, process::Command};
 
-    use super::{ConstructionTable, find_mis_exhaustive};
+    use super::{find_mis_exhaustive, ConstructionTable};
 
     #[test]
     fn simple() {
