@@ -1,5 +1,6 @@
 use arboretum_td::tree_decomposition::{TreeDecomposition, Bag};
 
+/// Represents a post order iterator used to traverse tree decompositions.
 pub struct PostOrderIter<'a> {
     td: &'a TreeDecomposition,
     stack: Vec<usize>,  // Just bag IDs.
@@ -7,6 +8,7 @@ pub struct PostOrderIter<'a> {
 }
 
 impl<'a> PostOrderIter<'a> {
+    /// Creates a iterator for the given tree decomposition.
     pub fn new(td: &'a TreeDecomposition) -> Self {
         PostOrderIter {
             td,
@@ -33,6 +35,7 @@ impl<'a> PostOrderIter<'a> {
 impl<'a> Iterator for PostOrderIter<'a> {
     type Item = &'a Bag;
 
+    /// Returns the next bag of the tree decomposition in post order.
     fn next(&mut self) -> Option<Self::Item> {
         // Traverse subtrees until we find a leaf node to return.
         while let Some(&current_id) = self.stack.last() {

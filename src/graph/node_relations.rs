@@ -2,20 +2,24 @@ use std::collections::{HashMap, VecDeque};
 
 use arboretum_td::tree_decomposition::TreeDecomposition;
 
+/// Represents the parent of a bag. The [`Fake`] value is used for the root since it has no real
+/// parent.
 #[derive(Clone, Copy)]
 pub enum NodeParent {
     Fake,
     Real(usize),
 }
 
-// TODO: When the children are not needed, this struct can be replaced by the hash map itself.
 // @speed The hash map could be replaced with a parent matrix.
+/// Associates bag IDs with their parent and their children.
 pub struct NodeRelations {
     pub parent: HashMap<usize, NodeParent>,
     pub children: HashMap<usize, Vec<usize>>,
 }
 
 impl NodeRelations {
+    /// Creates a new relation struct by traversing the tree decomposition in breadth first search
+    /// order.
     pub fn new(td: &TreeDecomposition) -> Self {
         let mut parent = HashMap::new();
         let mut children = HashMap::new();

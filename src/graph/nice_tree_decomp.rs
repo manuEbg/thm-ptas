@@ -5,12 +5,18 @@ use std::collections::HashMap;
 
 use super::node_relations::NodeRelations;
 
+/// Represents a nice tree decomposition.
 pub struct NiceTreeDecomposition {
+    /// The tree decomposition, validation with [NiceTreeDecomposition::validate].
     pub td: TreeDecomposition,
+
+    /// The node relations for the tree decomposition. See [NodeRelations].
     pub relations: NodeRelations,
 }
 
 impl NiceTreeDecomposition {
+    /// Validates the nice tree decomposition by checking if all bags of the old tree decomposition
+    /// are present in it and if the parent child bag relations are correct.
     pub fn validate(&self, otd: &TreeDecomposition, relations: &NodeRelations) -> bool {
         let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
         self.td.bags.iter().all(|bag| {
@@ -42,6 +48,7 @@ impl NiceTreeDecomposition {
 }
 
 impl From<&TreeDecomposition> for NiceTreeDecomposition {
+    /// Creates a nice tree decomposition from a tree decomposition.
     fn from(td: &TreeDecomposition) -> Self {
         let td_rels = NodeRelations::new(&td);
 
@@ -145,7 +152,7 @@ impl From<&TreeDecomposition> for NiceTreeDecomposition {
     }
 }
 
-/// This function returns the intersection between two bags and two vectors.
+/// Returns the intersection between two bags and two vectors.
 /// The first vector is the set difference between the first set and the intersection. Similarly, the
 /// second vector is the set differences between the second set and the intersection.
 /// They are used to easier create the between bags in [insert_between_bags] function.
@@ -159,7 +166,7 @@ fn get_bag_intersection(
     (intersection, b1_diff, b2_diff)
 }
 
-/// This function inserts between bags into the nice tree decomposition.
+/// Inserts between bags into the nice tree decomposition.
 /// The between bags are connected to the given 'new parent bag' and if the old bag had some child,
 /// the relation will be updated.
 /// The sets for the between bags are calculated by [get_bag_intersection].
@@ -221,12 +228,14 @@ fn insert_between_bags(
     }
 }
 
+/// A mapping of origin tree decomposition bags to the nice tree decomposition bags.
 struct BagRelations {
     to_new: HashMap<usize, usize>,
     to_old: HashMap<usize, usize>,
 }
 
 impl BagRelations {
+    /// Creates default mappings where each bags is associated with itself.
     fn new(bags: &Vec<Bag>) -> Self {
         let (to_new, to_old) = bags.iter().fold(
             (HashMap::new(), HashMap::new()),

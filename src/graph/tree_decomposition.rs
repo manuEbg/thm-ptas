@@ -6,8 +6,8 @@ use fxhash::FxHashSet;
 
 use super::{iterators::bfs::TreeDecompBfsIter, node_relations::{NodeRelations, NodeParent}};
 
-/// This function is used to create a tree decomposition on one of the rings
-/// in a DCEL data structure.
+/// Creates a tree decomposition for the
+/// [arboretum_td](https://docs.rs/arboretum-td/latest/arboretum_td/) library.
 impl From<&ApproximatedTD<'_>> for TreeDecomposition {
     fn from(atd: &ApproximatedTD) -> Self {
         let mut result = TreeDecomposition {
@@ -37,6 +37,7 @@ impl From<&ApproximatedTD<'_>> for TreeDecomposition {
     }
 }
 
+/// Writes a tree decomposition to a given dot file.
 pub fn td_write_to_dot(
     title: &str,
     file: &mut File,
