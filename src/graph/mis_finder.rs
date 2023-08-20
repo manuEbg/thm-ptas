@@ -22,21 +22,39 @@ use super::{
     node_relations::NodeRelations,
 };
 
+/// Represents a maximum independent set size that can either be a positive integer or negative
+/// infinity. In order to avoid arithmetic overflows, the addition and subtraction operators are
+/// overloaded and negative infinity "consumes" valid values.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum MisSize {
     Invalid,
     Valid(usize),
 }
 
+/// Represents a dynamic table for the maximum independent set algorithm.
+/// The functions for the algorithm are [find_mis] and [find_mis_fast].
 pub trait DynTable<'a, Set>
 where
     Set: Default + Clone + Eq + std::fmt::Debug,
 {
+    /// Returns the set index and the maximum independent set size for a given bag ID and subset.
     fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
+
     // TODO: @cleanup This function may only be needed for debugging purposes.
+    /// Returns the subset and its maximum independent set size for a given abg ID and the subset
+    /// index.
     fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&Set, MisSize);
+
+    /// Returns a list of set indices and corresponding maximum independent set sizes for the root
+    /// bag. It is used to start the reconstruction of the maximum independent set, see
+    /// [reconstruct_mis].
     fn get_max_root_set_indices(&self, root_id: usize) -> Vec<(usize, MisSize)>;
+
+    /// Inserts a bag ID, a subset and the calculated maximum independent set size into the table.
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
+
+    /// Adds the vertices from the subset described by the given bag ID and subset index to the
+    /// maximum independent set [`mis`]. This function is used in the reconstruction algorithm.
     fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>);
 }
 
@@ -77,6 +95,8 @@ impl std::fmt::Display for MisSize {
     }
 }
 
+/// Represents possible errors that can occur when the algorithm tries to find the maximum
+/// independent set.
 #[derive(Debug)]
 pub enum FindMisError {
     InvalidNiceTD,
@@ -94,14 +114,16 @@ impl std::fmt::Display for FindMisError {
     }
 }
 
+/// Represents a 2D matrix that stores information about the construction of dynamic table values.
 type ConstructionTable = Vec<Vec<(Option<usize>, Option<usize>)>>;
 
+/// Checks whether `v` is independent from all vertices in `set` or not.
 fn is_independent(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &FxHashSet<usize>) -> bool {
     set.iter().all(|u| !adjaceny_matrix[v][*u])
 }
 
-// TODO: Maybe this reconstruction is not correct.
-// The reconstructed set is smaller than the size in the table.
+/// Reconstructs the maximum independent set from the dynamic table.
+/// It recursively traverses the construction table while building the maximum independent set.
 fn reconstruct_mis<Set>(
     table: &dyn DynTable<Set>,
     root_id: usize,
@@ -112,7 +134,7 @@ fn reconstruct_mis<Set>(
 where
     Set: Eq + std::fmt::Debug + Clone + Default,
 {
-    // This function recursively traverses the table and finds the maximum independent set.
+    /// Recursively traverses the table while building the maximum independent set.
     fn rec<Set>(
         table: &dyn DynTable<Set>,
         bag_id: usize,
@@ -230,9 +252,12 @@ where
     HashSet::new() // No MIS found.
 }
 
-// TODO:
-// 1. Remove the `.0` for the `dyn_table` and use the common interface.
-// 2. Add an adjaceny matrix/list to check whether two vertices are connected or not.
+/// Finds the maximum independent set as described in the
+/// [wiki](https://github.com/manuEbg/thm-ptas/wiki/Maximum-Independent-Set-with-Dynamic-Programming-on-Nice-Tree-Decompositions.)
+/// for this project.
+/// The nice tree decomposition [`ntd`] is traversed in post order (left child, right child, parent) and
+/// the independence is checked by the [`adjaceny_matrix`].
+/// This implementation uses the [NormalDynTable].
 pub fn find_mis(
     adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
@@ -250,6 +275,7 @@ pub fn find_mis(
 
         match children.len() {
             0 => {
+                // Leaf node.
                 entry.add(DynTableValueItem::new(
                     FxHashSet::from_iter(Vec::new().into_iter()),
                     MisSize::Valid(0),
@@ -371,10 +397,17 @@ pub fn find_mis(
     Ok((result.clone(), result.len()))
 }
 
+/// Checks whether `v` is independent from all vertices in `set` or not.
 fn is_independent_fast(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &BitSet) -> bool {
     set.iter().all(|u| !adjaceny_matrix[u][v])
 }
 
+/// Finds the maximum independent set as described in the
+/// [wiki](https://github.com/manuEbg/thm-ptas/wiki/Maximum-Independent-Set-with-Dynamic-Programming-on-Nice-Tree-Decompositions.)
+/// for this project.
+/// The nice tree decomposition [`ntd`] is traversed in post order (left child, right child, parent) and
+/// the independence is checked by the [`adjaceny_matrix`].
+/// This implementation uses the [FastDynTable].
 pub fn find_mis_fast(
     adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
@@ -493,6 +526,8 @@ pub fn find_mis_fast(
     Ok((result.clone(), result.len()))
 }
 
+/// Finds the maximum independent set by checking all subsets of the graph for independence and
+/// keeping the biggest.
 pub fn find_mis_exhaustive(
     adjaceny_matrix: &Vec<Vec<bool>>,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
@@ -560,6 +595,7 @@ where
 }
 */
 
+/// Writes the construction table into a given file.
 fn dump_construction_table<Set>(
     mut file: File,
     constr_table: &ConstructionTable,
@@ -606,6 +642,7 @@ where
     Ok(())
 }
 
+/// Finds the connected vertices of a set.
 pub fn find_connected_vertices(
     set: &HashSet<usize>,
     adjaceny_matrix: &Vec<Vec<bool>>,

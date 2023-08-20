@@ -6,6 +6,14 @@ use crate::graph::{
 use fxhash::FxHashSet;
 use std::collections::{HashMap, HashSet};
 
+/// A simple implementation for the dynamic table. It implements the [DynTable] trait and uses the
+/// [DynTableValue] and [DynTableValueItem] structs to store its information.
+///
+/// The internal representation is not `M[i, S] = s` with type `N x P(V) -> Z` as in the theory or
+/// [crate::graph::dyn_table::dt_fast::FastDynTable], it's more like a curried function
+/// `N -> P(V) -> Z` and then a conversion to `N -> {f: P(V) -> Z}`. That means we have an index
+/// that yields a struct ([DynTableValue]) which contains a list of subsets that are mapped to
+/// their maximum independent set size ([DynTableValueItem]).
 pub struct NormalDynTable(pub HashMap<usize, DynTableValue>);
 
 impl Default for NormalDynTable {
@@ -62,6 +70,8 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
     }
 }
 
+/// Represents a value of the dynamic table.
+/// This maps to the `{f: P(V) -> Z}` of the theory.
 #[derive(Debug)]
 pub struct DynTableValue {
     pub sets: Vec<DynTableValueItem>,
@@ -98,6 +108,8 @@ impl std::fmt::Display for DynTableValue {
     }
 }
 
+/// A wrapper so that we can implement [std::fmt::Display] for a nice tree decomposition and its
+/// dynamic table.
 pub struct NtdAndNormalTable<'a> {
     pub ntd: &'a NiceTreeDecomposition,
     pub table: &'a NormalDynTable,
@@ -123,13 +135,16 @@ impl std::fmt::Display for NtdAndNormalTable<'_> {
     }
 }
 
+/// Returns the debug format of a vector but substitutes the brackets (`'['`, `']'`) with curly braces
+/// (`'{'`, `'}'`).
 fn format_vec_as_set(vec: Vec<usize>) -> String {
     let vec_str = format!("{:?}", vec);
     let inner_str = String::from(&vec_str[1..vec_str.len() - 1]);
     format!("{{{inner_str}}}")
 }
 
-// TODO: Maybe change to a tuple struct.
+/// Represents a value of the dynamic table.
+/// This maps to one value of `{f: P(V) -> Z}`, or a `(P(V), Z)` in the theory.
 #[derive(Debug)]
 pub struct DynTableValueItem {
     pub mis: FxHashSet<usize>,
@@ -157,6 +172,7 @@ impl std::fmt::Display for NormalDynTable {
     }
 }
 
+/// Returns the subset index and maximum independent set size for a given table entry and subset.
 fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> (usize, MisSize) {
     entry
         .sets

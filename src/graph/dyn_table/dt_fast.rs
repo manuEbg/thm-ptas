@@ -19,22 +19,36 @@ let (set_index, size) = table.get(2, &set);
 immutable borrow occurs here
 mutable borrow later used here
 */
-/// This type is essentially a 2D matrix where the first value of the tuple is the bag ID and the
-/// second index is a subset of vertices from the current subgraph (donut).
+/// This table uses bitsets to for the subsets. It implements the [DynTable] trait but has several
+/// internal values that store information.
 #[derive(Debug)]
 pub struct FastDynTable {
-    /// (bag ID, subset index) -> size
+    /// Associates a bag ID and a subset index with the corresponding maximum independent set size.
+    /// To get the index of a given subset, see [FastDynTable::set_indces].
+    /// (bag ID, subset index) -> maximum independent set size.
     map: HashMap<(usize, usize), MisSize>,
-    /// (bag ID, subset set) -> subset index
+
+    /// Associates a bag ID and a subset with its corresponding subset index.
+    /// A subset gets its index when its inserted by the [DynTable::put] function and only these
+    /// subsets are valid.
+    /// (bag ID, subset set) -> subset index.
     set_indices: HashMap<(usize, BitSet), usize>,
-    /// (bag ID, subset index) -> subset
+
+    /// Associates a bag ID and a subset index with the corresponding subset.
+    /// It is the inverse of [FastDynTable::set_indices] and only needed for internal bookkeeping.
+    /// (bag ID, subset index) -> subset.
     set_indices_back: HashMap<(usize, usize), BitSet>,
-    /// bag ID -> number of subsets
+
+    /// Stores the amount of subsets for all bag IDs.
+    /// bag ID -> number of subsets.
     set_count: HashMap<usize, usize>,
+
     // subsets: HashSet<BitSet>, // This could be a cache but it caused borrow checker errors.
 }
 
 impl FastDynTable {
+    /// Creates a new dynamic table that uses bitsets.
+    /// Note: The [subset_count] is unused for now.
     pub fn new(subset_count: usize) -> Self {
         FastDynTable {
             map: HashMap::default(),
@@ -93,6 +107,8 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
     }
 }
 
+/// A wrapper so that we can implement [std::fmt::Display] for a nice tree decomposition and its
+/// dynamic table.
 pub struct NtdAndFastTable<'a> {
     pub ntd: &'a NiceTreeDecomposition,
     pub table: &'a FastDynTable,
