@@ -357,7 +357,7 @@ impl WebFileWriter for Dcel {
             })
             .collect::<Vec<_>>();
 
-        let donuts = &self.find_donuts_for_k(4).unwrap();
+        let donuts = &self.find_donuts_for_k(5).unwrap();
 
         file.write_all(b"let data = ")?;
         JsObject {

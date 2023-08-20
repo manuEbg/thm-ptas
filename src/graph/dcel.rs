@@ -183,11 +183,11 @@ impl Dcel {
                 for (a, _) in face_iter2 {
                     vec.push(a);
                 }
-                panic!(
+                println!(
                     "FACE {} with edges {:?} iterated. Should never be here",
                     f, vec
                 );
-                // FaceInfo::TriangulatedFace
+                FaceInfo::TriangulatedFace
             }
             None => {
                 panic!("FACE {} IS EMPTY", f);
@@ -260,7 +260,6 @@ impl Dcel {
         let src = self.arc(id).src();
         let twin_n = self.arc(an).twin();
         let twin_p = self.arc(ap).twin();
-        self.arcs[twin_n].reset_dst(src);
         if self.arc(ap).src() == self.arc(an).dst() {
             // we collapsed a triangle into a line
             self.invalid_arcs[ap] = true;
@@ -272,7 +271,9 @@ impl Dcel {
             println!("Face {face} is invalid");
             self.invalid_faces[face] = true;
         }
+        self.arcs[twin_n].reset_dst(src);
         self.invalid_arcs[id] = true;
+        // self.invalid_arcs[self.arcs[id].twin()] = true;
     }
 
     /// merge vertex from into vertex into
@@ -307,11 +308,15 @@ impl Dcel {
         let arcs = self.vertices[from].arcs().clone();
         self.vertices[into].remove_arc_at(position_of_from);
         for a in arcs.into_iter().rev() {
+            if self.invalid_arcs[a] {
+                // continue;
+            }
             self.arcs[a].reset_src(into);
             let twin = self.arcs[a].twin();
             self.arcs[twin].reset_dst(into);
             if self.arc(a).dst() == into || self.neighbors(into).contains(&self.arc(a).dst()) {
                 self.invalid_arcs[a] = true;
+                self.invalid_arcs[twin] = true;
                 continue;
             }
             self.vertices[into].push_arc_at(a, position_of_from);
@@ -368,6 +373,7 @@ impl Dcel {
         collapsed_root: VertexId,
         spanning_tree: &SpanningTree,
     ) -> Result<SubDcel, Box<dyn Error>> {
+        let mut aId = 0;
         // let spanning_tree = self.spanning_tree(0);
 
         if end > spanning_tree.max_level() + 1 {
@@ -383,10 +389,15 @@ impl Dcel {
             self.vertex(collapsed_root)
                 .arcs()
                 .iter()
-                .map(|id| self.arc(*id))
-                .for_each(|a| {
-                    builder.push_arc(a);
-                    println!("pushing fake arc {:?}", a);
+                .map(|id| (id, self.arc(*id)))
+                .for_each(|(id, a)| {
+                    if !self.invalid_arcs[*id] {
+                        builder.push_arc(a);
+                        println!("pushing fake(from root) arc{aId} g{id} {:?}", a);
+                        aId += 1;
+                    } else {
+                        println!("not pushing fake(fromroot) arc g{id} {:?}", a);
+                    }
                 });
         }
 
@@ -403,13 +414,30 @@ impl Dcel {
                     .collect::<Vec<_>>();
 
                 for (i, arc) in outgoing_arcs.iter().enumerate() {
+                    let global_arc_id = self.vertices[vertex].arcs()[i];
+                    // if builder.contains_arc(arc) {
+                    //     continue;
+                    // }
                     if spanning_tree.vertex_level()[arc.dst()] >= start
                         && spanning_tree.vertex_level()[arc.dst()] < end
                     {
-                        if self.invalid_arcs[self.vertices[vertex].arcs()[i]] {
-                            println!("not pushing arc {}", self.vertices[vertex].arcs()[i]);
+                        if self.invalid_arcs[global_arc_id] {
+                            println!(
+                                "not pushing arc g{global_arc_id} {}",
+                                self.vertices[vertex].arcs()[i]
+                            );
                         } else {
-                            println!("pushing arc {:?}", arc);
+                            println!("pushing arc{aId} g{global_arc_id} {:?}", arc);
+                            aId += 1;
+                            if self.invalid_arcs[self.arcs[global_arc_id].twin()]
+                                || self.invalid_arcs[self.arcs[global_arc_id].next()]
+                                || self.invalid_arcs[self.arcs[global_arc_id].prev()]
+                            {
+                                println!(
+                                    "twin,next or prev of g{global_arc_id} {:?} is invalid",
+                                    arc
+                                );
+                            }
                             builder.push_arc(arc);
                         }
                     } else if arc.dst() == collapsed_root {
@@ -419,7 +447,8 @@ impl Dcel {
                             continue;
                         }
                         builder.push_arc(&arc);
-                        println!("pushing fake arc {:?}", arc);
+                        println!("pushing fake(to root) arc{aId} g{global_arc_id} {:?}", arc);
+                        aId += 1;
                     }
                 }
 
@@ -444,7 +473,7 @@ impl Dcel {
 
         for n in 1..(spanning_tree.max_level() + 1) {
             println!("Find Donuts: Going through level {}", n);
-            if n % k == 0 {
+            if n % (k + 1) == 0 {
                 /* Current donut is from last_level -> n */
                 let mut donut = clone.collect_donut(last_level, n, root, &spanning_tree)?;
                 donut.triangulate();
@@ -462,7 +491,7 @@ impl Dcel {
             }
         }
 
-        if last_level != spanning_tree.max_level() {
+        if last_level < spanning_tree.max_level() + 1 {
             let mut last_donut = clone.collect_donut(
                 last_level,
                 spanning_tree.max_level() + 1,
@@ -492,12 +521,13 @@ mod tests {
         let am = dcel.adjacency_matrix();
         println!("{:?}", am)
     }
+
     #[test]
     fn merge_vertices() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/merge_test.graph").unwrap();
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
         let mut dcel = dcel_b.build();
         // dcel.merge_vertices(0, 2);
-        dcel.merge_vertices(0, 7);
+        // dcel.merge_vertices(0, 7);
         // dcel.merge_vertices(0, 6);
         let mut clone = dcel.clone();
         let st = dcel.spanning_tree(0);

@@ -127,6 +127,27 @@ impl SubDcelBuilder {
         self.last_vertex_id - 1
     }
 
+    pub fn contains_arc(&self, a: &arc::Arc) -> bool {
+        if self.vertex_mapping.contains(&a.dst()) && self.vertex_mapping.contains(&a.src()) {
+            let map = self
+                .vertex_mapping
+                .iter()
+                .position(|v| *v == a.src())
+                .unwrap();
+            if map >= self.dcel_builder.num_vertices() {
+                return false;
+            }
+            return self.dcel_builder.get_neighborhood(map).contains(
+                &self
+                    .vertex_mapping
+                    .iter()
+                    .position(|v| *v == a.dst())
+                    .unwrap(),
+            );
+        }
+        false
+    }
+
     pub fn push_arc(&mut self, a: &arc::Arc) {
         let src = self.push_vertex(a.src());
         let dst = self.push_vertex(a.dst());

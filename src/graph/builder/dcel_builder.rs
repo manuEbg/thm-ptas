@@ -199,7 +199,7 @@ impl DcelBuilder {
         index - smaller_indices.len()
     }
 
-    fn get_neighborhood(&self, vertex: VertexId) -> Vec<VertexId> {
+    pub fn get_neighborhood(&self, vertex: VertexId) -> Vec<VertexId> {
         self.vertices[vertex]
             .arcs
             .iter()
