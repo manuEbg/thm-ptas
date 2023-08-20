@@ -378,11 +378,17 @@ impl Dcel {
         let mut builder = SubDcelBuilder::new(self.clone(), start);
 
         // add collapsed_root as fake_root and push all its arcs
-        self.vertex(collapsed_root)
-            .arcs()
-            .iter()
-            .map(|id| self.arc(*id))
-            .for_each(|a| builder.push_arc(a));
+        let fake_lvl = spanning_tree.vertex_level()[collapsed_root];
+        if fake_lvl < start {
+            self.vertex(collapsed_root)
+                .arcs()
+                .iter()
+                .map(|id| self.arc(*id))
+                .for_each(|a| {
+                    builder.push_arc(a);
+                    println!("pushing fake arc {:?}", a);
+                });
+        }
 
         for vertex in 0..self.vertices().len() {
             let vertex_depth = spanning_tree.vertex_level()[vertex];
@@ -407,7 +413,13 @@ impl Dcel {
                             builder.push_arc(arc);
                         }
                     } else if arc.dst() == collapsed_root {
+                        if fake_lvl >= start && fake_lvl < end
+                            || self.invalid_arcs[self.vertex(vertex).arcs()[i]]
+                        {
+                            continue;
+                        }
                         builder.push_arc(&arc);
+                        println!("pushing fake arc {:?}", arc);
                     }
                 }
 
@@ -482,10 +494,12 @@ mod tests {
     }
     #[test]
     fn merge_vertices() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/merge_test.graph").unwrap();
         let mut dcel = dcel_b.build();
+        // dcel.merge_vertices(0, 2);
+        dcel.merge_vertices(0, 7);
+        // dcel.merge_vertices(0, 6);
         let mut clone = dcel.clone();
-        // dcel.merge_vertices(0, 7);
         let st = dcel.spanning_tree(0);
 
         // for level in 1..6 {

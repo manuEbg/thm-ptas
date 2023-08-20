@@ -128,7 +128,13 @@ impl DcelBuilder {
             let src_port = self.arcs[i].src_port;
 
             self.arcs[twin].dst_port = src_port;
-            println!("Set Dest{:?}", self.arc(twin));
+            println!("Set Dest for arc{twin}: {:?}", self.arc(twin));
+        }
+        println!("{} arcs in this builder", self.arcs.len());
+        for a in self.arcs.iter() {
+            if a.dst_port == None {
+                println!("arc has no destinaion port: {:?}", a)
+            }
         }
     }
 
