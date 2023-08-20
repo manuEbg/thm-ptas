@@ -1,6 +1,6 @@
 use std::io::Write;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     fs::File,
 };
 
@@ -372,19 +372,8 @@ pub fn find_mis(
 }
 
 fn is_independent_fast(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &BitSet) -> bool {
-    let result = set.iter().all(|u| {
-        println!("Check {v} -- {u}");
-        !adjaceny_matrix[u][v]
-    });
-    if v == 15 {
-        println!("BitSet: {:?}", set);
-        println!("{}", result);
-    }
-    result
+    set.iter().all(|u| !adjaceny_matrix[u][v])
 }
-
-// TODO: If possible, merge the two `find_mis` algorithms.
-// TODO: Would it be a nice idea to log the steps of the algorithm (print to a string buffer)?
 
 pub fn find_mis_fast(
     adjaceny_matrix: &Vec<Vec<bool>>,
@@ -443,7 +432,6 @@ pub fn find_mis_fast(
                             table.put(bag.id, subset, MisSize::Invalid);
                             constr_table[bag.id].push((None, None));
                         }
-                        // println!("CT[{}, {}] = {:?}", bag.id, constr_table[bag.id].len(), constr_table[bag.id][set_index]);
                     }
                 } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
                     // Forget node.
@@ -533,6 +521,9 @@ pub fn find_mis_exhaustive(
     Ok((max, len))
 }
 
+// TODO: If possible, merge the two `find_mis` algorithms.
+// TODO: Would it be a nice idea to log the steps of the algorithm (print to a string buffer)?
+
 /*
 pub struct AlgorithmData<Set>
 where
@@ -585,7 +576,6 @@ where
 
                 (Some(p), None) => {
                     let child_id = node_relations.children[&bag_id][0];
-                    // println!("Bag ID: {bag_id}, set ID: {set_id}, child ID: {child_id}, child set ID: {p}");
                     let (subset, size) = table.get_by_index(bag_id, set_id);
                     let (child_subset, child_size) = table.get_by_index(child_id, *p);
                     writeln!(
@@ -613,18 +603,6 @@ where
         }
     }
 
-    /*
-    constr_table
-        .iter()
-        .enumerate()
-        .map(|(bag_id, preds)| {
-            preds
-                .iter()
-                .enumerate()
-                .map(move |(set_id, preds)| match preds {
-                })
-        });
-    */
     Ok(())
 }
 

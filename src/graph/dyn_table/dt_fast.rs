@@ -74,10 +74,11 @@ impl<'a> DynTable<'a, BitSet> for FastDynTable {
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: BitSet, size: MisSize) {
         let set_count = self.set_count.entry(bag_id).or_insert(0);
+        // TODO: @speed Get rid of this copies. -> Problem: Borrow checker and we need the nightly
+        // compiler for this.
         self.map.insert((bag_id, set_count.clone()), size);
         self.set_indices
             .insert((bag_id, subset.clone()), set_count.clone());
-        // TODO: @speed Get rid of this copy.
         self.set_indices_back
             .insert((bag_id, set_count.clone()), subset);
         *set_count += 1;

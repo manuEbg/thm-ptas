@@ -86,7 +86,6 @@ impl<'a> TreeDecompBfsIter<'a> {
     }
 }
 
-// TODO: Remove initialization of the node relations from the iterator.
 impl<'a> Iterator for TreeDecompBfsIter<'a> {
     type Item = &'a Bag;
 

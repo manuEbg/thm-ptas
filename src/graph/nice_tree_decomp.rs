@@ -179,7 +179,6 @@ fn insert_between_bags(
 
     // Build introduces.
     for last_idx in (0..b1_diff.len()).rev() {
-        // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b1_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
         println!("(Introduce) Add {set:?}");

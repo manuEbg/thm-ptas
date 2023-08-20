@@ -32,7 +32,7 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
             .max_by(|l, r| l.size.cmp(&r.size))
             .unwrap()
             .size;
-        // println!("Normal max size in root: {max_size}");
+
         self.0[&root_id]
             .sets
             .iter()
