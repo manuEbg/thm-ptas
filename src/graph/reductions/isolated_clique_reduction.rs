@@ -1,11 +1,33 @@
 /* data structure for isolated clique reduction */
+use std::collections::HashMap;
+use crate::graph::dcel::vertex::VertexId;
+use crate::graph::DcelBuilder;
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
+use crate::graph::reductions::{ApplicableReduction, remove_vertex_and_update_indices, update_vertex_indices};
+
+#[derive(Debug)]
+pub struct IsolatedClique {
+    pub(crate) isolated_vertex: usize,
+    pub(crate) members: Vec<usize>
+}
+
+impl ApplicableReduction for IsolatedClique {
+    fn reduce_dcel_builder(
+        &self,
+        dcel_builder: &mut DcelBuilder,
+        vertex_ids: &mut HashMap<VertexId, VertexId>,
+    ) {
+        for &vertex in &self.members {
+            remove_vertex_and_update_indices(dcel_builder, vertex, vertex_ids);
+        }
+    }
+}
 
 pub fn do_isolated_clique_reductions(graph: &mut QuickGraph)
-                                     -> Vec<usize> {
+                                     -> Vec<IsolatedClique> {
 
-    let mut result: Vec<usize> = Vec::new();
+    let mut result: Vec<IsolatedClique> = Vec::new();
     loop {
         /* find an isolated clique */
         if let Some(vertex) = (0..graph.adjacency.len())
@@ -19,7 +41,10 @@ pub fn do_isolated_clique_reductions(graph: &mut QuickGraph)
             clique.iter().for_each(|&member| graph.remove_vertex(member));
 
             /* add clique to result */
-            result.push(vertex);
+            result.push(IsolatedClique {
+                isolated_vertex: vertex,
+                members: clique
+            });
         } else {
             break;
         }
@@ -33,10 +58,10 @@ solution for the graph after isolated clique reductions
  */
 
 pub fn transfer_isolated_clique(
-    isolated_cliques: Vec<usize>,
-    independence_set: Vec<usize>
-) -> Vec<usize> {
-    let mut result = independence_set.clone();
-    result.extend(isolated_cliques.iter());
-    result
+    mut independence_set: &mut Vec<usize>,
+    isolated_cliques: &Vec<IsolatedClique>
+) {
+    independence_set.extend(isolated_cliques.iter().map(|isolated_clique|
+        isolated_clique.isolated_vertex)
+    );
 }

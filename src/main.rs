@@ -20,7 +20,7 @@ use crate::graph::reductions::isolated_clique_reduction::{
     do_isolated_clique_reductions, transfer_isolated_clique,
 };
 use crate::graph::reductions::nodal_fold_reduction::{
-    do_nodal_fold_reductions, transfer_nodal_fold_reduction,
+    do_nodal_fold_reductions, transfer_nodal_fold_reductions,
 };
 use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
 use graph::quick_graph::QuickGraph;
