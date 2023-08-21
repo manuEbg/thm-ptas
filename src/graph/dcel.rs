@@ -8,7 +8,6 @@ use std::{collections::HashSet, error::Error};
 use self::face::FaceIterator;
 use super::{
     iterators::bfs::BfsIter,
-    reducible::Reducible,
     sub_dcel::{SubDcel, SubDcelBuilder},
 };
 use crate::graph::{builder::dcel_builder::DcelBuilder, dcel::spanning_tree::SpanningTree};
@@ -432,7 +431,7 @@ impl Dcel {
                     }
                 }
             }
-            let resulting_sub_dcel = builder.build(None)?;
+            let resulting_sub_dcel = builder.build(None, None)?;
             result.push(resulting_sub_dcel);
         }
 
@@ -532,7 +531,7 @@ impl Dcel {
             }
         }
 
-        let sub_dcel = builder.build(Some(collapsed_root))?;
+        let sub_dcel = builder.build(Some(collapsed_root), Some(start))?;
         for (i, a) in sub_dcel.dcel.arcs().iter().enumerate() {
             println!("Subdcelarcs({i}) {:?}", a);
         }
@@ -557,7 +556,17 @@ impl Dcel {
                 /* Current donut is from last_level -> n */
                 let mut donut = clone.collect_donut(last_level, n, root, &spanning_tree)?;
                 // todo:
+                println!(
+                    "arc count: {}, face count: {}",
+                    donut.sub.num_arcs(),
+                    donut.sub.num_faces()
+                );
                 donut.triangulate();
+                println!(
+                    "arc count: {}, face count: {}",
+                    donut.sub.num_arcs(),
+                    donut.sub.num_faces()
+                );
                 result.push(donut);
 
                 // after creating the donut we merge it into the root of the tree to create a fake

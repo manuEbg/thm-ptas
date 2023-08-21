@@ -15,6 +15,7 @@ pub struct SubDcel {
     pub arc_mapping: Vec<arc::ArcId>,
     pub vertex_mapping: Vec<vertex::VertexId>,
     fake_root: Option<VertexId>,
+    pub min_lvl: Option<usize>,
 }
 
 impl SubDcel {
@@ -24,6 +25,7 @@ impl SubDcel {
         arc_mapping: Vec<arc::ArcId>,
         vertex_mapping: Vec<vertex::VertexId>,
         fake_root: Option<VertexId>,
+        min_lvl: Option<usize>,
     ) -> Self {
         Self {
             dcel,
@@ -31,7 +33,12 @@ impl SubDcel {
             arc_mapping,
             vertex_mapping,
             fake_root,
+            min_lvl,
         }
+    }
+
+    pub fn get_local_index(&self, a: VertexId) -> Option<VertexId> {
+        self.vertex_mapping.iter().position(|e| *e == a)
     }
 
     pub fn get_original_arc(&self, a: arc::ArcId) -> Option<&arc::ArcId> {
@@ -154,7 +161,11 @@ impl SubDcelBuilder {
         self.dcel_builder.push_arc(src, dst);
     }
 
-    pub fn build(&mut self, fake_root: Option<VertexId>) -> Result<SubDcel, Box<dyn Error>> {
+    pub fn build(
+        &mut self,
+        fake_root: Option<VertexId>,
+        min_lvl: Option<usize>,
+    ) -> Result<SubDcel, Box<dyn Error>> {
         let final_dcel = self.dcel_builder.build();
         let mut arc_mapping = vec![0 as arc::ArcId; final_dcel.num_arcs()];
 
@@ -175,6 +186,7 @@ impl SubDcelBuilder {
             arc_mapping,
             self.vertex_mapping.clone(),
             fake_root,
+            min_lvl,
         ))
     }
 }

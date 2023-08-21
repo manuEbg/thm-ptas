@@ -5,29 +5,15 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 pub mod graph;
 
-
 #[macro_use]
 pub mod logger;
 
-use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
-t
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
+use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
 
-use graph::approximated_td::{ApproximatedTD, SubTDBuilder};
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
-
-use graph::iterators::bfs::BfsIter;
-
-use crate::graph::reductions::isolated_clique_reduction::{
-    do_isolated_clique_reductions, transfer_isolated_clique,
-};
-use crate::graph::reductions::nodal_fold_reduction::{
-    do_nodal_fold_reductions, transfer_nodal_fold_reductions,
-};
-use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
-
 
 use graph::mis_finder::find_mis;
 use graph::nice_tree_decomp::NiceTreeDecomposition;
@@ -175,8 +161,11 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
 
             let root = 0;
             // build spanning tree
+            watch.start("Spanning Tree");
             let spanning_tree = graph.spanning_tree(root);
-            for i in 1..ptas_config.k {
+            watch.stop();
+            for i in 0..ptas_config.k {
+                println!("Approximation: i: {i}");
                 watch.start(format!("Approximation: i={i:?}").as_str());
                 // TODO use spanning tree to find donuts
 
@@ -185,10 +174,18 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                     // TODO: apply donut reduction on DCEL builders
                 }
 
-                for donut in donuts {
-                    let mut td_b = SubTDBuilder::new(&donut, &spanning_tree, 0);
+                for (i, donut) in donuts.iter().enumerate() {
+                    println!("Donut {i}: ");
+                    donut
+                        .vertex_mapping
+                        .iter()
+                        .for_each(|&v| println!("global v{v}"));
+                    let mut td_b =
+                        SubTDBuilder::new(&donut, &spanning_tree, donut.min_lvl.unwrap());
                     let td = ApproximatedTD::from(&mut td_b);
+                    println!("AproxTd:\n{:?}", td.bags());
                     if td.bags().len() == 0 {
+                        println!("bags of donut are {i} empty");
                         continue;
                         //todo add all nodes of donut to MIS
                     }
@@ -299,7 +296,7 @@ fn main() {
 
     //    //dcel.triangulate();
 
-    write_web_file(&args.output, &dcel);
+    // write_web_file(&args.output, &dcel);
     //    // let mut dg = DualGraph::new(&st);
     //    // dg.build();
 
