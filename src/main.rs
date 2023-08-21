@@ -5,11 +5,15 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 pub mod graph;
 
+use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
 
+use graph::approximated_td::{ApproximatedTD, SubTDBuilder};
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
 
+use graph::mis_finder::find_mis;
+use graph::nice_tree_decomp::NiceTreeDecomposition;
 use graph::quick_graph::QuickGraph;
 use graph::{Dcel, DcelBuilder};
 
@@ -151,24 +155,39 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
             let _rings = graph.find_rings();
             watch.stop();
 
-            // TODO
+            let root = 0;
             // build spanning tree
+            let spanning_tree = graph.spanning_tree(root);
             for i in 1..ptas_config.k {
                 watch.start(format!("Approximation: i={i:?}").as_str());
                 // TODO use spanning tree to find donuts
-                let donuts = graph.find_donuts_for_k(i)?;
+
+                let donuts = graph.find_donuts_for_k(ptas_config.k, i, &spanning_tree)?;
                 for donut_reductions in ptas_config.reduce_donuts.clone() {
                     // TODO: apply donut reduction on DCEL builders
                 }
 
                 for donut in donuts {
+                    let mut td_b = SubTDBuilder::new(&donut, &spanning_tree, 0);
+                    let td = ApproximatedTD::from(&mut td_b);
+                    if td.bags().len() == 0 {
+                        continue;
+                        //todo add all nodes of donut to MIS
+                    }
 
-                    // let td_b = SubTDBuilder::new(&donut, &st, 0);
-                    // let td = ApproximatedTD::from(td_b);
-
-                    // let decomp = TreeDecomposition::from(&td);
+                    let decomp = TreeDecomposition::from(&td);
 
                     // TODO: generate MIS for this donut and add to list
+                    let ntd = NiceTreeDecomposition::from(&decomp);
+                    match find_mis(&graph.adjacency_matrix(), &ntd) {
+                        Ok((mis, size)) => {
+                            println!("mis: {mis:?}, size: {size}");
+                        }
+                        Err(e) => {
+                            println!("Error: {e}")
+                        }
+                    };
+                    // panic!("fuuuu u");
                 }
 
                 // TODO:
@@ -262,7 +281,7 @@ fn main() {
 
     //    //dcel.triangulate();
 
-    write_web_file(&args.output, &dcel);
+    // write_web_file(&args.output, &dcel);
     //    // let mut dg = DualGraph::new(&st);
     //    // dg.build();
 
