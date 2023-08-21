@@ -3,7 +3,7 @@ const MEDIUM_EDGE = 2;
 const FINE_EDGE = 1;
 const NODE_SIZE = 40;
 const FAT_NODE_SIZE = 60;
-const LAYOUT_FACTOR = 1000;
+const LAYOUT_FACTOR = 10000;
 
 
 class Arc {
