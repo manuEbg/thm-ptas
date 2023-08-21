@@ -1,4 +1,4 @@
-use super::ArcId;
+use super::{ArcId, Dcel};
 pub type VertexId = usize;
 
 #[derive(Clone, Debug)]
@@ -29,5 +29,9 @@ impl Vertex {
 
     pub fn remove_arcs(&mut self) {
         self.arcs.clear();
+    }
+
+    pub fn remove_invalid(&mut self, ia: &Vec<bool>) {
+        self.arcs.retain(|a| !ia[*a]);
     }
 }

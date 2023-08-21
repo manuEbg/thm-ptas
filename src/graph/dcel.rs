@@ -275,34 +275,45 @@ impl Dcel {
             self.invalid_arcs[r1.1] = true;
             let t0 = self.arcs[r1.0].twin();
             let t1 = self.arcs[r1.1].twin();
-            self.arcs[r1.0].reset_twin(t1);
-            self.arcs[t1].reset_twin(r1.0);
-            self.arcs[r1.1].reset_twin(t0);
-            self.arcs[t0].reset_twin(r1.1);
-            self.invalid_faces[self.arc(id1).face()];
+            self.arcs[r1.0].reset_twin(r1.1);
+            self.arcs[t1].reset_twin(t0);
+            self.arcs[r1.1].reset_twin(r1.0);
+            self.arcs[t0].reset_twin(t1);
+            self.invalid_faces[self.arcs[id1].face()] = true;
         } else if !is_line1 && is_line2 {
             println!("is line 2");
             self.invalid_arcs[r2.0] = true;
             self.invalid_arcs[r2.1] = true;
             let t0 = self.arcs[r2.0].twin();
             let t1 = self.arcs[r2.1].twin();
-            self.arcs[r2.0].reset_twin(t1);
-            self.arcs[r2.1].reset_twin(t0);
-            self.arcs[t1].reset_twin(r2.0);
-            self.arcs[t0].reset_twin(r2.1);
-            self.invalid_faces[self.arc(id2).face()];
+            self.arcs[r2.0].reset_twin(r2.1);
+            self.arcs[r2.1].reset_twin(r2.0);
+            self.arcs[t1].reset_twin(t0);
+            self.arcs[t0].reset_twin(t1);
+            self.invalid_faces[self.arcs[id2].face()] = true;
         } else if is_line1 && is_line2 {
             println!("is line 1 and 2");
             self.invalid_arcs[r1.0] = true;
             self.invalid_arcs[r1.1] = true;
             let t0 = self.arcs[r1.0].twin();
             let t1 = self.arcs[r1.1].twin();
-            self.arcs[r1.0].reset_twin(t1);
-            self.arcs[t1].reset_twin(r1.0);
-            self.arcs[r1.1].reset_twin(t0);
-            self.arcs[t0].reset_twin(r1.1);
-            self.invalid_faces[self.arc(id1).face()];
-            self.invalid_faces[self.arc(id1).face()];
+            self.arcs[r1.0].reset_twin(r1.1);
+            self.arcs[t1].reset_twin(t0);
+            self.arcs[r1.1].reset_twin(r1.0);
+            self.arcs[t0].reset_twin(t1);
+            self.invalid_faces[self.arcs[id1].face()] = true;
+            // println!("is line 2");
+            self.invalid_arcs[r2.0] = true;
+            self.invalid_arcs[r2.1] = true;
+            let t0 = self.arcs[r2.0].twin();
+            let t1 = self.arcs[r2.1].twin();
+            self.arcs[r2.0].reset_twin(r2.1);
+            self.arcs[r2.1].reset_twin(r2.0);
+            self.arcs[t1].reset_twin(t0);
+            self.arcs[t0].reset_twin(t1);
+            self.invalid_faces[self.arcs[id2].face()] = true;
+        } else {
+            println!("no line");
         }
 
         // let src = self.arc(id1).src();
@@ -341,7 +352,8 @@ impl Dcel {
         {
             Some(v) => v,
             None => {
-                panic!("cannot merge not adjacent vertices into: {into} and from: {from}")
+                println!("cannot merge not adjacent vertices into: {into} and from: {from}");
+                return;
             }
         };
         let position_of_from: usize = neighbors_of_into
@@ -366,19 +378,24 @@ impl Dcel {
 
             self.arcs[a].reset_src(into);
             self.arcs[twin].reset_dst(into);
-            if (self.invalid_arcs[a]) {
-                continue;
-            }
+            // if (self.invalid_arcs[a]) {
+            //     continue;
+            // }
             self.vertices[into].push_arc_at(a, position_of_from);
         }
+
         // remove u_v, v_u
         self.remove_arc(into_to_from, from_to_into);
+        for a in 0..self.num_vertices() {
+            self.vertices[a].remove_invalid(&self.invalid_arcs);
+        }
+        // self.vertices[into].remove_invalid(&self.invalid_arcs);
         self.vertices[from].remove_arcs();
     }
 
     pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
-        return Ok(result);
+        // return Ok(result);
         let spanning_tree = self.spanning_tree(0);
 
         for depth in 1..(spanning_tree.max_level() + 1) {
@@ -450,8 +467,9 @@ impl Dcel {
                 .for_each(|(id, a)| {
                     if !self.invalid_arcs[*id] {
                         builder.push_arc(a);
-                        println!("pushing fake(from root) arc{aId} g{id} {:?}", a);
-                        aId += 1;
+                        builder.push_arc(self.twin(*id));
+                        println!("pushing fake(from root) and twin arc{aId} g{id} {:?}", a);
+                        aId += 2;
                     } else {
                         println!("not pushing fake(fromroot) arc g{id} {:?}", a);
                     }
@@ -498,14 +516,15 @@ impl Dcel {
                             builder.push_arc(arc);
                         }
                     } else if arc.dst() == collapsed_root {
-                        if fake_lvl >= start && fake_lvl < end
-                            || self.invalid_arcs[self.vertex(vertex).arcs()[i]]
-                        {
-                            continue;
-                        }
-                        builder.push_arc(&arc);
-                        println!("pushing fake(to root) arc{aId} g{global_arc_id} {:?}", arc);
-                        aId += 1;
+                        // println!("arc point to fake_root {arc:?}");
+                        // if fake_lvl >= start && fake_lvl < end
+                        //     || self.invalid_arcs[self.vertex(vertex).arcs()[i]]
+                        // {
+                        //     continue;
+                        // }
+                        // builder.push_arc(&arc);
+                        // println!("pushing fake(to root) arc{aId} g{global_arc_id} {:?}", arc);
+                        // aId += 1;
                     }
                 }
 
@@ -538,7 +557,7 @@ impl Dcel {
                 /* Current donut is from last_level -> n */
                 let mut donut = clone.collect_donut(last_level, n, root, &spanning_tree)?;
                 // todo:
-                // donut.triangulate();
+                donut.triangulate();
                 result.push(donut);
 
                 // after creating the donut we merge it into the root of the tree to create a fake
@@ -576,6 +595,8 @@ impl Dcel {
 mod tests {
     use crate::{read_graph_file_into_dcel_builder, write_web_file};
 
+    use super::Dcel;
+
     #[test]
     fn adjacency_matrix() {
         let mut dcel_b = read_graph_file_into_dcel_builder("data/tree.graph").unwrap();
@@ -593,7 +614,7 @@ mod tests {
             println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
         }
         println!("merge ");
-        dcel.merge_vertices(2, 3);
+        dcel.merge_vertices(0, 1);
         // dcel.merge_vertices(0, 2);
         for (i, a) in dcel.arcs().iter().enumerate() {
             println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
@@ -603,6 +624,41 @@ mod tests {
         let mut clone = dcel.clone();
         write_web_file("data/test.js", &clone);
     }
+
+    #[test]
+    fn merge_vertices_random() {
+        let mut dcel_b =
+            read_graph_file_into_dcel_builder("data/random_merge/graph.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        show_relevant_stuff(&dcel);
+
+        let mut clone = dcel.clone();
+        let st = dcel.spanning_tree(0);
+        show_relevant_stuff(&clone);
+        write_web_file("data/test.js", &clone);
+    }
+    #[test]
+    fn merge_vertices_circ() {
+        let mut dcel_b =
+            read_graph_file_into_dcel_builder("data/circular_merge/graph.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        show_relevant_stuff(&dcel);
+
+        let mut clone = dcel.clone();
+        let st = dcel.spanning_tree(0);
+        show_relevant_stuff(&clone);
+        write_web_file("data/test.js", &clone);
+    }
+
+    fn show_relevant_stuff(g: &Dcel) {
+        for (i, a) in g.arcs().iter().enumerate() {
+            println!("Arc{i}: {} {a:?} ", g.invalid_arcs[i]);
+        }
+        for (i, a) in g.vertices().iter().enumerate() {
+            println!("Vertex{i}: {a:?} ");
+        }
+    }
+
     #[test]
     fn merge_vertices_big() {
         let mut dcel_b =
@@ -613,13 +669,9 @@ mod tests {
         }
         println!("merge ");
         dcel.merge_vertices(0, 7);
-        // dcel.merge_vertices(2, 3);
-        // dcel.merge_vertices(0, 2);
         for (i, a) in dcel.arcs().iter().enumerate() {
             println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
         }
-        // dcel.merge_vertices(0, 7);
-        // dcel.merge_vertices(0, 6);
         let mut clone = dcel.clone();
         // let st = dcel.spanning_tree(0);
 
