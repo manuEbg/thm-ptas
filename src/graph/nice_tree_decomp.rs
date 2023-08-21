@@ -1,16 +1,24 @@
-use crate::graph::iterators::bfs::TreeDecompBfsIter;
+use crate::{graph::iterators::bfs::TreeDecompBfsIter, log_if_enabled};
 use arboretum_td::tree_decomposition::{Bag, TreeDecomposition};
 use fxhash::FxHashSet;
 use std::collections::HashMap;
 
 use super::node_relations::NodeRelations;
 
+static LOG_FILE_PATH: &str = "ntd_out.txt";
+
+/// Represents a nice tree decomposition.
 pub struct NiceTreeDecomposition {
+    /// The tree decomposition, validation with [NiceTreeDecomposition::validate].
     pub td: TreeDecomposition,
+
+    /// The node relations for the tree decomposition. See [NodeRelations].
     pub relations: NodeRelations,
 }
 
 impl NiceTreeDecomposition {
+    /// Validates the nice tree decomposition by checking if all bags of the old tree decomposition
+    /// are present in it and if the parent child bag relations are correct.
     pub fn validate(&self, otd: &TreeDecomposition, relations: &NodeRelations) -> bool {
         let mut present = vec![false; otd.bags.len()]; // Check if all original bags are present.
         self.td.bags.iter().all(|bag| {
@@ -42,6 +50,7 @@ impl NiceTreeDecomposition {
 }
 
 impl From<&TreeDecomposition> for NiceTreeDecomposition {
+    /// Creates a nice tree decomposition from a tree decomposition.
     fn from(td: &TreeDecomposition) -> Self {
         let td_rels = NodeRelations::new(&td);
 
@@ -145,7 +154,7 @@ impl From<&TreeDecomposition> for NiceTreeDecomposition {
     }
 }
 
-/// This function returns the intersection between two bags and two vectors.
+/// Returns the intersection between two bags and two vectors.
 /// The first vector is the set difference between the first set and the intersection. Similarly, the
 /// second vector is the set differences between the second set and the intersection.
 /// They are used to easier create the between bags in [insert_between_bags] function.
@@ -159,7 +168,7 @@ fn get_bag_intersection(
     (intersection, b1_diff, b2_diff)
 }
 
-/// This function inserts between bags into the nice tree decomposition.
+/// Inserts between bags into the nice tree decomposition.
 /// The between bags are connected to the given 'new parent bag' and if the old bag had some child,
 /// the relation will be updated.
 /// The sets for the between bags are calculated by [get_bag_intersection].
@@ -174,15 +183,14 @@ fn insert_between_bags(
     let mut sets = Vec::new();
     let (intersection, b1_diff, b2_diff) = get_bag_intersection(s1, s2);
 
-    println!("Insert between bags for new {new_parent_id} and old {old_child_id:?}");
-    println!("Intersection = {intersection:?}, introduces = {b1_diff:?}, forgets = {b2_diff:?}");
+    log_if_enabled!(LOG_FILE_PATH, "Insert between bags for new {new_parent_id} and old {old_child_id:?}");
+    log_if_enabled!(LOG_FILE_PATH, "Intersection = {intersection:?}, introduces = {b1_diff:?}, forgets = {b2_diff:?}");
 
     // Build introduces.
     for last_idx in (0..b1_diff.len()).rev() {
-        // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b1_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
-        println!("(Introduce) Add {set:?}");
+        log_if_enabled!(LOG_FILE_PATH, "(Introduce) Add {set:?}");
         sets.push(set);
     }
 
@@ -193,7 +201,7 @@ fn insert_between_bags(
         // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b2_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
-        println!("(Forget) Add {set:?}");
+        log_if_enabled!(LOG_FILE_PATH, "(Forget) Add {set:?}");
         sets.push(set);
         insert_last_child = true;
     }
@@ -222,12 +230,14 @@ fn insert_between_bags(
     }
 }
 
+/// A mapping of origin tree decomposition bags to the nice tree decomposition bags.
 struct BagRelations {
     to_new: HashMap<usize, usize>,
     to_old: HashMap<usize, usize>,
 }
 
 impl BagRelations {
+    /// Creates default mappings where each bags is associated with itself.
     fn new(bags: &Vec<Bag>) -> Self {
         let (to_new, to_old) = bags.iter().fold(
             (HashMap::new(), HashMap::new()),

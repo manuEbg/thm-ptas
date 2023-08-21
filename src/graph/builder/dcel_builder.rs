@@ -65,6 +65,10 @@ impl DcelBuilder {
         }
     }
 
+    pub fn vertex_count(&self) -> usize {
+        self.vertices.len()
+    }
+
     pub fn push_arc(&mut self, src: usize, dst: usize) {
         self.arcs.push(Arc::new(src, dst));
         let current_arc = self.arcs.len() - 1;
@@ -188,23 +192,18 @@ impl DcelBuilder {
     }
 
     /* decrease indices of elements when elements with smaller index are removed */
-    fn decrease_index(index: usize, removed_indices: &Vec<usize>) -> usize {
-        // all the indices that are smaller than the current index
-        let smaller_indices: Vec<VertexId> = removed_indices
-            .iter()
-            .filter(|&&removed_index| removed_index < index)
-            .map(|&element| element)
-            .collect();
-        // old index minus the amount of elements removed BEFORE the index
+    pub fn decrease_index(index: usize, removed_indices: &Vec<usize>) -> usize {
+        let smaller_indices: Vec<VertexId> = removed_indices.iter()
+            .filter(|&&removed_index| removed_index <= index).map(|&element| element).
+            collect();
+
         index - smaller_indices.len()
     }
 
     pub fn get_neighborhood(&self, vertex: VertexId) -> Vec<VertexId> {
-        self.vertices[vertex]
-            .arcs
-            .iter()
-            .map(|&arc_index| self.arcs[arc_index].dst)
-            .collect()
+        self.vertices[vertex].arcs.iter().map(|&arc_index| {
+            self.arcs[arc_index].dst
+        }).collect()
     }
 
     fn remove_vertex_and_arcs(&mut self, removed_vertex: VertexId, removed_arcs: &mut Vec<ArcId>) {
@@ -331,9 +330,9 @@ impl Reducible for DcelBuilder {
         }
 
         /* bend over ingoing arcs of v */
-        for arc_index in bend_over_twins {
-            // TODO: this must probably be u
-            self.arcs[arc_index].dst = v;
+        for &arc_index in &bend_over_twins {
+            self.arcs[arc_index].dst = u;
+
         }
 
         /* update vertex u
@@ -344,6 +343,8 @@ impl Reducible for DcelBuilder {
                 .arcs
                 .insert(position_of_v + index, *arc_index);
         }
+
+
 
         /* remove arcs and vertex v */
         self.remove_vertex_and_arcs(v, &mut deleted_arcs);

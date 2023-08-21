@@ -6,7 +6,7 @@ This repository is used for our GFSP SS23 Project
 To execute the Program with a given example graph use 
 
 ```
-cargo run data/exp.graph
+cargo run -- ptas data/exp.graph 
 ```
 
 ## The input data

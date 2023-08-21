@@ -5,6 +5,12 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 pub mod graph;
 
+
+#[macro_use]
+pub mod logger;
+
+use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
+t
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
 
@@ -12,8 +18,20 @@ use graph::approximated_td::{ApproximatedTD, SubTDBuilder};
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
 
+use graph::iterators::bfs::BfsIter;
+
+use crate::graph::reductions::isolated_clique_reduction::{
+    do_isolated_clique_reductions, transfer_isolated_clique,
+};
+use crate::graph::reductions::nodal_fold_reduction::{
+    do_nodal_fold_reductions, transfer_nodal_fold_reductions,
+};
+use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
+
+
 use graph::mis_finder::find_mis;
 use graph::nice_tree_decomp::NiceTreeDecomposition;
+
 use graph::quick_graph::QuickGraph;
 use graph::{Dcel, DcelBuilder};
 

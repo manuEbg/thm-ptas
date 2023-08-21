@@ -1,9 +1,17 @@
-use std::collections::{HashMap, HashSet};
+use std::io::Write;
+use std::{
+    collections::HashSet,
+    fs::File,
+};
 
 use bit_set::BitSet;
 use fxhash::FxHashSet;
 
-use crate::graph::iterators::subset::SubsetIter;
+use crate::graph::{
+    dyn_table::{dt_fast::NtdAndFastTable, dt_normal::NtdAndNormalTable},
+    iterators::subset::SubsetIter,
+};
+use crate::log_if_enabled;
 
 use super::{
     dyn_table::{
@@ -15,21 +23,41 @@ use super::{
     node_relations::NodeRelations,
 };
 
+static LOG_FILE_PATH: &str = "mis_log.txt";
+
+/// Represents a maximum independent set size that can either be a positive integer or negative
+/// infinity. In order to avoid arithmetic overflows, the addition and subtraction operators are
+/// overloaded and negative infinity "consumes" valid values.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum MisSize {
     Invalid,
     Valid(usize),
 }
 
+/// Represents a dynamic table for the maximum independent set algorithm.
+/// The functions for the algorithm are [find_mis] and [find_mis_fast].
 pub trait DynTable<'a, Set>
 where
     Set: Default + Clone + Eq + std::fmt::Debug,
 {
+    /// Returns the set index and the maximum independent set size for a given bag ID and subset.
     fn get(&self, bag_id: usize, subset: &Set) -> (usize, MisSize);
+
     // TODO: @cleanup This function may only be needed for debugging purposes.
+    /// Returns the subset and its maximum independent set size for a given abg ID and the subset
+    /// index.
     fn get_by_index(&self, bag_id: usize, subset_index: usize) -> (&Set, MisSize);
-    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize);
+
+    /// Returns a list of set indices and corresponding maximum independent set sizes for the root
+    /// bag. It is used to start the reconstruction of the maximum independent set, see
+    /// [reconstruct_mis].
+    fn get_max_root_set_indices(&self, root_id: usize) -> Vec<(usize, MisSize)>;
+
+    /// Inserts a bag ID, a subset and the calculated maximum independent set size into the table.
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: Set, size: MisSize);
+
+    /// Adds the vertices from the subset described by the given bag ID and subset index to the
+    /// maximum independent set [`mis`]. This function is used in the reconstruction algorithm.
     fn add_to_mis(&self, bag_id: usize, subset_index: usize, mis: &mut HashSet<usize>);
 }
 
@@ -70,6 +98,8 @@ impl std::fmt::Display for MisSize {
     }
 }
 
+/// Represents possible errors that can occur when the algorithm tries to find the maximum
+/// independent set.
 #[derive(Debug)]
 pub enum FindMisError {
     InvalidNiceTD,
@@ -87,26 +117,27 @@ impl std::fmt::Display for FindMisError {
     }
 }
 
+/// Represents a 2D matrix that stores information about the construction of dynamic table values.
 type ConstructionTable = Vec<Vec<(Option<usize>, Option<usize>)>>;
 
+/// Checks whether `v` is independent from all vertices in `set` or not.
 fn is_independent(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &FxHashSet<usize>) -> bool {
     set.iter().all(|u| !adjaceny_matrix[v][*u])
 }
 
-// TODO: Maybe this reconstruction is not correct.
-// The reconstructed set is smaller than the size in the table.
+/// Reconstructs the maximum independent set from the dynamic table.
+/// It recursively traverses the construction table while building the maximum independent set.
 fn reconstruct_mis<Set>(
     table: &dyn DynTable<Set>,
     root_id: usize,
     constr_table: &ConstructionTable,
     node_relations: &NodeRelations,
+    adjaceny_matrix: &Vec<Vec<bool>>,
 ) -> HashSet<usize>
 where
     Set: Eq + std::fmt::Debug + Clone + Default,
 {
-    let result = HashSet::from_iter(Vec::new());
-
-    // This function recursively traverses the table and finds the maximum independent set.
+    /// Recursively traverses the table while building the maximum independent set.
     fn rec<Set>(
         table: &dyn DynTable<Set>,
         bag_id: usize,
@@ -120,20 +151,23 @@ where
     {
         table.add_to_mis(bag_id, set_index, &mut mis);
 
+        let (subset, size) = table.get_by_index(bag_id, set_index);
+        log_if_enabled!(LOG_FILE_PATH, "({set_index}): MIS at M[{bag_id}, {subset:?}] = {size}:\t{mis:?}");
+
         let children = &node_relations.children[&bag_id];
-        println!("{bag_id}'s children: {children:?}");
+        log_if_enabled!(LOG_FILE_PATH, "{bag_id}'s children: {children:?}");
 
         match children.len() {
             // Leaf node: We're finished.
             0 => {
-                println!("{bag_id} is a leaf node => MIS = {mis:?}");
+                log_if_enabled!(LOG_FILE_PATH, "{bag_id} is a leaf node => MIS = {mis:?}");
                 mis
             }
 
             // Check the child.
             1 => {
                 let child_index = constr_table[bag_id][set_index].0.unwrap();
-                println!(
+                log_if_enabled!(LOG_FILE_PATH,
                     "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?}",
                     table.get_by_index(bag_id, set_index),
                     children[0],
@@ -155,8 +189,8 @@ where
             2 => {
                 let left = constr_table[bag_id][set_index].0.unwrap();
                 let right = constr_table[bag_id][set_index].1.unwrap();
-                println!(
-                    "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?} or {}'s {} {:?}",
+                log_if_enabled!(LOG_FILE_PATH,
+                    "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?} and {}'s {} {:?}",
                     table.get_by_index(bag_id, set_index),
                     children[0],
                     constr_table[bag_id][set_index].0.unwrap(),
@@ -187,7 +221,6 @@ where
                     &node_relations,
                 );
 
-                // std::cmp::max_by(left, right, |l, r| l.len().cmp(&r.len()))
                 mis = HashSet::from_iter(left.union(&right).into_iter().copied());
                 mis
             }
@@ -196,26 +229,38 @@ where
         }
     }
 
-    // Find the largest set in the root node. This begins the table traversal.
-    let (root_set_index, size) = table.get_max_root_set_index(root_id);
+    // We find all subsets with the largest number in the root entry.
+    let root_sets = table.get_max_root_set_indices(root_id);
+    log_if_enabled!(LOG_FILE_PATH, "MIS size according to table: {}", root_sets[0].1);
 
-    println!("MIS size according to table: {size}");
+    // We try to reconstruction the independent sets until one is found.
+    for (index, size) in root_sets.into_iter() {
 
-    let result = rec(
-        table,
-        root_id,
-        root_set_index,
-        &constr_table,
-        result,
-        &node_relations,
-    );
+        let mut result = HashSet::new();
+        result = rec(
+            table,
+            root_id,
+            index,
+            &constr_table,
+            result,
+            &node_relations,
+        );
 
-    result
+        let connectes_vertices = find_connected_vertices(&result, &adjaceny_matrix);
+        if connectes_vertices.len() == 0 {
+            return result; // Return the found MIS.
+        }
+    }
+
+    HashSet::new() // No MIS found.
 }
 
-// TODO:
-// 1. Remove the `.0` for the `dyn_table` and use the common interface.
-// 2. Add an adjaceny matrix/list to check whether two vertices are connected or not.
+/// Finds the maximum independent set as described in the
+/// [wiki](https://github.com/manuEbg/thm-ptas/wiki/Maximum-Independent-Set-with-Dynamic-Programming-on-Nice-Tree-Decompositions.)
+/// for this project.
+/// The nice tree decomposition [`ntd`] is traversed in post order (left child, right child, parent) and
+/// the independence is checked by the [`adjaceny_matrix`].
+/// This implementation uses the [NormalDynTable].
 pub fn find_mis(
     adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
@@ -233,6 +278,7 @@ pub fn find_mis(
 
         match children.len() {
             0 => {
+                // Leaf node.
                 entry.add(DynTableValueItem::new(
                     FxHashSet::from_iter(Vec::new().into_iter()),
                     MisSize::Valid(0),
@@ -251,7 +297,7 @@ pub fn find_mis(
                     for subset in SubsetIter::new(&bag.vertex_set) {
                         if !subset.contains(&v) {
                             let (i, size) = table.get(child.id, &subset);
-                            println!(
+                            log_if_enabled!(LOG_FILE_PATH,
                                 "{v} notin {subset:?} => M[{}, {subset:?}] = M[{}, {subset:?}] = {size}",
                                 bag.id, child.id
                             );
@@ -261,17 +307,17 @@ pub fn find_mis(
                             // @speed This clone could be expensive.
                             let mut clone = subset.clone();
                             clone.remove(&v);
-                            // println!(
-                            //     "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
-                            //     bag.id, child.id
-                            // );
                             let (i, size) = table.get(child.id, &clone);
+                            log_if_enabled!(LOG_FILE_PATH,
+                                "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
+                                bag.id, child.id
+                            );
                             entry
                                 .sets
                                 .push(DynTableValueItem::new(subset, size + MisSize::Valid(1)));
                             constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                         } else {
-                            println!(
+                            log_if_enabled!(LOG_FILE_PATH,
                                 "{subset:?} is not independent => M[{}, S] = -infinity",
                                 bag.id
                             );
@@ -285,7 +331,7 @@ pub fn find_mis(
                     // Forget node.
                     // forall subsets of bag: M[bag, subset] = max { ... }.
 
-                    println!(
+                    log_if_enabled!(LOG_FILE_PATH,
                         "Forget: B{} -> B{} = {:?} -> {:?}",
                         &child.id, &bag.id, &child.vertex_set, &bag.vertex_set
                     );
@@ -329,7 +375,7 @@ pub fn find_mis(
                     let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
 
-                    println!("M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
+                    log_if_enabled!(LOG_FILE_PATH, "M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len} = {}", bag.id, left_child.id, right_child.id, left_size + right_size - len);
                     entry
                         .sets
                         .push(DynTableValueItem::new(subset, left_size + right_size - len));
@@ -343,28 +389,28 @@ pub fn find_mis(
         table.0.insert(bag.id.clone(), entry);
     }
 
-    println!("{}", &table);
+    let mut out = File::create("normal_table.txt").unwrap();
+    write!(out, "{}", NtdAndNormalTable { ntd, table: &table });
 
-    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
+    let mut constr_out = File::create("normal_constr_table.txt").unwrap();
+    dump_construction_table(constr_out, &constr_table, &table, &ntd.relations);
+
+    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations, &adjaceny_matrix);
 
     Ok((result.clone(), result.len()))
 }
 
+/// Checks whether `v` is independent from all vertices in `set` or not.
 fn is_independent_fast(adjaceny_matrix: &Vec<Vec<bool>>, v: usize, set: &BitSet) -> bool {
-    let result = set.iter().all(|u| {
-        println!("Check {v} -- {u}");
-        !adjaceny_matrix[u][v]
-    });
-    if v == 15 {
-        println!("BitSet: {:?}", set);
-        println!("{}", result);
-    }
-    result
+    set.iter().all(|u| !adjaceny_matrix[u][v])
 }
 
-// TODO: If possible, merge the two `find_mis` algorithms.
-// TODO: Would it be a nice idea to log the steps of the algorithm (print to a string buffer)?
-
+/// Finds the maximum independent set as described in the
+/// [wiki](https://github.com/manuEbg/thm-ptas/wiki/Maximum-Independent-Set-with-Dynamic-Programming-on-Nice-Tree-Decompositions.)
+/// for this project.
+/// The nice tree decomposition [`ntd`] is traversed in post order (left child, right child, parent) and
+/// the independence is checked by the [`adjaceny_matrix`].
+/// This implementation uses the [FastDynTable].
 pub fn find_mis_fast(
     adjaceny_matrix: &Vec<Vec<bool>>,
     ntd: &NiceTreeDecomposition,
@@ -398,7 +444,7 @@ pub fn find_mis_fast(
                         let set_index = constr_table[bag.id].len();
                         if !subset.contains(v) {
                             let (child_set_index, size) = table.get(child.id, &subset);
-                            println!(
+                            log_if_enabled!(LOG_FILE_PATH,
                                 "{v} notin {subset:?} => M[{}, {subset:?}] = M[{}, {subset:?}] = {size}",
                                 bag.id, child.id
                             );
@@ -408,21 +454,20 @@ pub fn find_mis_fast(
                             let mut clone = subset.clone();
                             clone.remove(v);
                             let (child_set_index, size) = table.get(child.id, &clone);
-                            println!(
+                            log_if_enabled!(LOG_FILE_PATH,
                                 "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
                                 bag.id, child.id
                             );
                             table.put(bag.id, subset, size + MisSize::Valid(1));
                             constr_table[bag.id].push((Some(child_set_index), None));
                         } else {
-                            println!(
+                            log_if_enabled!(LOG_FILE_PATH,
                                 "{subset:?} is not independent => M[{}, S] = -infinity",
                                 bag.id
                             );
                             table.put(bag.id, subset, MisSize::Invalid);
                             constr_table[bag.id].push((None, None));
                         }
-                        // println!("CT[{}, {}] = {:?}", bag.id, constr_table[bag.id].len(), constr_table[bag.id][set_index]);
                     }
                 } else if let Some(&v) = child.vertex_set.difference(&bag.vertex_set).nth(0) {
                     // Forget node.
@@ -463,7 +508,7 @@ pub fn find_mis_fast(
                     let (i, left_size) = table.get(left_child.id, &subset);
                     let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
-                    println!("M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
+                    log_if_enabled!(LOG_FILE_PATH, "M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
                     table.put(bag.id, subset, left_size + right_size - len);
                     constr_table[bag.id].push((Some(i), Some(j))); // Reconstruction.
                 }
@@ -473,29 +518,36 @@ pub fn find_mis_fast(
         }
     }
 
-    println!("Dynamic table:");
-    println!("{:?}", table);
+    let mut table_out = File::create("fast_table.txt").unwrap();
+    write!(table_out, "{}", NtdAndFastTable { ntd, table: &table });
 
-    println!("Construction table:");
-    // print_constr_table(&constr_table, &table, &ntd.relations);
+    let mut constr_out = File::create("fast_constr_table.txt").unwrap();
+    dump_construction_table(constr_out, &constr_table, &table, &ntd.relations);
 
-    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations);
+    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations, &adjaceny_matrix);
 
     Ok((result.clone(), result.len()))
 }
 
+/// Finds the maximum independent set by checking all subsets of the graph for independence and
+/// keeping the biggest.
 pub fn find_mis_exhaustive(
     adjaceny_matrix: &Vec<Vec<bool>>,
 ) -> Result<(HashSet<usize>, usize), FindMisError> {
     let is_independent = |subset: &HashSet<usize>| {
-        subset.iter().all(|u| subset.iter().all(|v| !adjaceny_matrix[*u][*v]))
+        subset
+            .iter()
+            .all(|u| subset.iter().all(|v| !adjaceny_matrix[*u][*v]))
     };
 
     let mut max: HashSet<usize> = HashSet::new();
     let combinations = u32::pow(2, adjaceny_matrix.len() as u32);
     for (i, subset) in SubsetIter::new(&FxHashSet::from_iter(0..adjaceny_matrix.len())).enumerate() {
         if i % 100000 == 0 {
-            println!("{i}/{combinations}, {}%", f64::from(i as u32)/f64::from(combinations) * 100.0);
+            log_if_enabled!(LOG_FILE_PATH,
+                "{i}/{combinations}, {}%",
+                f64::from(i as u32) / f64::from(combinations) * 100.0
+            );
         }
         let subset2 = HashSet::from_iter(subset.into_iter());
         if is_independent(&subset2) && subset2.len() > max.len() {
@@ -506,6 +558,9 @@ pub fn find_mis_exhaustive(
     let len = max.len();
     Ok((max, len))
 }
+
+// TODO: If possible, merge the two `find_mis` algorithms.
+// TODO: Would it be a nice idea to log the steps of the algorithm (print to a string buffer)?
 
 /*
 pub struct AlgorithmData<Set>
@@ -543,51 +598,54 @@ where
 }
 */
 
-fn print_constr_table<Set>(
+/// Writes the construction table into a given file.
+fn dump_construction_table<Set>(
+    mut file: File,
     constr_table: &ConstructionTable,
     table: &dyn DynTable<Set>,
     node_relations: &NodeRelations,
-) where
+) -> std::io::Result<()>
+where
     Set: Eq + std::fmt::Debug + Clone + Default,
 {
-    constr_table
-        .iter()
-        .enumerate()
-        .for_each(|(bag_id, preds)| {
-            preds
-                .iter()
-                .enumerate()
-                .for_each(|(set_id, preds)| match preds {
-                    (None, None) => {},
+    for (bag_id, preds) in constr_table.iter().enumerate() {
+        for (set_id, preds) in preds.iter().enumerate() {
+            match preds {
+                (None, None) => Ok(()),
 
-                    (Some(p), None) => {
-                        let child_id = node_relations.children[&bag_id][0];
-                        // println!("Bag ID: {bag_id}, set ID: {set_id}, child ID: {child_id}, child set ID: {p}");
-                        let (subset, size) = table.get_by_index(bag_id, set_id);
-                        let (child_subset, child_size) = table.get_by_index(child_id, *p);
-                        println!(
-                            "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
-                            subset, size,
-                            child_subset, child_size,
-                        )
-                    },
+                (Some(p), None) => {
+                    let child_id = node_relations.children[&bag_id][0];
+                    let (subset, size) = table.get_by_index(bag_id, set_id);
+                    let (child_subset, child_size) = table.get_by_index(child_id, *p);
+                    writeln!(
+                        file,
+                        "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
+                        subset, size,
+                        child_subset, child_size,
+                    )
+                }
 
-                    (Some(l), Some(r)) => {
-                        let left_id = node_relations.children[&bag_id][0];
-                        let right_id = node_relations.children[&bag_id][1];
-                        println!(
-                            "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
-                            table.get_by_index(bag_id, set_id).0,
-                            table.get_by_index(left_id, *l).0,
-                            table.get_by_index(right_id, *r).0,
-                        )
-                    },
+                (Some(l), Some(r)) => {
+                    let left_id = node_relations.children[&bag_id][0];
+                    let right_id = node_relations.children[&bag_id][1];
+                    writeln!(
+                        file,
+                        "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
+                        table.get_by_index(bag_id, set_id).0,
+                        table.get_by_index(left_id, *l).0,
+                        table.get_by_index(right_id, *r).0,
+                    )
+                }
 
-                    _ => panic!("Unreachable"),
-                })
-        });
+                _ => panic!("Unreachable"),
+            };
+        }
+    }
+
+    Ok(())
 }
 
+/// Finds the connected vertices of a set.
 pub fn find_connected_vertices(
     set: &HashSet<usize>,
     adjaceny_matrix: &Vec<Vec<bool>>,
@@ -622,7 +680,7 @@ pub mod tests {
     use fxhash::FxHashSet;
     use std::{fs::File, process::Command};
 
-    use super::{ConstructionTable, find_mis_exhaustive};
+    use super::{find_mis_exhaustive, ConstructionTable};
 
     #[test]
     fn simple() {
@@ -709,7 +767,7 @@ pub mod tests {
 
     #[test]
     fn fast() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/problem.graph").unwrap();
+        let mut dcel_b = read_graph_file_into_dcel_builder("data/simple.graph").unwrap();
         let mut dcel = dcel_b.build();
         let adjacency_matrix = dcel.adjacency_matrix();
         // dcel.triangulate();

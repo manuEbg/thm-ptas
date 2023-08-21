@@ -1,7 +1,19 @@
-use crate::graph::mis_finder::{DynTable, MisSize};
+use crate::graph::{
+    iterators::{post_order::PostOrderIter, subset::SubsetIter},
+    mis_finder::{DynTable, MisSize},
+    nice_tree_decomp::NiceTreeDecomposition,
+};
 use fxhash::FxHashSet;
 use std::collections::{HashMap, HashSet};
 
+/// A simple implementation for the dynamic table. It implements the [DynTable] trait and uses the
+/// [DynTableValue] and [DynTableValueItem] structs to store its information.
+///
+/// The internal representation is not `M[i, S] = s` with type `N x P(V) -> Z` as in the theory or
+/// [crate::graph::dyn_table::dt_fast::FastDynTable], it's more like a curried function
+/// `N -> P(V) -> Z` and then a conversion to `N -> {f: P(V) -> Z}`. That means we have an index
+/// that yields a struct ([DynTableValue]) which contains a list of subsets that are mapped to
+/// their maximum independent set size ([DynTableValueItem]).
 pub struct NormalDynTable(pub HashMap<usize, DynTableValue>);
 
 impl Default for NormalDynTable {
@@ -21,14 +33,21 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
         (&item.mis, item.size.clone())
     }
 
-    fn get_max_root_set_index(&self, root_id: usize) -> (usize, MisSize) {
+    fn get_max_root_set_indices(&self, root_id: usize) -> Vec<(usize, MisSize)> {
+        let max_size = self.0[&root_id]
+            .sets
+            .iter()
+            .max_by(|l, r| l.size.cmp(&r.size))
+            .unwrap()
+            .size;
+
         self.0[&root_id]
             .sets
             .iter()
             .enumerate()
-            .max_by(|(_, l), (_, r)| l.size.cmp(&r.size))
-            .map(|(i, item)| (i, item.size))
-            .unwrap()
+            .filter(|e| e.1.size == max_size)
+            .map(|(i, s)| (i, s.size))
+            .collect::<Vec<_>>()
     }
 
     fn put<'b: 'a>(&'a mut self, bag_id: usize, subset: FxHashSet<usize>, size: MisSize) {
@@ -51,6 +70,8 @@ impl<'a> DynTable<'a, FxHashSet<usize>> for NormalDynTable {
     }
 }
 
+/// Represents a value of the dynamic table.
+/// This maps to the `{f: P(V) -> Z}` of the theory.
 #[derive(Debug)]
 pub struct DynTableValue {
     pub sets: Vec<DynTableValueItem>,
@@ -87,7 +108,43 @@ impl std::fmt::Display for DynTableValue {
     }
 }
 
-// TODO: Maybe change to a tuple struct.
+/// A wrapper so that we can implement [std::fmt::Display] for a nice tree decomposition and its
+/// dynamic table.
+pub struct NtdAndNormalTable<'a> {
+    pub ntd: &'a NiceTreeDecomposition,
+    pub table: &'a NormalDynTable,
+}
+
+impl std::fmt::Display for NtdAndNormalTable<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for bag in PostOrderIter::new(&self.ntd.td) {
+            for subset in SubsetIter::new(&bag.vertex_set) {
+                let mut sorted_subset = Vec::from_iter(subset.iter().copied());
+                sorted_subset.sort();
+                writeln!(
+                    f,
+                    "M[{}, {}] = {}",
+                    bag.id,
+                    format_vec_as_set(sorted_subset),
+                    self.table.get(bag.id, &subset).1
+                )?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+/// Returns the debug format of a vector but substitutes the brackets (`'['`, `']'`) with curly braces
+/// (`'{'`, `'}'`).
+fn format_vec_as_set(vec: Vec<usize>) -> String {
+    let vec_str = format!("{:?}", vec);
+    let inner_str = String::from(&vec_str[1..vec_str.len() - 1]);
+    format!("{{{inner_str}}}")
+}
+
+/// Represents a value of the dynamic table.
+/// This maps to one value of `{f: P(V) -> Z}`, or a `(P(V), Z)` in the theory.
 #[derive(Debug)]
 pub struct DynTableValueItem {
     pub mis: FxHashSet<usize>,
@@ -115,6 +172,7 @@ impl std::fmt::Display for NormalDynTable {
     }
 }
 
+/// Returns the subset index and maximum independent set size for a given table entry and subset.
 fn find_child_size(entry: &DynTableValue, set: &FxHashSet<usize>) -> (usize, MisSize) {
     entry
         .sets

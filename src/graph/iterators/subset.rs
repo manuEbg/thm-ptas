@@ -2,10 +2,19 @@ use bit_set::BitSet;
 use fxhash::FxHashSet;
 use std::hash::Hash;
 
+/// Represents a subset iterator for [FxHashSet]s.
 pub struct SubsetIter<T: Eq + Hash + Copy> {
-    set: Vec<T>, // We want to get the elements one by another, so a vector is useful.
+    /// A list of the elements of the subset. We use this to easily create sub vectors and subsets.
+    set: Vec<T>,
+
+    /// The current index in the [`set`] vector to create the subsets.
     element_index: usize,
+
+    /// A list of cached subsets.
+    /// We find all subsets in the range of `(0..element_index)` and then return one after another.
     subsets: Vec<FxHashSet<T>>,
+
+    /// The index of the current subset of [`subsets`].
     subset_index: usize,
 }
 
@@ -57,10 +66,19 @@ impl<T: Eq + Hash + Copy> Iterator for SubsetIter<T> {
     }
 }
 
+/// Represents a subset iterator for [BitSet]s.
 pub struct SubBitSetIter {
-    set: Vec<usize>, // We want to get the elements one by another, so a vector is useful.
+    /// A list of the elements of the subset. We use this to easily create sub vectors and subsets.
+    set: Vec<usize>,
+
+    /// The current index in the [`set`] vector to create the subsets.
     element_index: usize,
+
+    /// A list of cached subsets.
+    /// We find all subsets in the range of `(0..element_index)` and then return one after another.
     subsets: Vec<BitSet>,
+
+    /// The index of the current subset of [`subsets`].
     subset_index: usize,
 }
 

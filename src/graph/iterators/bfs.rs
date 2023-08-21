@@ -74,6 +74,7 @@ impl<'a> Iterator for BfsIter<'a> {
     }
 }
 
+/// Represents a breadth-first search iterator used to traverse tree decompositions.
 pub struct TreeDecompBfsIter<'a> {
     td: &'a TreeDecomposition,
     queue: VecDeque<usize>, // Bag IDs.
@@ -81,6 +82,7 @@ pub struct TreeDecompBfsIter<'a> {
 }
 
 impl<'a> TreeDecompBfsIter<'a> {
+    /// Creates a iterator for the given tree decomposition.
     pub fn new(td: &'a TreeDecomposition) -> Self {
         TreeDecompBfsIter {
             td,
@@ -90,10 +92,10 @@ impl<'a> TreeDecompBfsIter<'a> {
     }
 }
 
-// TODO: Remove initialization of the node relations from the iterator.
 impl<'a> Iterator for TreeDecompBfsIter<'a> {
     type Item = &'a Bag;
 
+    /// Returns the next bag of the tree decomposition in post order.
     fn next(&mut self) -> Option<Self::Item> {
         let front = self.queue.pop_front();
         if front.is_none() {

@@ -1,10 +1,32 @@
 /* data structure for nodal fold reduction */
+use std::collections::HashMap;
+use crate::graph::dcel::vertex::VertexId;
+use crate::graph::DcelBuilder;
 use crate::graph::quick_graph::QuickGraph;
 use crate::graph::reducible::Reducible;
+use crate::graph::reductions::{ApplicableReduction, merge_vertices_and_update_indices, update_vertex_indices};
 
+#[derive(Debug)]
 pub struct NodalFold {
-    inner_vertex: usize,
-    neighbors: Vec<usize>
+    pub(crate) inner_vertex: usize,
+    pub(crate) neighbors: Vec<usize>
+}
+
+impl ApplicableReduction for NodalFold {
+    fn reduce_dcel_builder(
+        &self,
+        dcel_builder: &mut DcelBuilder,
+        vertex_ids: &mut HashMap<usize, usize>
+    ) {
+        for &neighbor in &self.neighbors {
+            merge_vertices_and_update_indices(
+                dcel_builder,
+                self.inner_vertex,
+                neighbor,
+                vertex_ids
+            );
+        }
+    }
 }
 
 pub fn do_nodal_fold_reductions(graph: &mut QuickGraph) -> Vec<NodalFold> {
@@ -42,19 +64,17 @@ pub fn do_nodal_fold_reductions(graph: &mut QuickGraph) -> Vec<NodalFold> {
 }
 
 /* restore solution from solution after nodal fold reductions */
-pub fn transfer_nodal_fold_reduction(
-    independence_set: Vec<usize>,
-    reductions: &mut Vec<NodalFold>
-) -> Vec<usize> {
-    let mut result = independence_set.clone();
+pub fn transfer_nodal_fold_reductions(
+    mut independence_set: &mut Vec<usize>,
+    mut reductions: &mut Vec<NodalFold>
+) {
     while let Some(reduction) = reductions.pop() {
         /* decide if the inner vertex or the neighbors should be taken into the solution */
-        if result.contains(&reduction.inner_vertex) {
-            result.retain(|&vertex| vertex != reduction.inner_vertex);
-            reduction.neighbors.iter().for_each(|&neighbor| result.push(neighbor));
+        if independence_set.contains(&reduction.inner_vertex) {
+            independence_set.retain(|&vertex| vertex != reduction.inner_vertex);
+            reduction.neighbors.iter().for_each(|&neighbor| independence_set.push(neighbor));
         } else {
-            result.push(reduction.inner_vertex);
+            independence_set.push(reduction.inner_vertex);
         }
     }
-    result
 }

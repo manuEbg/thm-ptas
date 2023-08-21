@@ -1,3 +1,6 @@
+[features]
+logging = []
+
 [package]
 name = "thm-ptas"
 version = "0.1.0"
@@ -10,6 +13,7 @@ arboretum-td = "*"
 fxhash = "*"
 clap = { version = "4.0", features = ["derive"] }
 bit-set = "*"
+lazy_static = "*"
 
 [toolchain]
 channel = "nightly"
