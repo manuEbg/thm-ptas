@@ -1,8 +1,8 @@
-const THICK_EDGE = 100;
-const MEDIUM_EDGE = 50;
-const FINE_EDGE = 30;
-const NODE_SIZE = 400;
-const FAT_NODE_SIZE = 600;
+const THICK_EDGE = 5;
+const MEDIUM_EDGE = 2;
+const FINE_EDGE = 1;
+const NODE_SIZE = 40;
+const FAT_NODE_SIZE = 60;
 const LAYOUT_FACTOR = 1000;
 
 
@@ -153,7 +153,7 @@ class Graph {
         })
         .selector('edge')
         .style({
-          'curve-style': 'straight',
+          'curve-style': 'bezier',
           'target-arrow-shape': 'triangle',
           'width': FINE_EDGE,
           'line-color': '#ddd',
