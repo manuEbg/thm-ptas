@@ -1,0 +1,147 @@
+use bit_set::BitSet;
+use fxhash::FxHashSet;
+use std::hash::Hash;
+
+/// Represents a subset iterator for [FxHashSet]s.
+pub struct SubsetIter<T: Eq + Hash + Copy> {
+    /// A list of the elements of the subset. We use this to easily create sub vectors and subsets.
+    set: Vec<T>,
+
+    /// The current index in the [`set`] vector to create the subsets.
+    element_index: usize,
+
+    /// A list of cached subsets.
+    /// We find all subsets in the range of `(0..element_index)` and then return one after another.
+    subsets: Vec<FxHashSet<T>>,
+
+    /// The index of the current subset of [`subsets`].
+    subset_index: usize,
+}
+
+impl<T: Eq + Hash + Copy> SubsetIter<T> {
+    pub fn new(set: &FxHashSet<T>) -> Self {
+        let items = set.iter().copied().collect::<Vec<T>>();
+        SubsetIter {
+            set: items,
+            element_index: 0,
+            subsets: vec![FxHashSet::from_iter(Vec::new().into_iter())],
+            subset_index: 0,
+        }
+    }
+}
+
+impl<T: Eq + Hash + Copy> Iterator for SubsetIter<T> {
+    type Item = FxHashSet<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.subset_index < self.subsets.len() {
+            self.subset_index += 1;
+            return self
+                .subsets
+                .get(self.subset_index - 1)
+                .map(|subset| subset.clone());
+        }
+
+        if self.element_index >= self.set.len() {
+            return None;
+        }
+
+        let new_subsets = self
+            .subsets
+            .iter()
+            .map(|subset| {
+                let mut clone = subset.clone();
+                clone.insert(self.set[self.element_index]);
+                clone
+            })
+            .collect::<Vec<FxHashSet<T>>>();
+
+        new_subsets
+            .into_iter()
+            .for_each(|set| self.subsets.push(set));
+
+        self.element_index += 1;
+
+        self.next()
+    }
+}
+
+/// Represents a subset iterator for [BitSet]s.
+pub struct SubBitSetIter {
+    /// A list of the elements of the subset. We use this to easily create sub vectors and subsets.
+    set: Vec<usize>,
+
+    /// The current index in the [`set`] vector to create the subsets.
+    element_index: usize,
+
+    /// A list of cached subsets.
+    /// We find all subsets in the range of `(0..element_index)` and then return one after another.
+    subsets: Vec<BitSet>,
+
+    /// The index of the current subset of [`subsets`].
+    subset_index: usize,
+}
+
+impl SubBitSetIter {
+    pub fn new(set: &FxHashSet<usize>) -> Self {
+        let items = set.iter().copied().collect::<Vec<usize>>();
+        SubBitSetIter {
+            set: items,
+            element_index: 0,
+            subsets: vec![BitSet::from_iter(Vec::new().into_iter())],
+            subset_index: 0,
+        }
+    }
+}
+
+impl Iterator for SubBitSetIter {
+    type Item = BitSet;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.subset_index < self.subsets.len() {
+            self.subset_index += 1;
+            return self
+                .subsets
+                .get(self.subset_index - 1)
+                .map(|subset| subset.clone());
+        }
+
+        if self.element_index >= self.set.len() {
+            return None;
+        }
+
+        let new_subsets = self
+            .subsets
+            .iter()
+            .map(|subset| {
+                let mut clone = subset.clone();
+                clone.insert(self.set[self.element_index]);
+                clone
+            })
+            .collect::<Vec<BitSet>>();
+
+        new_subsets
+            .into_iter()
+            .for_each(|set| self.subsets.push(set));
+
+        self.element_index += 1;
+
+        self.next()
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use fxhash::FxHashSet;
+
+    #[test]
+    fn sub_bitsets() {
+        println!("Sub bitsets!");
+        let set = FxHashSet::from_iter(vec![1, 3, 10]);
+
+        for (i, subset) in SubBitSetIter::new(&set).enumerate() {
+            println!("{i}. Subset: {:?}", subset);
+        }
+    }
+}

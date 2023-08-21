@@ -1,3 +1,5 @@
+#![feature(hash_set_entry)]
+
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -5,6 +7,9 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 use std::{env, result, string};
 pub mod graph;
+
+#[macro_use]
+pub mod logger;
 
 use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
 
