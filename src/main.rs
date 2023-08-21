@@ -8,6 +8,9 @@ use std::time::{Duration, Instant};
 use std::{env, result, string};
 pub mod graph;
 
+#[macro_use]
+pub mod logger;
+
 use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
 
 use arboretum_td::tree_decomposition::TreeDecomposition;

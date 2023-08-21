@@ -1,9 +1,11 @@
-use crate::graph::iterators::bfs::TreeDecompBfsIter;
+use crate::{graph::iterators::bfs::TreeDecompBfsIter, log_if_enabled};
 use arboretum_td::tree_decomposition::{Bag, TreeDecomposition};
 use fxhash::FxHashSet;
 use std::collections::HashMap;
 
 use super::node_relations::NodeRelations;
+
+static LOG_FILE_PATH: &str = "ntd_out.txt";
 
 /// Represents a nice tree decomposition.
 pub struct NiceTreeDecomposition {
@@ -181,14 +183,14 @@ fn insert_between_bags(
     let mut sets = Vec::new();
     let (intersection, b1_diff, b2_diff) = get_bag_intersection(s1, s2);
 
-    println!("Insert between bags for new {new_parent_id} and old {old_child_id:?}");
-    println!("Intersection = {intersection:?}, introduces = {b1_diff:?}, forgets = {b2_diff:?}");
+    log_if_enabled!(LOG_FILE_PATH, "Insert between bags for new {new_parent_id} and old {old_child_id:?}");
+    log_if_enabled!(LOG_FILE_PATH, "Intersection = {intersection:?}, introduces = {b1_diff:?}, forgets = {b2_diff:?}");
 
     // Build introduces.
     for last_idx in (0..b1_diff.len()).rev() {
         let diff_part = FxHashSet::from_iter(b1_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
-        println!("(Introduce) Add {set:?}");
+        log_if_enabled!(LOG_FILE_PATH, "(Introduce) Add {set:?}");
         sets.push(set);
     }
 
@@ -199,7 +201,7 @@ fn insert_between_bags(
         // TODO: Would into_iter break the original vector?
         let diff_part = FxHashSet::from_iter(b2_diff[0..last_idx].iter().copied());
         let set = FxHashSet::from_iter(intersection.union(&diff_part).copied());
-        println!("(Forget) Add {set:?}");
+        log_if_enabled!(LOG_FILE_PATH, "(Forget) Add {set:?}");
         sets.push(set);
         insert_last_child = true;
     }
