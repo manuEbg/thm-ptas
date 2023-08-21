@@ -247,7 +247,7 @@ impl Dcel {
         self.vertices[arc.src()].push_arc(id);
     }
 
-    fn remove_arc(&mut self, id: ArcId) {
+    fn update_face(&mut self, id: ArcId) -> (ArcId, ArcId) {
         let ap = self.arc(id).prev();
         let an = self.arc(id).next();
         let af = self.arc(id).face();
@@ -256,30 +256,81 @@ impl Dcel {
         }
         self.arcs[ap].set_next(an);
         self.arcs[an].set_prev(ap);
+        (an, ap)
+    }
 
-        let src = self.arc(id).src();
-        let twin_n = self.arc(an).twin();
-        let twin_p = self.arc(ap).twin();
-        if self.arc(ap).src() == self.arc(an).dst() {
-            // we collapsed a triangle into a line
-            self.invalid_arcs[ap] = true;
-            self.invalid_arcs[an] = true;
-            // TODO: update Twins
-            self.arcs[twin_n].reset_twin(twin_p);
-            self.arcs[twin_p].reset_twin(twin_n);
-            let face = self.arc(id).face();
-            println!("Face {face} is invalid");
-            self.invalid_faces[face] = true;
+    fn is_line(&self, a: ArcId, b: ArcId) -> bool {
+        self.arc(a).next() == b && self.arc(a).prev() == b
+    }
+
+    fn remove_arc(&mut self, id1: ArcId, id2: ArcId) {
+        let r1 = self.update_face(id1);
+        let r2 = self.update_face(id2);
+        let is_line1 = self.is_line(r1.0, r1.1);
+        let is_line2 = self.is_line(r2.0, r2.1);
+
+        if is_line1 && !is_line2 {
+            println!("is line 1");
+            self.invalid_arcs[r1.0] = true;
+            self.invalid_arcs[r1.1] = true;
+            let t0 = self.arcs[r1.0].twin();
+            let t1 = self.arcs[r1.1].twin();
+            self.arcs[r1.0].reset_twin(t1);
+            self.arcs[t1].reset_twin(r1.0);
+            self.arcs[r1.1].reset_twin(t0);
+            self.arcs[t0].reset_twin(r1.1);
+            self.invalid_faces[self.arc(id1).face()];
+        } else if !is_line1 && is_line2 {
+            println!("is line 2");
+            self.invalid_arcs[r2.0] = true;
+            self.invalid_arcs[r2.1] = true;
+            let t0 = self.arcs[r2.0].twin();
+            let t1 = self.arcs[r2.1].twin();
+            self.arcs[r2.0].reset_twin(t1);
+            self.arcs[r2.1].reset_twin(t0);
+            self.arcs[t1].reset_twin(r2.0);
+            self.arcs[t0].reset_twin(r2.1);
+            self.invalid_faces[self.arc(id2).face()];
+        } else if is_line1 && is_line2 {
+            println!("is line 1 and 2");
+            self.invalid_arcs[r1.0] = true;
+            self.invalid_arcs[r1.1] = true;
+            let t0 = self.arcs[r1.0].twin();
+            let t1 = self.arcs[r1.1].twin();
+            self.arcs[r1.0].reset_twin(t1);
+            self.arcs[t1].reset_twin(r1.0);
+            self.arcs[r1.1].reset_twin(t0);
+            self.arcs[t0].reset_twin(r1.1);
+            self.invalid_faces[self.arc(id1).face()];
+            self.invalid_faces[self.arc(id1).face()];
         }
-        self.arcs[twin_n].reset_dst(src);
-        self.invalid_arcs[id] = true;
+
+        // let src = self.arc(id1).src();
+
+        // let twin_n = self.arc(an).twin();
+        // let twin_p = self.arc(ap).twin();
+        // if r1.0 == r2.1 && r1.1 == r2.0 {
+        //     // we collapsed a triangle into a line
+        //     self.invalid_arcs[twin_p] = true;
+        //     self.invalid_arcs[twin_n] = true;
+        //     // TODO: update Twins
+        //     self.arcs[ap].reset_twin(an);
+        //     self.arcs[an].reset_twin(ap);
+        //     let face = self.arc(id1).face();
+        //     println!("Face {face} is invalid");
+        //     self.invalid_faces[face] = true;
+        // }
+        // self.arcs[twin_n].reset_dst(src);
+        self.invalid_arcs[id1] = true;
+        self.invalid_arcs[id2] = true;
         // self.invalid_arcs[self.arcs[id].twin()] = true;
     }
 
     /// merge vertex from into vertex into
     fn merge_vertices(&mut self, into: VertexId, from: VertexId) {
         if into == from {
-            panic!("merging v{from} into v{into} is not allowed!");
+            println!("merging v{from} into v{into} is not allowed!");
+            return;
         }
         /* gather neighbors of u and v and the position of each other */
         let neighbors_of_into: Vec<VertexId> = self.neighbors(into);
@@ -307,37 +358,40 @@ impl Dcel {
         // Add them to into
         let arcs = self.vertices[from].arcs().clone();
         self.vertices[into].remove_arc_at(position_of_from);
+        self.vertices[from].remove_arc_at(position_of_into);
         for a in arcs.into_iter().rev() {
-            if self.invalid_arcs[a] {
-                // continue;
-            }
-            self.arcs[a].reset_src(into);
             let twin = self.arcs[a].twin();
+            self.arcs[a].reset_src(into);
             self.arcs[twin].reset_dst(into);
-            if self.arc(a).dst() == into || self.neighbors(into).contains(&self.arc(a).dst()) {
-                self.invalid_arcs[a] = true;
-                self.invalid_arcs[twin] = true;
+
+            self.arcs[a].reset_src(into);
+            self.arcs[twin].reset_dst(into);
+            if (self.invalid_arcs[a]) {
                 continue;
             }
             self.vertices[into].push_arc_at(a, position_of_from);
         }
         // remove u_v, v_u
-        self.remove_arc(into_to_from);
-        self.remove_arc(from_to_into);
+        self.remove_arc(into_to_from, from_to_into);
         self.vertices[from].remove_arcs();
     }
 
     pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
+        return Ok(result);
         let spanning_tree = self.spanning_tree(0);
 
         for depth in 1..(spanning_tree.max_level() + 1) {
             let mut visited = vec![false; self.vertices.len()];
+            println!("building ring{depth}");
 
             let mut builder = SubDcelBuilder::new(self.clone(), depth);
 
-            for spanning_arc in spanning_tree.arcs() {
+            for (i, spanning_arc) in spanning_tree.arcs().iter().enumerate() {
                 let arc = self.arc(*spanning_arc);
+                // if self.invalid_arcs[*spanning_arc] {
+                //     continue;
+                // }
                 let src_level = spanning_tree.vertex_level()[arc.src()];
 
                 /* Is this vertex part of the ring? */
@@ -347,12 +401,15 @@ impl Dcel {
                     let outgoing_arcs = self
                         .arcs()
                         .iter()
-                        .filter(|a| a.src() == arc.src())
+                        .enumerate()
+                        .filter(|(i, a)| a.src() == arc.src() && !self.invalid_arcs[*i])
+                        .map(|(i, a)| a)
                         .collect::<Vec<_>>();
                     for outgoing_arc in outgoing_arcs {
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
                         if dst_level == depth {
+                            println!("pushing arc into ring{depth} {outgoing_arc:?}");
                             builder.push_arc(outgoing_arc);
                         }
                     }
@@ -463,20 +520,25 @@ impl Dcel {
         Ok(sub_dcel)
     }
 
-    pub fn find_donuts_for_k(&self, k: usize) -> Result<Vec<SubDcel>, Box<dyn Error>> {
+    pub fn find_donuts_for_k(
+        &self,
+        k: usize,
+        i: usize,
+        spanning_tree: &SpanningTree,
+    ) -> Result<Vec<SubDcel>, Box<dyn Error>> {
         let mut result = vec![];
-        let root = 0;
         let mut clone = self.clone();
-        let spanning_tree = self.spanning_tree(root);
+        let root = spanning_tree.root();
 
-        let mut last_level = 1;
+        let mut last_level = 0;
 
         for n in 1..(spanning_tree.max_level() + 1) {
-            println!("Find Donuts: Going through level {}", n);
-            if n % (k + 1) == 0 {
+            if n % (k + 1) == i {
+                println!("Find Donuts: level {last_level} to {n}");
                 /* Current donut is from last_level -> n */
                 let mut donut = clone.collect_donut(last_level, n, root, &spanning_tree)?;
-                donut.triangulate();
+                // todo:
+                // donut.triangulate();
                 result.push(donut);
 
                 // after creating the donut we merge it into the root of the tree to create a fake
@@ -523,14 +585,43 @@ mod tests {
     }
 
     #[test]
-    fn merge_vertices() {
-        let mut dcel_b = read_graph_file_into_dcel_builder("data/exp.graph").unwrap();
+    fn merge_vertices_simple() {
+        let mut dcel_b =
+            read_graph_file_into_dcel_builder("data/simple_merge/graph.graph").unwrap();
         let mut dcel = dcel_b.build();
+        for (i, a) in dcel.arcs().iter().enumerate() {
+            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+        }
+        println!("merge ");
+        dcel.merge_vertices(2, 3);
         // dcel.merge_vertices(0, 2);
+        for (i, a) in dcel.arcs().iter().enumerate() {
+            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+        }
         // dcel.merge_vertices(0, 7);
         // dcel.merge_vertices(0, 6);
         let mut clone = dcel.clone();
-        let st = dcel.spanning_tree(0);
+        write_web_file("data/test.js", &clone);
+    }
+    #[test]
+    fn merge_vertices_big() {
+        let mut dcel_b =
+            read_graph_file_into_dcel_builder("data/bigger_merge/graph.graph").unwrap();
+        let mut dcel = dcel_b.build();
+        for (i, a) in dcel.arcs().iter().enumerate() {
+            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+        }
+        println!("merge ");
+        dcel.merge_vertices(0, 7);
+        // dcel.merge_vertices(2, 3);
+        // dcel.merge_vertices(0, 2);
+        for (i, a) in dcel.arcs().iter().enumerate() {
+            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+        }
+        // dcel.merge_vertices(0, 7);
+        // dcel.merge_vertices(0, 6);
+        let mut clone = dcel.clone();
+        // let st = dcel.spanning_tree(0);
 
         // for level in 1..6 {
         //     st.on_level(level)

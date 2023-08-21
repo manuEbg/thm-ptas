@@ -177,9 +177,11 @@ pub struct SubTDBuilder<'a> {
 impl<'a> TreeDecomposable for SubTDBuilder<'a> {
     fn spanning_tree_contains(&self, a: ArcId) -> bool {
         if let Some(og_arc) = self.donut.get_original_arc(a) {
-            self.spanning_tree_contains(*og_arc)
+            println!("arc mapped");
+            self.spanning_tree.contains_arc(*og_arc)
         } else {
-            panic!("Arc {} not mapped. Never should be here!", a);
+            println!("Arc {} not mapped. Never should be here!", a);
+            true
         }
     }
 
@@ -251,7 +253,7 @@ impl<'a> TreeDecomposable for SubTDBuilder<'a> {
 
 impl<'a> SubTDBuilder<'a> {
     pub fn new(donut: &'a SubDcel, st: &'a SpanningTree, min_level: usize) -> Self {
-        SubTDBuilder {
+        let mut sb = SubTDBuilder {
             spanning_tree: st,
             donut,
             adjacent: vec![vec![]; donut.sub.num_faces()],
@@ -259,12 +261,31 @@ impl<'a> SubTDBuilder<'a> {
             min_level,
             on_tree_path: vec![vec![]; donut.sub.num_faces()],
             tree_path_calculated: vec![false; donut.sub.num_vertices()],
-        }
+        };
+        sb.initialize_tree_paths();
+        sb
     }
 
     fn initialize_tree_paths(&mut self) {
-        self.tree_path_calculated[self.donut.fake_root()] = true;
+        if self.donut.sub.num_vertices() <= self.donut.fake_root() {
+            return;
+        }
+        // self.tree_path_calculated[self.donut.fake_root()] = true;
+        // for i in self.donut.dcel.neighbors(self.donut.fake_root()) {
+        //     if i >= self.tree_path_calculated.len() {
+        //         continue;
+        //     }
+        //     self.tree_path_calculated[i] = true;
+        // }
         for v in 0..self.donut.sub.num_vertices() {
+            if self.spanning_tree.vertex_level()[*self.donut.get_original_vertex(v).unwrap()]
+                == self.min_level
+            {
+                self.tree_path_calculated[v] = true;
+            }
+        }
+        for v in 0..self.donut.sub.num_vertices() {
+            // vertex is a local arc id
             self.tree_path(v);
         }
     }
@@ -276,7 +297,17 @@ impl<'a> SubTDBuilder<'a> {
             if self.tree_path_calculated[current] {
                 break;
             }
-            let prev = self.spanning_tree.discovered_by(current).src();
+            let prev = self
+                .spanning_tree
+                .discovered_by(*self.donut.get_original_vertex(current).unwrap())
+                .src();
+            let prev = match self.donut.vertex_mapping.iter().position(|u| *u == prev) {
+                Some(v) => v,
+                None => {
+                    println!("src not in donut");
+                    break;
+                }
+            };
             stack.push(prev);
             current = prev;
         }
