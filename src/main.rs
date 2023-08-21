@@ -152,7 +152,7 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
             watch.stop();
 
             watch.start("Find Rings");
-            let _rings = graph.find_rings();
+            // let _rings = graph.find_rings();
             watch.stop();
 
             let root = 0;
@@ -281,7 +281,7 @@ fn main() {
 
     //    //dcel.triangulate();
 
-    // write_web_file(&args.output, &dcel);
+    write_web_file(&args.output, &dcel);
     //    // let mut dg = DualGraph::new(&st);
     //    // dg.build();
 
