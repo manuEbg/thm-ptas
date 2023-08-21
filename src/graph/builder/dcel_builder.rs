@@ -12,6 +12,50 @@ pub struct DcelBuilder {
     faces: Vec<Face>,
 }
 
+/// Duuuuuuuuuuuuuuuuuuuuude
+impl From<&Dcel> for DcelBuilder {
+    fn from(dcel: &Dcel) -> Self {
+        DcelBuilder {
+            vertices: dcel
+                .vertices()
+                .iter()
+                .map(|v| Vertex {
+                    arcs: v.arcs().iter().copied().collect(),
+                })
+                .collect(),
+            arcs: dcel
+                .arcs()
+                .iter()
+                .map(|a| Arc {
+                    src: a.src(),
+                    src_port: dcel
+                        .vertex(a.src())
+                        .arcs()
+                        .iter()
+                        .position(|a2| dcel.arc(*a2).dst() == a.dst()),
+                    dst: a.dst(),
+                    dst_port: dcel
+                        .vertex(a.dst())
+                        .arcs()
+                        .iter()
+                        .position(|a2| dcel.arc(*a2).dst() == a.src()),
+                    next: Some(a.next()),
+                    prev: Some(a.prev()),
+                    twin: Some(a.twin()),
+                    face: Some(a.face()),
+                })
+                .collect(),
+            faces: dcel
+                .faces()
+                .iter()
+                .map(|f| Face {
+                    start_arc: f.start_arc(),
+                })
+                .collect(),
+        }
+    }
+}
+
 impl DcelBuilder {
     pub fn new() -> Self {
         DcelBuilder {
@@ -79,10 +123,22 @@ impl DcelBuilder {
 
     fn set_dest_ports(&mut self) {
         for i in 0..self.arcs.len() {
-            let twin = self.arcs[i].twin.unwrap();
+            let twin = match self.arcs[i].twin {
+                Some(v) => v,
+                None => {
+                    panic!("Could not find a twin for arc {i}")
+                }
+            };
             let src_port = self.arcs[i].src_port;
 
             self.arcs[twin].dst_port = src_port;
+            println!("Set Dest for arc{twin}: {:?}", self.arc(twin));
+        }
+        println!("{} arcs in this builder", self.arcs.len());
+        for a in self.arcs.iter() {
+            if a.dst_port == None {
+                println!("arc has no destinaion port: {:?}", a)
+            }
         }
     }
 
@@ -118,7 +174,12 @@ impl DcelBuilder {
      */
     fn find_next_arc(&mut self, cur_arc_idx: usize) -> usize {
         let arc = &mut self.arcs[cur_arc_idx];
-        let dest_port = arc.dst_port.unwrap();
+        let dest_port = match arc.dst_port {
+            Some(v) => v,
+            None => {
+                panic!("Arc {cur_arc_idx} has no dst_port. Arc: {:?}", arc);
+            }
+        };
 
         let dest_v = &self.vertices[arc.dst];
 
@@ -135,6 +196,7 @@ impl DcelBuilder {
         let smaller_indices: Vec<VertexId> = removed_indices.iter()
             .filter(|&&removed_index| removed_index <= index).map(|&element| element).
             collect();
+
         index - smaller_indices.len()
     }
 
@@ -146,9 +208,10 @@ impl DcelBuilder {
 
     fn remove_vertex_and_arcs(&mut self, removed_vertex: VertexId, removed_arcs: &mut Vec<ArcId>) {
         /* remove arcs */
+        // Sort arcs and start removing from the highest because that wont change the ArcIds of
+        // lower Arcs
         removed_arcs.sort();
-        removed_arcs.reverse();
-        for i in 0..removed_arcs.len() {
+        for i in (0..removed_arcs.len()).rev() {
             self.arcs.remove(removed_arcs[i]);
         }
 
@@ -156,11 +219,13 @@ impl DcelBuilder {
         self.vertices.remove(removed_vertex);
 
         /* remove ports */
-        for mut vertex in &mut self.vertices {
+        // Remove deleted arcs from other vertices
+        for vertex in &mut self.vertices {
             vertex.arcs.retain(|arc| !removed_arcs.contains(arc));
         }
 
         /* update vertices */
+        // update arcIds of other vertices and let them point to updated arcIds
         for mut vertex in &mut self.vertices {
             vertex.arcs = vertex
                 .arcs
@@ -169,6 +234,8 @@ impl DcelBuilder {
                 .collect();
         }
 
+        /* update arcs */
+        // let arcs point to correct new arcIds and VertexIds
         for vertex in &mut self.vertices {
             for index in 0..vertex.arcs.len() {
                 let mut arc: &mut Arc = &mut self.arcs[vertex.arcs[index]];
@@ -181,6 +248,17 @@ impl DcelBuilder {
                 };
             }
         }
+    }
+
+    pub fn num_vertices(&self) -> usize {
+        self.vertices.len()
+    }
+
+    pub fn arc(&self, id: ArcId) -> &Arc {
+        &self.arcs[id]
+    }
+    pub fn arcs(&self, vertex: VertexId) -> Vec<ArcId> {
+        self.vertices[vertex].arcs.clone()
     }
 }
 
@@ -204,16 +282,20 @@ impl Reducible for DcelBuilder {
         self.remove_vertex_and_arcs(u, &mut arcs_to_be_removed);
     }
 
+    /// merges vertex v into vertex u
+    /// removes all clutter arcs
     fn merge_vertices(&mut self, u: usize, v: usize) {
         /* we can assume that both vertices are adjacent, because we merge only adjacent vertices */
 
         /* gather neighbors of u and v and the position of each other */
         let neighbors_of_u: Vec<VertexId> = self.get_neighborhood(u);
         let neighbors_of_v: Vec<VertexId> = self.get_neighborhood(v);
-        let position_of_u: usize = neighbors_of_v
-            .iter()
-            .position(|&neighbor| neighbor == u)
-            .unwrap();
+        let position_of_u: usize = match neighbors_of_v.iter().position(|&neighbor| neighbor == u) {
+            Some(v) => v,
+            None => {
+                panic!("cannot merge not adjacent vertices u: {u} and v: {v}")
+            }
+        };
         let position_of_v: usize = neighbors_of_u
             .iter()
             .position(|&neighbor| neighbor == v)
@@ -236,9 +318,11 @@ impl Reducible for DcelBuilder {
 
             /* delete or bend over arc */
             if neighbors_of_u.contains(&arc.dst) {
+                // Delete arcs from v with destinations that can be reached from u.
                 deleted_arcs.push(arc_index);
                 deleted_arcs.push(arc.twin.unwrap());
             } else {
+                // append arcs of v to u
                 arc.src = u;
                 bend_over_arcs.push(arc_index);
                 bend_over_twins.push(arc.twin.unwrap());
@@ -248,9 +332,11 @@ impl Reducible for DcelBuilder {
         /* bend over ingoing arcs of v */
         for &arc_index in &bend_over_twins {
             self.arcs[arc_index].dst = u;
+
         }
 
-        /* update vertex u */
+        /* update vertex u
+         * append all preserved arcs from v to u */
         self.vertices[u].arcs.remove(position_of_v);
         for (index, arc_index) in bend_over_arcs.iter().enumerate() {
             self.vertices[u]
@@ -262,5 +348,6 @@ impl Reducible for DcelBuilder {
 
         /* remove arcs and vertex v */
         self.remove_vertex_and_arcs(v, &mut deleted_arcs);
+        println!("merge of {u} and {v} completed");
     }
 }

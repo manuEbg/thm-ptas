@@ -1,24 +1,23 @@
-#![feature(hash_set_entry)]
-
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
-use std::{env, result, string};
 pub mod graph;
+
 
 #[macro_use]
 pub mod logger;
 
 use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
-
+t
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
 
-use graph::dcel::spanning_tree::SpanningTree;
+use graph::approximated_td::{ApproximatedTD, SubTDBuilder};
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
+
 use graph::iterators::bfs::BfsIter;
 
 use crate::graph::reductions::isolated_clique_reduction::{
@@ -28,9 +27,12 @@ use crate::graph::reductions::nodal_fold_reduction::{
     do_nodal_fold_reductions, transfer_nodal_fold_reductions,
 };
 use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
+
+
+use graph::mis_finder::find_mis;
+use graph::nice_tree_decomp::NiceTreeDecomposition;
+
 use graph::quick_graph::QuickGraph;
-use graph::reducible::Reducible;
-use graph::reductions::*;
 use graph::{Dcel, DcelBuilder};
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
@@ -168,27 +170,42 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
             watch.stop();
 
             watch.start("Find Rings");
-            let _rings = graph.find_rings();
+            // let _rings = graph.find_rings();
             watch.stop();
 
-            // TODO
+            let root = 0;
             // build spanning tree
+            let spanning_tree = graph.spanning_tree(root);
             for i in 1..ptas_config.k {
                 watch.start(format!("Approximation: i={i:?}").as_str());
                 // TODO use spanning tree to find donuts
-                let donuts = graph.find_donuts_for_k(i)?;
+
+                let donuts = graph.find_donuts_for_k(ptas_config.k, i, &spanning_tree)?;
                 for donut_reductions in ptas_config.reduce_donuts.clone() {
                     // TODO: apply donut reduction on DCEL builders
                 }
 
                 for donut in donuts {
+                    let mut td_b = SubTDBuilder::new(&donut, &spanning_tree, 0);
+                    let td = ApproximatedTD::from(&mut td_b);
+                    if td.bags().len() == 0 {
+                        continue;
+                        //todo add all nodes of donut to MIS
+                    }
 
-                    // let td_b = SubTDBuilder::new(&donut, &st, 0);
-                    // let td = ApproximatedTD::from(td_b);
-
-                    // let decomp = TreeDecomposition::from(&td);
+                    let decomp = TreeDecomposition::from(&td);
 
                     // TODO: generate MIS for this donut and add to list
+                    let ntd = NiceTreeDecomposition::from(&decomp);
+                    match find_mis(&graph.adjacency_matrix(), &ntd) {
+                        Ok((mis, size)) => {
+                            println!("mis: {mis:?}, size: {size}");
+                        }
+                        Err(e) => {
+                            println!("Error: {e}")
+                        }
+                    };
+                    // panic!("fuuuu u");
                 }
 
                 // TODO:

@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::dcel::arc::ArcId;
 use super::dcel::face::FaceId;
 use super::dcel::vertex::VertexId;
-use super::dcel::SubDcel;
+use super::sub_dcel::SubDcel;
 use super::{dcel::face::Face, dcel::spanning_tree::SpanningTree, Dcel};
 
 type BagId = usize;
@@ -171,14 +171,17 @@ pub struct SubTDBuilder<'a> {
     bags: Vec<HashSet<VertexId>>,
     min_level: usize,
     on_tree_path: Vec<Vec<VertexId>>,
+    tree_path_calculated: Vec<bool>,
 }
 
 impl<'a> TreeDecomposable for SubTDBuilder<'a> {
     fn spanning_tree_contains(&self, a: ArcId) -> bool {
         if let Some(og_arc) = self.donut.get_original_arc(a) {
-            self.spanning_tree_contains(*og_arc)
+            println!("arc mapped");
+            self.spanning_tree.contains_arc(*og_arc)
         } else {
-            panic!("Arc {} not mapped. Never should be here!", a);
+            println!("Arc {} not mapped. Never should be here!", a);
+            true
         }
     }
 
@@ -250,14 +253,75 @@ impl<'a> TreeDecomposable for SubTDBuilder<'a> {
 
 impl<'a> SubTDBuilder<'a> {
     pub fn new(donut: &'a SubDcel, st: &'a SpanningTree, min_level: usize) -> Self {
-        SubTDBuilder {
+        let mut sb = SubTDBuilder {
             spanning_tree: st,
             donut,
             adjacent: vec![vec![]; donut.sub.num_faces()],
             bags: vec![HashSet::new(); donut.sub.num_faces()],
             min_level,
             on_tree_path: vec![vec![]; donut.sub.num_faces()],
+            tree_path_calculated: vec![false; donut.sub.num_vertices()],
+        };
+        sb.initialize_tree_paths();
+        sb
+    }
+
+    fn initialize_tree_paths(&mut self) {
+        if self.donut.sub.num_vertices() <= self.donut.fake_root() {
+            return;
         }
+        // self.tree_path_calculated[self.donut.fake_root()] = true;
+        // for i in self.donut.dcel.neighbors(self.donut.fake_root()) {
+        //     if i >= self.tree_path_calculated.len() {
+        //         continue;
+        //     }
+        //     self.tree_path_calculated[i] = true;
+        // }
+        for v in 0..self.donut.sub.num_vertices() {
+            if self.spanning_tree.vertex_level()[*self.donut.get_original_vertex(v).unwrap()]
+                == self.min_level
+            {
+                self.tree_path_calculated[v] = true;
+            }
+        }
+        for v in 0..self.donut.sub.num_vertices() {
+            // vertex is a local arc id
+            self.tree_path(v);
+        }
+    }
+
+    fn tree_path(&mut self, v: VertexId) {
+        let mut stack = vec![v];
+        let mut current = v;
+        loop {
+            if self.tree_path_calculated[current] {
+                break;
+            }
+            let prev = self
+                .spanning_tree
+                .discovered_by(*self.donut.get_original_vertex(current).unwrap())
+                .src();
+            let prev = match self.donut.vertex_mapping.iter().position(|u| *u == prev) {
+                Some(v) => v,
+                None => {
+                    println!("src not in donut");
+                    break;
+                }
+            };
+            stack.push(prev);
+            current = prev;
+        }
+        if stack.len() < 2 {
+            // root case
+            return;
+        }
+
+        (stack.len() - 2..=0).for_each(|i| {
+            let this_v = stack[i];
+            let prev_v = stack[i + 1];
+            self.on_tree_path[this_v] = [vec![prev_v], self.on_tree_path[prev_v].clone()].concat();
+            self.tree_path_calculated[this_v] = true;
+        });
     }
 }
 
