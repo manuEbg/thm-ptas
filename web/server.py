@@ -14,7 +14,6 @@ def index():
 @app.route('/graphs', methods=['GET'])
 def list_graphs():
     files = os.listdir('../data')
-    print(files)
     files = [f for f in files if f.endswith(".graph")]
     return jsonify(files)
 
@@ -66,8 +65,8 @@ def run():
 
     if code != 0:
         error_response = jsonify({
-            'stdout': str(stdout),
-            'stderr': str(stderr),
+            'stdout': stdout.decode('utf-8'),
+            'stderr': stderr.decode('utf-8'),
         })
 
         return error_response, 400
@@ -77,8 +76,8 @@ def run():
 
     response = {
         'k': k,
-        'stdout': str(stdout),
-        'stderr': str(stderr),
+        'stdout': stdout.decode('utf-8'),
+        'stderr': stderr.decode('utf-8'),
         'graph': graph,
         'layout': layout,
     }
@@ -86,4 +85,3 @@ def run():
     return jsonify(response)
 
 app.run(host=HOST, port=PORT)
-print(f"Running on {HOST}:{PORT}")

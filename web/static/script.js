@@ -102,7 +102,8 @@ function Sidebar(props) {
           </div>
         }
 
-        <a href='#' className="btn btn-success mb-2 w-100 mt-2" onClick={() => { props.handleRun({inputFile, K}) }}>Run</a>
+        <a href='#' className="btn btn-success w-100 mt-2" onClick={() => { props.handleRun({inputFile, K}) }}>Run</a>
+        <a href='#' className="btn btn-secondary w-100 mt-2" onClick={() => { props.handleShowDiagnostics() }}>Diagnostics</a>
       </form>
       <hr/>
       <ul className="nav nav-pills flex-column">
@@ -716,7 +717,13 @@ class GraphComponent extends React.Component {
 class GraphVisualizer extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { graph: {}, layout: [] };
+    this.state = { graph: {}, layout: [], stdout: '', stderr: '' };
+    this.diagnosticsModal = React.createRef();
+  }
+
+  handleShowDiagnostics() {
+    var modal = new bootstrap.Modal(this.diagnosticsModal.current);
+    modal.show();
   }
 
   async handleGen(params) {
@@ -733,10 +740,10 @@ class GraphVisualizer extends React.Component {
       }
 
       const data = await response.json();
-      console.log(data)
     } catch(err) {
       alert(err);
-    }  }
+    }
+  }
 
   async handleRun(params) {
     try {
@@ -766,17 +773,41 @@ class GraphVisualizer extends React.Component {
     const graph = JSON.parse(data.graph);
     const layout = JSON.parse(data.layout);
 
-    this.setState({
-      graph,
-      layout,
-    })
+    this.setState((prevState) => {
+      return {
+        ...prevState,
+        graph,
+        layout,
+        stdout: data.stdout,
+        stderr: data.stderr,
+      };
+    });
   }
 
   render() {
     return (
-      <div class='d-flex flex-nowrap' style={{height: "100%"}}>
-        <Sidebar handleRun={this.handleRun.bind(this)} handleGen={this.handleGen.bind(this)} />
+      <div className='d-flex flex-nowrap' style={{height: "100%"}}>
+        <Sidebar handleRun={this.handleRun.bind(this)} handleGen={this.handleGen.bind(this)} handleShowDiagnostics={this.handleShowDiagnostics.bind(this)} />
         <GraphComponent graph={this.state.graph} layout={this.state.layout} />
+
+        <div ref={this.diagnosticsModal} className="modal fade" tabindex="-1">
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Diagnostics</h5>
+                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div className="modal-body">
+                <strong>Output</strong>
+                <br/>
+                <code>{this.state.stdout}</code>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
