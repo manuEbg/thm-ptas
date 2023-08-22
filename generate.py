@@ -133,8 +133,7 @@ def main():
             'y': y,
         })
 
-    with open('./data/layout.js', 'w') as f:
-        f.write('let layout = ')
+    with open(outfile + '.layout.json', 'w') as f:
         json.dump(layout_json, f)
 
     nx.draw_networkx(embedding, pos=layout, with_labels=True)
