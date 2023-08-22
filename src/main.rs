@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -26,6 +26,10 @@ use graph::{Dcel, DcelBuilder};
 
 use crate::graph::mis_finder::find_connected_vertices;
 use crate::graph::node_relations::NodeRelations;
+use crate::graph::reductions::{ApplicableReduction, Reductions};
+use crate::graph::reductions::isolated_clique_reduction::{do_isolated_clique_reductions, IsolatedClique, transfer_isolated_clique};
+use crate::graph::reductions::nodal_fold_reduction::{do_nodal_fold_reductions, NodalFold, transfer_nodal_fold_reductions};
+use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions, TwinReduction};
 use crate::graph::tree_decomposition::td_write_to_dot;
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
@@ -265,18 +269,112 @@ fn mis_with_donut(
     Ok(vec![])
 }
 
-fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, Box<dyn Error>> {
+fn reduce_input_graph(
+    mut dcel_builder: &mut DcelBuilder,
+    mut quick_graph: &mut QuickGraph,
+    reductions: &Vec<Reduction>,
+    mut vertex_ids: &mut HashMap<VertexId, VertexId>
+) -> Reductions {
+    let mut found_reductions: Reductions = Reductions::default();
+
+    for input_reduction in reductions.iter() {
+        match input_reduction {
+            Reduction::NodalFold => {
+                found_reductions.nodal_folds = do_nodal_fold_reductions(&mut quick_graph);
+                found_reductions.nodal_folds.iter().for_each(
+                    |nodal_fold| nodal_fold.reduce_dcel_builder(
+                        &mut dcel_builder,
+                        &mut vertex_ids
+                    )
+                );
+            }
+            Reduction::IsolatedClique => {
+                found_reductions.isolated_cliques = do_isolated_clique_reductions(&mut quick_graph);
+                found_reductions.isolated_cliques.iter().for_each(
+                    |isolated_clique| isolated_clique.reduce_dcel_builder(
+                        &mut dcel_builder,
+                        &mut vertex_ids
+                    )
+                );
+            }
+            Reduction::Twin => {
+                found_reductions.twins = do_twin_reductions(&mut quick_graph);
+                found_reductions.twins.iter().for_each(
+                    |twin_reduction| twin_reduction.reduce_dcel_builder(
+                        &mut dcel_builder,
+                        &mut vertex_ids
+                    )
+                );
+            }
+        };
+    };
+    found_reductions
+}
+
+fn transfer_reductions(reduce_input: Vec<Reduction>,
+                       mut reductions: &mut Reductions,
+                       mut independence_set: &mut Vec<VertexId>,
+                       vertex_ids: &HashMap<VertexId, VertexId>
+) {
+    /* reconstruct original vertex indices */
+    let mut inverted_ids: HashMap<VertexId, VertexId> = HashMap::new();
+    vertex_ids.iter().for_each(|(&original_index, &recent_index)| {
+        inverted_ids.insert(recent_index, original_index);
+    });
+
+    for i in 0..independence_set.len() {
+        independence_set[i] = inverted_ids[&i];
+    }
+
+    for i in 0..reduce_input.len() {
+        let input_reduction = &reduce_input[reduce_input.len() - i - 1];
+        match input_reduction {
+            Reduction::NodalFold => {
+                transfer_nodal_fold_reductions(
+                    &mut independence_set,
+                    &mut reductions.nodal_folds
+                );
+            }
+            Reduction::IsolatedClique => {
+                transfer_isolated_clique(
+                    &mut independence_set,
+                    &mut reductions.isolated_cliques
+                );
+            }
+            Reduction::Twin => {
+                transfer_twin_reductions(
+                    &mut independence_set,
+                    &mut reductions.twins
+                )
+            }
+        }
+    }
+}
+
+fn find_max_independent_set(mut dcel_builder: &mut DcelBuilder, mut quick_graph: &mut QuickGraph, scheme: Scheme) -> Result<MISResult, Box<dyn Error>> {
     let mut watch = Stopwatch::new();
     let start_time = Instant::now();
+
+    /* initialize table with vertex indices */
+    let mut vertex_ids: HashMap<VertexId, VertexId> = HashMap::new();
+    (0..quick_graph.adjacency.len()).for_each(|vertex|
+        { vertex_ids.insert(vertex, vertex);} );
+
+    let graph: Dcel = dcel_builder.build();
 
     let result = match scheme {
         Scheme::PTAS {
             config: ptas_config,
         } => {
             watch.start("Applying approximations");
-            for input_reduction in ptas_config.reduce_input.iter() {
-                // TODO: apply input reduction
-            }
+
+            let mut input_reductions: Reductions = reduce_input_graph(
+                &mut dcel_builder,
+                &mut quick_graph,
+                &ptas_config.reduce_input,
+                &mut vertex_ids
+            );
+
             watch.stop();
 
             watch.start("Find Rings");
@@ -289,17 +387,38 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
             let spanning_tree = graph.spanning_tree(root);
             watch.stop();
 
-            if ptas_config.k > spanning_tree.max_level() {
-                mis_for_whole_graph(&graph, &spanning_tree, &mut watch)
+            let mut result = if ptas_config.k > spanning_tree.max_level() {
+                mis_for_whole_graph(&graph, &spanning_tree, &mut watch).unwrap()
             } else {
-                mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch)
-            }?
+                mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch).unwrap()
+            };
+            println!("{:?}", result);
+            transfer_reductions(
+                ptas_config.reduce_input,
+                &mut input_reductions,
+                &mut result,
+                &vertex_ids
+            );
+
+            result
         }
 
         Scheme::Exhaustive {
             reduce_input: input_reductions,
         } => {
-            vec![]
+            let mut found_reductions: Reductions = reduce_input_graph(
+                &mut dcel_builder,
+                &mut quick_graph,
+                &input_reductions,
+                &mut vertex_ids
+            );
+            let mut result: Vec<VertexId> = vec![];
+            transfer_reductions(
+                input_reductions,
+                &mut found_reductions,
+                &mut result, &vertex_ids
+            );
+            result
         }
 
         Scheme::AllWithTD => {
@@ -373,13 +492,16 @@ fn main() {
 
     let mut dcel_b = match read_graph_file_into_dcel_builder(args.input.to_str().unwrap()) {
         Ok(result) => result,
-        Err(error) => panic!("Failed to read graph file into DCEL: {error:?}"),
+        Err(error) => panic!("Failed to read graph file into DCEL: {:?}", error),
     };
 
-    let dcel = dcel_b.build();
+    let mut quick_graph: QuickGraph = match read_graph_file_into_quick_graph(args.input.to_str().unwrap()) {
+        Ok(result) => result,
+        Err(error) => panic!("Failed to read graph file into quick graph: {:?}", error)
+    };
 
     // write_web_file(&args.output, &dcel);
-    let mis_result = match find_max_independent_set(&dcel, scheme) {
+    let mis_result = match find_max_independent_set(&mut dcel_b, &mut quick_graph, scheme) {
         Ok(result) => result,
         Err(error) => panic!("Failed computing maximum independent set: {error:?}"),
     };

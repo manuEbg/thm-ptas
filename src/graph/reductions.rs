@@ -18,6 +18,15 @@ pub trait ApplicableReduction {
     );
 }
 
+#[derive(Default)]
+pub struct Reductions {
+    pub nodal_folds: Vec<NodalFold>,
+    pub isolated_cliques: Vec<IsolatedClique>,
+    pub twins: Vec<TwinReduction>
+}
+
+
+
 pub fn update_vertex_indices(
     vertex_indices: &mut HashMap<VertexId, VertexId>,
     removed_vertex: VertexId) {
