@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{Duration, Instant};
 pub mod graph;
 
@@ -20,6 +21,9 @@ use graph::nice_tree_decomp::NiceTreeDecomposition;
 
 use graph::quick_graph::QuickGraph;
 use graph::{Dcel, DcelBuilder};
+
+use crate::graph::node_relations::NodeRelations;
+use crate::graph::tree_decomposition::td_write_to_dot;
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -191,9 +195,39 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                     }
 
                     let decomp = TreeDecomposition::from(&td);
+                    let td_rels = NodeRelations::new(&decomp);
+                    let td_path = format!("./td_{i}.dot");
+
+                    let mut td_out = File::create(td_path.as_str()).unwrap();
+                    td_write_to_dot("td", &mut td_out, &decomp, &td_rels).unwrap();
+                    Command::new("dot")
+                        .args([
+                            "-Tpdf",
+                            td_path.as_str(),
+                            "-o",
+                            format!("./td_{i}.pdf").as_str(),
+                        ])
+                        .spawn()
+                        .expect("dot command did not work.");
 
                     // TODO: generate MIS for this donut and add to list
                     let ntd = NiceTreeDecomposition::from(&decomp);
+                    let ntd_rels = NodeRelations::new(&ntd.td);
+                    assert!(ntd.validate(&decomp, &ntd_rels));
+
+                    let ntd_path = format!("./ntd_{i}.dot");
+
+                    let mut ntd_out = File::create(ntd_path.as_str()).unwrap();
+                    td_write_to_dot("ntd", &mut ntd_out, &ntd.td, &ntd_rels).unwrap();
+                    Command::new("dot")
+                        .args([
+                            "-Tpdf",
+                            ntd_path.as_str(),
+                            "-o",
+                            format!("./ntd_{i}.pdf").as_str(),
+                        ])
+                        .spawn()
+                        .expect("dot command did not work.");
                     match find_mis(&graph.adjacency_matrix(), &ntd) {
                         Ok((mis, size)) => {
                             println!("mis: {mis:?}, size: {size}");
@@ -281,6 +315,7 @@ fn main() {
 
     let dcel = dcel_b.build();
 
+    // write_web_file(&args.output, &dcel);
     let mis_result = match find_max_independent_set(&dcel, scheme) {
         Ok(result) => result,
         Err(error) => panic!("Failed computing maximum independent set: {error:?}"),

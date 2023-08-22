@@ -338,6 +338,7 @@ impl Dcel {
 
     /// merge vertex from into vertex into
     fn merge_vertices(&mut self, into: VertexId, from: VertexId) {
+        println!("MERGE VERTEX {from} into {into}");
         if into == from {
             println!("merging v{from} into v{into} is not allowed!");
             return;
@@ -363,14 +364,25 @@ impl Dcel {
         /* collect bend over and deleted arcs */
         let into_to_from = self.vertices[into].arcs()[position_of_from];
         let from_to_into = self.vertices[from].arcs()[position_of_into];
+        println!(
+            "v{into} arcs: {:?}",
+            self.vertices[into]
+                .arcs()
+                .iter()
+                .map(|a| self.arcs[*a])
+                .collect::<Vec<_>>()
+        );
+        println!("Position of from: {position_of_from}");
 
         // update src of all remaining arcs of from
         // update dst of all their twins
         // Add them to into
-        let arcs = self.vertices[from].arcs().clone();
         self.vertices[into].remove_arc_at(position_of_from);
         self.vertices[from].remove_arc_at(position_of_into);
+
+        let arcs = self.vertices[from].arcs().clone();
         for a in arcs.into_iter().rev() {
+            println!("pushing arc {:?}", self.arc(a));
             let twin = self.arcs[a].twin();
             self.arcs[a].reset_src(into);
             self.arcs[twin].reset_dst(into);
@@ -380,16 +392,38 @@ impl Dcel {
             // if (self.invalid_arcs[a]) {
             //     continue;
             // }
+            if (self.neighbors(into).contains(&self.arc(a).dst())) {
+                let ups = self.arc(a).dst();
+                let upsi = self.neighbors(into).iter().position(|n| *n == ups).unwrap();
+                self.vertices[into].push_arc_at(a, upsi);
+                continue;
+            }
             self.vertices[into].push_arc_at(a, position_of_from);
         }
-
         // remove u_v, v_u
         self.remove_arc(into_to_from, from_to_into);
+        println!(
+            "v{into} arcs: {:?}",
+            self.vertices[into]
+                .arcs()
+                .iter()
+                .map(|a| self.arcs[*a])
+                .collect::<Vec<_>>()
+        );
+        println!("removing invalid arcs");
         for a in 0..self.num_vertices() {
             self.vertices[a].remove_invalid(&self.invalid_arcs);
         }
         // self.vertices[into].remove_invalid(&self.invalid_arcs);
         self.vertices[from].remove_arcs();
+        println!(
+            "v{into} arcs: {:?}",
+            self.vertices[into]
+                .arcs()
+                .iter()
+                .map(|a| self.arcs[*a])
+                .collect::<Vec<_>>()
+        );
     }
 
     pub fn find_rings(&self) -> Result<Vec<SubDcel>, Box<dyn Error>> {
@@ -466,8 +500,9 @@ impl Dcel {
                 .for_each(|(id, a)| {
                     if !self.invalid_arcs[*id] {
                         builder.push_arc(a);
-                        builder.push_arc(self.twin(*id));
+                        // builder.push_arc(self.twin(*id));
                         println!("pushing fake(from root) and twin arc{aId} g{id} {:?}", a);
+                        // println!("twin: {:?}", self.twin(*id));
                         aId += 2;
                     } else {
                         println!("not pushing fake(fromroot) arc g{id} {:?}", a);
@@ -515,13 +550,13 @@ impl Dcel {
                             builder.push_arc(arc);
                         }
                     } else if arc.dst() == collapsed_root {
-                        // println!("arc point to fake_root {arc:?}");
+                        println!("arc point to fake_root {arc:?}");
                         // if fake_lvl >= start && fake_lvl < end
                         //     || self.invalid_arcs[self.vertex(vertex).arcs()[i]]
                         // {
                         //     continue;
                         // }
-                        // builder.push_arc(&arc);
+                        builder.push_arc(&arc);
                         // println!("pushing fake(to root) arc{aId} g{global_arc_id} {:?}", arc);
                         // aId += 1;
                     }
@@ -561,12 +596,31 @@ impl Dcel {
                     donut.sub.num_arcs(),
                     donut.sub.num_faces()
                 );
+                for f in 0..donut.sub.num_faces() {
+                    print!("face{f}:");
+                    for a in donut.sub.walk_face(f) {
+                        print!(" v{},", self.arc(*donut.get_original_arc(a).unwrap()).src())
+                    }
+                    println!();
+                }
                 donut.triangulate();
                 println!(
-                    "arc count: {}, face count: {}",
+                    "after triangulation arc count: {}, face count: {}",
                     donut.sub.num_arcs(),
                     donut.sub.num_faces()
                 );
+                for f in 0..donut.sub.num_faces() {
+                    print!("face{f}:");
+                    for a in donut.sub.walk_face(f) {
+                        print!(" v{}", donut.vertex_mapping[donut.sub.arc(a).src()]);
+                        // if a >= donut.sub.pre_triangulation_arc_count() {
+                        //     println!("a{a} comes from triangulation");
+                        //     continue;
+                        // }
+                        // print!(" v{},", self.arc(*donut.get_original_arc(a).unwrap()).src())
+                    }
+                    println!();
+                }
                 result.push(donut);
 
                 // after creating the donut we merge it into the root of the tree to create a fake
