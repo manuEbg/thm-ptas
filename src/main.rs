@@ -111,6 +111,7 @@ struct PTASConfig {
 
 enum Scheme {
     PTAS { config: PTASConfig },
+    AllWithTD,
     Exhaustive { reduce_input: Vec<Reduction> },
 }
 
@@ -294,10 +295,19 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                 mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch)
             }?
         }
+
         Scheme::Exhaustive {
             reduce_input: input_reductions,
         } => {
             vec![]
+        }
+
+        Scheme::AllWithTD => {
+            let root = 0;
+            watch.start("Spanning Tree");
+            let spanning_tree = graph.spanning_tree(root);
+            watch.stop();
+            mis_for_whole_graph(&graph, &spanning_tree, &mut watch)?
         }
     };
 
@@ -314,6 +324,7 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum CliScheme {
     PTAS,
+    AllWithTD,
     Exhaustive,
 }
 
@@ -357,6 +368,7 @@ fn main() {
                 reduce_donuts: args.donut_reductions,
             },
         },
+        CliScheme::AllWithTD => Scheme::AllWithTD {},
     };
 
     let mut dcel_b = match read_graph_file_into_dcel_builder(args.input.to_str().unwrap()) {
