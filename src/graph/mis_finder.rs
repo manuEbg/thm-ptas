@@ -638,7 +638,7 @@ where
                 }
 
                 _ => panic!("Unreachable"),
-            };
+            }?;
         }
     }
 

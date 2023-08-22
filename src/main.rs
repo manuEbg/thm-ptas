@@ -1,37 +1,32 @@
-#![feature(hash_set_entry)]
-
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{Duration, Instant};
-use std::{env, result, string};
 pub mod graph;
 
 #[macro_use]
 pub mod logger;
 
-use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
-
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use clap::Parser;
+use graph::approximated_td::{ApproximatedTD, SubTDBuilder, TDBuilder};
 
 use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
-use graph::iterators::bfs::BfsIter;
 
-use crate::graph::reductions::isolated_clique_reduction::{
-    do_isolated_clique_reductions, transfer_isolated_clique,
-};
-use crate::graph::reductions::nodal_fold_reduction::{
-    do_nodal_fold_reductions, transfer_nodal_fold_reductions,
-};
-use crate::graph::reductions::twin_reduction::{do_twin_reductions, transfer_twin_reductions};
+use graph::mis_finder::find_mis;
+use graph::nice_tree_decomp::NiceTreeDecomposition;
+
 use graph::quick_graph::QuickGraph;
-use graph::reducible::Reducible;
-use graph::reductions::*;
 use graph::{Dcel, DcelBuilder};
+
+use crate::graph::mis_finder::find_connected_vertices;
+use crate::graph::node_relations::NodeRelations;
+use crate::graph::tree_decomposition::td_write_to_dot;
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -116,6 +111,7 @@ struct PTASConfig {
 
 enum Scheme {
     PTAS { config: PTASConfig },
+    AllWithTD,
     Exhaustive { reduce_input: Vec<Reduction> },
 }
 
@@ -153,53 +149,166 @@ impl Stopwatch {
     }
 }
 
+fn mis_for_whole_graph(
+    graph: &Dcel,
+    spanning_tree: &SpanningTree,
+    watch: &mut Stopwatch,
+) -> Result<Vec<VertexId>, Box<dyn Error>> {
+    println!("Solving whole graph");
+    watch.start("WholeGraph");
+    let mut builder = TDBuilder::new(spanning_tree);
+    let td = ApproximatedTD::from(&mut builder);
+    let td = TreeDecomposition::from(&td);
+    let ntd = NiceTreeDecomposition::from(&td);
+    // find_mis(&graph.adjacency_matrix(), &ntd).map(|(set, size)| set.into_iter().collect())
+    let result = find_mis(&graph.adjacency_matrix(), &ntd);
+    watch.stop();
+    match result {
+        Ok((mis, size)) => {
+            println!("mis: {mis:?}, size: {size}");
+            Ok(mis.into_iter().collect::<Vec<VertexId>>())
+        }
+        Err(e) => {
+            println!("Error: {e}");
+            Err(Box::new(e))
+        }
+    }
+}
+
+fn mis_with_donut(
+    graph: &Dcel,
+    spanning_tree: &SpanningTree,
+    ptas_config: &PTASConfig,
+    watch: &mut Stopwatch,
+) -> Result<Vec<VertexId>, Box<dyn Error>> {
+    for i in 0..ptas_config.k {
+        println!("Approximation: i: {i}");
+        watch.start(format!("Approximation: i={i:?}").as_str());
+        // TODO use spanning tree to find donuts
+
+        let donuts = graph.find_donuts_for_k(ptas_config.k, i, &spanning_tree)?;
+        for donut_reductions in ptas_config.reduce_donuts.clone() {
+            // TODO: apply donut reduction on DCEL builders
+        }
+
+        let mut mis_for_i = vec![];
+        for (i, donut) in donuts.iter().enumerate() {
+            // continue;
+            println!("Donut {i}: ");
+            // donut
+            //     .vertex_mapping
+            //     .iter()
+            //     .for_each(|&v| println!("global v{v}"));
+            let mut td_b = SubTDBuilder::new(&donut, &spanning_tree, donut.min_lvl.unwrap());
+            let td = ApproximatedTD::from(&mut td_b);
+            if td.bags().len() == 0 {
+                println!("bags of donut are {i} empty");
+                continue;
+                //todo add all nodes of donut to MIS
+            }
+
+            let decomp = TreeDecomposition::from(&td);
+            let td_rels = NodeRelations::new(&decomp);
+            let td_path = format!("./td_{i}.dot");
+
+            let mut td_out = File::create(td_path.as_str()).unwrap();
+            td_write_to_dot("td", &mut td_out, &decomp, &td_rels).unwrap();
+            Command::new("dot")
+                .args([
+                    "-Tpdf",
+                    td_path.as_str(),
+                    "-o",
+                    format!("./td_{i}.pdf").as_str(),
+                ])
+                .spawn()
+                .expect("dot command did not work.");
+
+            // TODO: generate MIS for this donut and add to list
+            let ntd = NiceTreeDecomposition::from(&decomp);
+            let ntd_rels = NodeRelations::new(&ntd.td);
+            assert!(ntd.validate(&decomp, &ntd_rels));
+
+            let ntd_path = format!("./ntd_{i}.dot");
+
+            let mut ntd_out = File::create(ntd_path.as_str()).unwrap();
+            td_write_to_dot("ntd", &mut ntd_out, &ntd.td, &ntd_rels).unwrap();
+            Command::new("dot")
+                .args([
+                    "-Tpdf",
+                    ntd_path.as_str(),
+                    "-o",
+                    format!("./ntd_{i}.pdf").as_str(),
+                ])
+                .spawn()
+                .expect("dot command did not work.");
+            match find_mis(&graph.adjacency_matrix(), &ntd) {
+                Ok((mis, size)) => {
+                    println!("mis: {mis:?}, size: {size}");
+                    mis.into_iter().for_each(|v| mis_for_i.push(v));
+                }
+                Err(e) => {
+                    println!("Error: {e}")
+                }
+            };
+            // panic!("fuuuu u");
+        }
+
+        println!("mis: {mis_for_i:?}, size: {}", mis_for_i.len());
+        assert!(find_connected_vertices(
+            &HashSet::from_iter(mis_for_i.iter().copied()),
+            &graph.adjacency_matrix(),
+        )
+        .is_empty());
+        // TODO:
+        watch.stop();
+    }
+    Ok(vec![])
+}
+
 fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, Box<dyn Error>> {
     let mut watch = Stopwatch::new();
     let start_time = Instant::now();
 
-    let _result = match scheme {
+    let result = match scheme {
         Scheme::PTAS {
             config: ptas_config,
         } => {
             watch.start("Applying approximations");
-            for input_reduction in ptas_config.reduce_input {
+            for input_reduction in ptas_config.reduce_input.iter() {
                 // TODO: apply input reduction
             }
             watch.stop();
 
             watch.start("Find Rings");
-            let _rings = graph.find_rings();
+            // let _rings = graph.find_rings();
             watch.stop();
 
-            // TODO
+            let root = 0;
             // build spanning tree
-            for i in 1..ptas_config.k {
-                watch.start(format!("Approximation: i={i:?}").as_str());
-                // TODO use spanning tree to find donuts
-                let donuts = graph.find_donuts_for_k(i)?;
-                for donut_reductions in ptas_config.reduce_donuts.clone() {
-                    // TODO: apply donut reduction on DCEL builders
-                }
+            watch.start("Spanning Tree");
+            let spanning_tree = graph.spanning_tree(root);
+            watch.stop();
 
-                for donut in donuts {
-
-                    // let td_b = SubTDBuilder::new(&donut, &st, 0);
-                    // let td = ApproximatedTD::from(td_b);
-
-                    // let decomp = TreeDecomposition::from(&td);
-
-                    // TODO: generate MIS for this donut and add to list
-                }
-
-                // TODO:
-                watch.stop();
-            }
-
-            // Choose best MIS and return that
+            if ptas_config.k > spanning_tree.max_level() {
+                mis_for_whole_graph(&graph, &spanning_tree, &mut watch)
+            } else {
+                mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch)
+            }?
         }
+
         Scheme::Exhaustive {
             reduce_input: input_reductions,
-        } => {}
+        } => {
+            vec![]
+        }
+
+        Scheme::AllWithTD => {
+            let root = 0;
+            watch.start("Spanning Tree");
+            let spanning_tree = graph.spanning_tree(root);
+            watch.stop();
+            mis_for_whole_graph(&graph, &spanning_tree, &mut watch)?
+        }
     };
 
     let end_time = Instant::now();
@@ -208,13 +317,14 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
     Ok(MISResult {
         timings: watch.timings,
         total_time,
-        result: vec![],
+        result,
     })
 }
 
 #[derive(Debug, Clone, clap::ValueEnum)]
 enum CliScheme {
     PTAS,
+    AllWithTD,
     Exhaustive,
 }
 
@@ -258,6 +368,7 @@ fn main() {
                 reduce_donuts: args.donut_reductions,
             },
         },
+        CliScheme::AllWithTD => Scheme::AllWithTD {},
     };
 
     let mut dcel_b = match read_graph_file_into_dcel_builder(args.input.to_str().unwrap()) {
@@ -267,6 +378,7 @@ fn main() {
 
     let dcel = dcel_b.build();
 
+    // write_web_file(&args.output, &dcel);
     let mis_result = match find_max_independent_set(&dcel, scheme) {
         Ok(result) => result,
         Err(error) => panic!("Failed computing maximum independent set: {error:?}"),
@@ -282,7 +394,7 @@ fn main() {
 
     //    //dcel.triangulate();
 
-    write_web_file(&args.output, &dcel);
+    // write_web_file(&args.output, &dcel);
     //    // let mut dg = DualGraph::new(&st);
     //    // dg.build();
 
