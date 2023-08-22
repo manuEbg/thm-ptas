@@ -637,11 +637,6 @@ impl Dcel {
                     log_if_enabled!(LOG, "face{f}:");
                     for a in donut.sub.walk_face(f) {
                         log_if_enabled!(LOG, " v{}", donut.vertex_mapping[donut.sub.arc(a).src()]);
-                        // if a >= donut.sub.pre_triangulation_arc_count() {
-                        //     log_if_enabled!(LOG, "a{a} comes from triangulation");
-                        //     continue;
-                        // }
-                        // print!(" v{},", self.arc(*donut.get_original_arc(a).unwrap()).src())
                     }
                     log_if_enabled!(LOG, "");
                 }
