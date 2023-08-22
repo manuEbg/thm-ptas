@@ -34,7 +34,7 @@ impl<'a> SpanningTree<'a> {
                 let twin = self.dcel.arc(a).twin();
                 self.contains_arc[a] = true;
                 self.contains_arc[twin] = true;
-                println!("SpanTree: adding arc {a} and twin {twin}");
+                // println!("SpanTree: adding arc {a} and twin {twin}");
                 self.arcs.push(a);
                 self.arcs.push(twin);
                 self.vertex_level[it.vertex] = it.level;

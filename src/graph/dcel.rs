@@ -11,9 +11,11 @@ use super::{
     sub_dcel::{SubDcel, SubDcelBuilder},
 };
 use crate::graph::{builder::dcel_builder::DcelBuilder, dcel::spanning_tree::SpanningTree};
+use crate::log_if_enabled;
 use arc::{Arc, ArcId};
 use face::{Face, FaceId};
 use vertex::{Vertex, VertexId};
+static LOG: &str = "./dcel_out.txt";
 
 #[derive(Clone, Debug)]
 pub struct Dcel {
@@ -143,7 +145,7 @@ impl Dcel {
         let count = self.num_faces();
         for f in 0..count {
             if self.invalid_faces[f] {
-                println!("Skipping Face {f} ");
+                log_if_enabled!(LOG, "Skipping Face {f} ");
                 continue;
             }
             loop {
@@ -164,15 +166,15 @@ impl Dcel {
                     match self.face_information(a1, a2) {
                         FaceInfo::Twins | FaceInfo::Triangle => {
                             a1 = a2;
-                            // println!("1");
+                            // log_if_enabled!(LOG, "1");
                         }
                         FaceInfo::TriangulatedFace => {
-                            // println!("3");
+                            // log_if_enabled!(LOG, "3");
                             return FaceInfo::TriangulatedFace;
                         }
                         FaceInfo::NotTriangulated => {
                             self.close_triangle(a1, a2);
-                            // println!("2");
+                            // log_if_enabled!(LOG, "2");
                             return FaceInfo::NotTriangulated;
                         }
                     }
@@ -182,9 +184,11 @@ impl Dcel {
                 for (a, _) in face_iter2 {
                     vec.push(a);
                 }
-                println!(
+                log_if_enabled!(
+                    LOG,
                     "FACE {} with edges {:?} iterated. Should never be here",
-                    f, vec
+                    f,
+                    vec
                 );
                 FaceInfo::TriangulatedFace
             }
@@ -269,7 +273,7 @@ impl Dcel {
         let is_line2 = self.is_line(r2.0, r2.1);
 
         if is_line1 && !is_line2 {
-            println!("is line 1");
+            log_if_enabled!(LOG, "is line 1");
             self.invalid_arcs[r1.0] = true;
             self.invalid_arcs[r1.1] = true;
             let t0 = self.arcs[r1.0].twin();
@@ -280,7 +284,7 @@ impl Dcel {
             self.arcs[t0].reset_twin(t1);
             self.invalid_faces[self.arcs[id1].face()] = true;
         } else if !is_line1 && is_line2 {
-            println!("is line 2");
+            log_if_enabled!(LOG, "is line 2");
             self.invalid_arcs[r2.0] = true;
             self.invalid_arcs[r2.1] = true;
             let t0 = self.arcs[r2.0].twin();
@@ -291,7 +295,7 @@ impl Dcel {
             self.arcs[t0].reset_twin(t1);
             self.invalid_faces[self.arcs[id2].face()] = true;
         } else if is_line1 && is_line2 {
-            println!("is line 1 and 2");
+            log_if_enabled!(LOG, "is line 1 and 2");
             self.invalid_arcs[r1.0] = true;
             self.invalid_arcs[r1.1] = true;
             let t0 = self.arcs[r1.0].twin();
@@ -301,7 +305,7 @@ impl Dcel {
             self.arcs[r1.1].reset_twin(r1.0);
             self.arcs[t0].reset_twin(t1);
             self.invalid_faces[self.arcs[id1].face()] = true;
-            // println!("is line 2");
+            // log_if_enabled!(LOG, "is line 2");
             self.invalid_arcs[r2.0] = true;
             self.invalid_arcs[r2.1] = true;
             let t0 = self.arcs[r2.0].twin();
@@ -312,7 +316,7 @@ impl Dcel {
             self.arcs[t0].reset_twin(t1);
             self.invalid_faces[self.arcs[id2].face()] = true;
         } else {
-            println!("no line");
+            log_if_enabled!(LOG, "no line");
         }
 
         // let src = self.arc(id1).src();
@@ -338,9 +342,9 @@ impl Dcel {
 
     /// merge vertex from into vertex into
     fn merge_vertices(&mut self, into: VertexId, from: VertexId) {
-        println!("MERGE VERTEX {from} into {into}");
+        log_if_enabled!(LOG, "MERGE VERTEX {from} into {into}");
         if into == from {
-            println!("merging v{from} into v{into} is not allowed!");
+            log_if_enabled!(LOG, "merging v{from} into v{into} is not allowed!");
             return;
         }
         /* gather neighbors of u and v and the position of each other */
@@ -352,7 +356,10 @@ impl Dcel {
         {
             Some(v) => v,
             None => {
-                println!("cannot merge not adjacent vertices into: {into} and from: {from}");
+                log_if_enabled!(
+                    LOG,
+                    "cannot merge not adjacent vertices into: {into} and from: {from}"
+                );
                 return;
             }
         };
@@ -364,7 +371,8 @@ impl Dcel {
         /* collect bend over and deleted arcs */
         let into_to_from = self.vertices[into].arcs()[position_of_from];
         let from_to_into = self.vertices[from].arcs()[position_of_into];
-        println!(
+        log_if_enabled!(
+            LOG,
             "v{into} arcs: {:?}",
             self.vertices[into]
                 .arcs()
@@ -372,7 +380,7 @@ impl Dcel {
                 .map(|a| self.arcs[*a])
                 .collect::<Vec<_>>()
         );
-        println!("Position of from: {position_of_from}");
+        log_if_enabled!(LOG, "Position of from: {position_of_from}");
 
         // update src of all remaining arcs of from
         // update dst of all their twins
@@ -382,7 +390,7 @@ impl Dcel {
 
         let arcs = self.vertices[from].arcs().clone();
         for a in arcs.into_iter().rev() {
-            println!("pushing arc {:?}", self.arc(a));
+            log_if_enabled!(LOG, "pushing arc {:?}", self.arc(a));
             let twin = self.arcs[a].twin();
             self.arcs[a].reset_src(into);
             self.arcs[twin].reset_dst(into);
@@ -402,7 +410,8 @@ impl Dcel {
         }
         // remove u_v, v_u
         self.remove_arc(into_to_from, from_to_into);
-        println!(
+        log_if_enabled!(
+            LOG,
             "v{into} arcs: {:?}",
             self.vertices[into]
                 .arcs()
@@ -410,13 +419,14 @@ impl Dcel {
                 .map(|a| self.arcs[*a])
                 .collect::<Vec<_>>()
         );
-        println!("removing invalid arcs");
+        log_if_enabled!(LOG, "removing invalid arcs");
         for a in 0..self.num_vertices() {
             self.vertices[a].remove_invalid(&self.invalid_arcs);
         }
         // self.vertices[into].remove_invalid(&self.invalid_arcs);
         self.vertices[from].remove_arcs();
-        println!(
+        log_if_enabled!(
+            LOG,
             "v{into} arcs: {:?}",
             self.vertices[into]
                 .arcs()
@@ -433,7 +443,7 @@ impl Dcel {
 
         for depth in 1..(spanning_tree.max_level() + 1) {
             let mut visited = vec![false; self.vertices.len()];
-            println!("building ring{depth}");
+            log_if_enabled!(LOG, "building ring{depth}");
 
             let mut builder = SubDcelBuilder::new(self.clone(), depth);
 
@@ -459,7 +469,7 @@ impl Dcel {
                         /* Add ring arcs */
                         let dst_level = spanning_tree.vertex_level()[outgoing_arc.dst()];
                         if dst_level == depth {
-                            println!("pushing arc into ring{depth} {outgoing_arc:?}");
+                            log_if_enabled!(LOG, "pushing arc into ring{depth} {outgoing_arc:?}");
                             builder.push_arc(outgoing_arc);
                         }
                     }
@@ -480,7 +490,7 @@ impl Dcel {
         collapsed_root: VertexId,
         spanning_tree: &SpanningTree,
     ) -> Result<SubDcel, Box<dyn Error>> {
-        let mut aId = 0;
+        let mut a_id = 0;
         // let spanning_tree = self.spanning_tree(0);
 
         if end > spanning_tree.max_level() + 1 {
@@ -492,6 +502,7 @@ impl Dcel {
 
         // add collapsed_root as fake_root and push all its arcs
         let fake_lvl = spanning_tree.vertex_level()[collapsed_root];
+        let mut collapsed_root_option = None;
         if fake_lvl < start {
             self.vertex(collapsed_root)
                 .arcs()
@@ -501,13 +512,18 @@ impl Dcel {
                     if !self.invalid_arcs[*id] {
                         builder.push_arc(a);
                         // builder.push_arc(self.twin(*id));
-                        println!("pushing fake(from root) and twin arc{aId} g{id} {:?}", a);
-                        // println!("twin: {:?}", self.twin(*id));
-                        aId += 2;
+                        log_if_enabled!(
+                            LOG,
+                            "pushing fake(from root) and twin arc{a_id} g{id} {:?}",
+                            a
+                        );
+                        // log_if_enabled!(LOG, "twin: {:?}", self.twin(*id));
+                        a_id += 2;
                     } else {
-                        println!("not pushing fake(fromroot) arc g{id} {:?}", a);
+                        log_if_enabled!(LOG, "not pushing fake(fromroot) arc g{id} {:?}", a);
                     }
                 });
+            collapsed_root_option = Some(collapsed_root);
         }
 
         for vertex in 0..self.vertices().len() {
@@ -531,18 +547,20 @@ impl Dcel {
                         && spanning_tree.vertex_level()[arc.dst()] < end
                     {
                         if self.invalid_arcs[global_arc_id] {
-                            println!(
+                            log_if_enabled!(
+                                LOG,
                                 "not pushing arc g{global_arc_id} {}",
                                 self.vertices[vertex].arcs()[i]
                             );
                         } else {
-                            println!("pushing arc{aId} g{global_arc_id} {:?}", arc);
-                            aId += 1;
+                            log_if_enabled!(LOG, "pushing arc{a_id} g{global_arc_id} {:?}", arc);
+                            a_id += 1;
                             if self.invalid_arcs[self.arcs[global_arc_id].twin()]
                                 || self.invalid_arcs[self.arcs[global_arc_id].next()]
                                 || self.invalid_arcs[self.arcs[global_arc_id].prev()]
                             {
-                                println!(
+                                log_if_enabled!(
+                                    LOG,
                                     "twin,next or prev of g{global_arc_id} {:?} is invalid",
                                     arc
                                 );
@@ -550,14 +568,14 @@ impl Dcel {
                             builder.push_arc(arc);
                         }
                     } else if arc.dst() == collapsed_root {
-                        println!("arc point to fake_root {arc:?}");
+                        log_if_enabled!(LOG, "arc point to fake_root {arc:?}");
                         // if fake_lvl >= start && fake_lvl < end
                         //     || self.invalid_arcs[self.vertex(vertex).arcs()[i]]
                         // {
                         //     continue;
                         // }
                         builder.push_arc(&arc);
-                        // println!("pushing fake(to root) arc{aId} g{global_arc_id} {:?}", arc);
+                        // log_if_enabled!(LOG, "pushing fake(to root) arc{aId} g{global_arc_id} {:?}", arc);
                         // aId += 1;
                     }
                 }
@@ -566,9 +584,9 @@ impl Dcel {
             }
         }
 
-        let sub_dcel = builder.build(Some(collapsed_root), Some(start))?;
+        let sub_dcel = builder.build(collapsed_root_option, Some(start))?;
         for (i, a) in sub_dcel.dcel.arcs().iter().enumerate() {
-            println!("Subdcelarcs({i}) {:?}", a);
+            log_if_enabled!(LOG, "Subdcelarcs({i}) {:?}", a);
         }
         Ok(sub_dcel)
     }
@@ -587,39 +605,45 @@ impl Dcel {
 
         for n in 1..(spanning_tree.max_level() + 1) {
             if n % (k + 1) == i {
-                println!("Find Donuts: level {last_level} to {n}");
+                log_if_enabled!(LOG, "Find Donuts: level {last_level} to {n}");
                 /* Current donut is from last_level -> n */
                 let mut donut = clone.collect_donut(last_level, n, root, &spanning_tree)?;
                 // todo:
-                println!(
+                log_if_enabled!(
+                    LOG,
                     "arc count: {}, face count: {}",
                     donut.sub.num_arcs(),
                     donut.sub.num_faces()
                 );
                 for f in 0..donut.sub.num_faces() {
-                    print!("face{f}:");
+                    log_if_enabled!(LOG, "face{f}:");
                     for a in donut.sub.walk_face(f) {
-                        print!(" v{},", self.arc(*donut.get_original_arc(a).unwrap()).src())
+                        log_if_enabled!(
+                            LOG,
+                            " v{},",
+                            self.arc(*donut.get_original_arc(a).unwrap()).src()
+                        )
                     }
-                    println!();
+                    log_if_enabled!(LOG, "");
                 }
                 donut.triangulate();
-                println!(
+                log_if_enabled!(
+                    LOG,
                     "after triangulation arc count: {}, face count: {}",
                     donut.sub.num_arcs(),
                     donut.sub.num_faces()
                 );
                 for f in 0..donut.sub.num_faces() {
-                    print!("face{f}:");
+                    log_if_enabled!(LOG, "face{f}:");
                     for a in donut.sub.walk_face(f) {
-                        print!(" v{}", donut.vertex_mapping[donut.sub.arc(a).src()]);
+                        log_if_enabled!(LOG, " v{}", donut.vertex_mapping[donut.sub.arc(a).src()]);
                         // if a >= donut.sub.pre_triangulation_arc_count() {
-                        //     println!("a{a} comes from triangulation");
+                        //     log_if_enabled!(LOG, "a{a} comes from triangulation");
                         //     continue;
                         // }
                         // print!(" v{},", self.arc(*donut.get_original_arc(a).unwrap()).src())
                     }
-                    println!();
+                    log_if_enabled!(LOG, "");
                 }
                 result.push(donut);
 
@@ -656,7 +680,7 @@ impl Dcel {
 
 #[cfg(test)]
 mod tests {
-    use crate::{read_graph_file_into_dcel_builder, write_web_file};
+    use crate::{log_if_enabled, read_graph_file_into_dcel_builder, write_web_file};
 
     use super::Dcel;
 
@@ -665,7 +689,7 @@ mod tests {
         let mut dcel_b = read_graph_file_into_dcel_builder("data/tree.graph").unwrap();
         let dcel = dcel_b.build();
         let am = dcel.adjacency_matrix();
-        println!("{:?}", am)
+        log_if_enabled!(LOG, "{:?}", am)
     }
 
     #[test]
@@ -674,13 +698,13 @@ mod tests {
             read_graph_file_into_dcel_builder("data/simple_merge/graph.graph").unwrap();
         let mut dcel = dcel_b.build();
         for (i, a) in dcel.arcs().iter().enumerate() {
-            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+            log_if_enabled!(LOG, "Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
         }
-        println!("merge ");
+        log_if_enabled!(LOG, "merge ");
         dcel.merge_vertices(0, 1);
         // dcel.merge_vertices(0, 2);
         for (i, a) in dcel.arcs().iter().enumerate() {
-            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+            log_if_enabled!(LOG, "Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
         }
         // dcel.merge_vertices(0, 7);
         // dcel.merge_vertices(0, 6);
@@ -715,10 +739,10 @@ mod tests {
 
     fn show_relevant_stuff(g: &Dcel) {
         for (i, a) in g.arcs().iter().enumerate() {
-            println!("Arc{i}: {} {a:?} ", g.invalid_arcs[i]);
+            log_if_enabled!(LOG, "Arc{i}: {} {a:?} ", g.invalid_arcs[i]);
         }
         for (i, a) in g.vertices().iter().enumerate() {
-            println!("Vertex{i}: {a:?} ");
+            log_if_enabled!(LOG, "Vertex{i}: {a:?} ");
         }
     }
 
@@ -728,12 +752,12 @@ mod tests {
             read_graph_file_into_dcel_builder("data/bigger_merge/graph.graph").unwrap();
         let mut dcel = dcel_b.build();
         for (i, a) in dcel.arcs().iter().enumerate() {
-            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+            log_if_enabled!(LOG, "Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
         }
-        println!("merge ");
+        log_if_enabled!(LOG, "merge ");
         dcel.merge_vertices(0, 7);
         for (i, a) in dcel.arcs().iter().enumerate() {
-            println!("Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
+            log_if_enabled!(LOG, "Arc{i}: {} {a:?} ", dcel.invalid_arcs[i]);
         }
         let mut clone = dcel.clone();
         // let st = dcel.spanning_tree(0);

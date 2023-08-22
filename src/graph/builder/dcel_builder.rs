@@ -4,6 +4,9 @@ use super::types::*;
 use crate::graph::dcel::arc::ArcId;
 use crate::graph::dcel::vertex::VertexId;
 use crate::graph::reducible::Reducible;
+use crate::log_if_enabled;
+
+static LOG: &str = "approxTdOut.txt";
 
 #[derive(Debug)]
 pub struct DcelBuilder {
@@ -132,12 +135,12 @@ impl DcelBuilder {
             let src_port = self.arcs[i].src_port;
 
             self.arcs[twin].dst_port = src_port;
-            println!("Set Dest for arc{twin}: {:?}", self.arc(twin));
+            log_if_enabled!(LOG, "Set Dest for arc{twin}: {:?}", self.arc(twin));
         }
-        println!("{} arcs in this builder", self.arcs.len());
+        log_if_enabled!(LOG, "{} arcs in this builder", self.arcs.len());
         for a in self.arcs.iter() {
             if a.dst_port == None {
-                println!("arc has no destinaion port: {:?}", a)
+                log_if_enabled!(LOG, "arc has no destinaion port: {:?}", a)
             }
         }
     }
@@ -193,17 +196,21 @@ impl DcelBuilder {
 
     /* decrease indices of elements when elements with smaller index are removed */
     pub fn decrease_index(index: usize, removed_indices: &Vec<usize>) -> usize {
-        let smaller_indices: Vec<VertexId> = removed_indices.iter()
-            .filter(|&&removed_index| removed_index <= index).map(|&element| element).
-            collect();
+        let smaller_indices: Vec<VertexId> = removed_indices
+            .iter()
+            .filter(|&&removed_index| removed_index <= index)
+            .map(|&element| element)
+            .collect();
 
         index - smaller_indices.len()
     }
 
     pub fn get_neighborhood(&self, vertex: VertexId) -> Vec<VertexId> {
-        self.vertices[vertex].arcs.iter().map(|&arc_index| {
-            self.arcs[arc_index].dst
-        }).collect()
+        self.vertices[vertex]
+            .arcs
+            .iter()
+            .map(|&arc_index| self.arcs[arc_index].dst)
+            .collect()
     }
 
     fn remove_vertex_and_arcs(&mut self, removed_vertex: VertexId, removed_arcs: &mut Vec<ArcId>) {
@@ -332,7 +339,6 @@ impl Reducible for DcelBuilder {
         /* bend over ingoing arcs of v */
         for &arc_index in &bend_over_twins {
             self.arcs[arc_index].dst = u;
-
         }
 
         /* update vertex u
@@ -344,10 +350,8 @@ impl Reducible for DcelBuilder {
                 .insert(position_of_v + index, *arc_index);
         }
 
-
-
         /* remove arcs and vertex v */
         self.remove_vertex_and_arcs(v, &mut deleted_arcs);
-        println!("merge of {u} and {v} completed");
+        log_if_enabled!(LOG, "merge of {u} and {v} completed");
     }
 }

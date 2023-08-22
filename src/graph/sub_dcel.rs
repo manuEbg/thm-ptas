@@ -70,8 +70,8 @@ impl SubDcel {
         self.sub.pre_triangulation_arc_count() > 0
     }
 
-    pub fn fake_root(&self) -> VertexId {
-        self.fake_root.unwrap()
+    pub fn fake_root(&self) -> Option<VertexId> {
+        self.fake_root
     }
 }
 

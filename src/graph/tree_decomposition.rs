@@ -51,12 +51,6 @@ pub fn td_write_to_dot(
 
     let iter = TreeDecompBfsIter::new(&td);
     for bag in iter {
-        println!(
-            "Bag{}, {:?}, children: {:?}",
-            bag.id,
-            bag.vertex_set,
-            node_relations.children.get(&bag.id).unwrap()
-        );
         let parent = node_relations.parent.get(&bag.id).unwrap();
 
         writeln!(
@@ -68,7 +62,6 @@ pub fn td_write_to_dot(
         match parent {
             NodeParent::Fake => {}
             NodeParent::Real(parent) => {
-                println!("B{parent} is parent of Bag{}", bag.id);
                 writeln!(file, "\tB{} -- B{};", parent, bag.id)?;
             }
         }

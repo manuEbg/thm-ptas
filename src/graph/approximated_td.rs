@@ -249,6 +249,11 @@ impl<'a> TreeDecomposable for SubTDBuilder<'a> {
     }
 
     fn add_vertex(&mut self, v: VertexId, to: BagId) {
+        if let Some(root) = self.donut.fake_root() {
+            if root == v {
+                return;
+            }
+        }
         let mapped_v = self.vertex_mapping(v);
         log_if_enabled!(SUB_TD_LOG, "adding local v{v} g{mapped_v} to bag{to}");
         self.bags[to].insert(mapped_v);
@@ -291,26 +296,24 @@ impl<'a> SubTDBuilder<'a> {
     }
 
     fn initialize_tree_paths(&mut self) {
-        if self.donut.sub.num_vertices() <= self.donut.fake_root() {
+        if self.donut.sub.num_vertices() == 0 {
             return;
         }
-        // self.tree_path_calculated[self.donut.fake_root()] = true;
-        // for i in self.donut.dcel.neighbors(self.donut.fake_root()) {
-        //     if i >= self.tree_path_calculated.len() {
-        //         continue;
-        //     }
-        //     self.tree_path_calculated[i] = true;
-        // }
+        let global_root = 0;
         for v in 0..self.donut.sub.num_vertices() {
-            if v == self.donut.fake_root() {
+            if v == match self.donut.fake_root() {
+                Some(root) => root,
+                None => global_root,
+            } {
                 self.tree_path_calculated[v] = true;
                 log_if_enabled!(SUB_TD_LOG, "fake root treepath calculated");
-                continue;
-            }
-            if self.spanning_tree.vertex_level()[*self.donut.get_original_vertex(v).unwrap()]
+            } else if self.spanning_tree.vertex_level()[*self.donut.get_original_vertex(v).unwrap()]
                 == self.min_level
             {
-                self.on_tree_path[v].push(self.donut.fake_root());
+                match self.donut.fake_root() {
+                    Some(root) => self.on_tree_path[v].push(root),
+                    None => self.on_tree_path[v].push(global_root),
+                }
                 self.tree_path_calculated[v] = true;
                 log_if_enabled!(
                     SUB_TD_LOG,
