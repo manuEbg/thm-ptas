@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead};
@@ -22,6 +23,7 @@ use graph::nice_tree_decomp::NiceTreeDecomposition;
 use graph::quick_graph::QuickGraph;
 use graph::{Dcel, DcelBuilder};
 
+use crate::graph::mis_finder::find_connected_vertices;
 use crate::graph::node_relations::NodeRelations;
 use crate::graph::tree_decomposition::td_write_to_dot;
 
@@ -178,6 +180,7 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                     // TODO: apply donut reduction on DCEL builders
                 }
 
+                let mut mis_for_i = vec![];
                 for (i, donut) in donuts.iter().enumerate() {
                     // continue;
                     println!("Donut {i}: ");
@@ -231,6 +234,7 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                     match find_mis(&graph.adjacency_matrix(), &ntd) {
                         Ok((mis, size)) => {
                             println!("mis: {mis:?}, size: {size}");
+                            mis.into_iter().for_each(|v| mis_for_i.push(v));
                         }
                         Err(e) => {
                             println!("Error: {e}")
@@ -239,6 +243,12 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                     // panic!("fuuuu u");
                 }
 
+                println!("mis: {mis_for_i:?}, size: {}", mis_for_i.len());
+                assert!(find_connected_vertices(
+                    &HashSet::from_iter(mis_for_i.iter().copied()),
+                    &graph.adjacency_matrix(),
+                )
+                .is_empty());
                 // TODO:
                 watch.stop();
             }
