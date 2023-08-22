@@ -175,6 +175,7 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                 }
 
                 for (i, donut) in donuts.iter().enumerate() {
+                    // continue;
                     println!("Donut {i}: ");
                     donut
                         .vertex_mapping
@@ -183,7 +184,6 @@ fn find_max_independent_set(graph: &Dcel, scheme: Scheme) -> Result<MISResult, B
                     let mut td_b =
                         SubTDBuilder::new(&donut, &spanning_tree, donut.min_lvl.unwrap());
                     let td = ApproximatedTD::from(&mut td_b);
-                    println!("AproxTd:\n{:?}", td.bags());
                     if td.bags().len() == 0 {
                         println!("bags of donut are {i} empty");
                         continue;
