@@ -3,10 +3,22 @@ This repository is used for our GFSP SS23 Project
 
 ## How to use?
 
-To execute the Program with a given example graph use 
+View available falgs with:
 
 ```
-cargo run -- ptas data/exp.graph 
+cargo run -- --help
+```
+
+To execute the Program with a given example graph using the PTAS scheme with an approximation of `k=2`:
+
+```
+cargo run -- ptas --k 2 data/exp.graph 
+```
+
+To execute the Program with a given example graph using the exhaustive scheme:
+
+```
+cargo run -- exhaustive data/exp.graph 
 ```
 
 ## The input data
@@ -63,7 +75,7 @@ Run the `server.py` program in the `web` folder.
   * Rings: navigate through rings
   * Toggle Tree Decomposition: show and hide the graph's tree decomposition
   * Additional Edges: show triangulated edges
-  * Toggle Show MIS: highlight the graph's vertices belong to the maximum independent set
+  * Toggle Show MIS: highlight the graph's vertices belong to the maximum independent set (marked yellow)
   * Visualization Options: tweak graph visualization
 * Generator: generate new graphs randomly
   * Type: either Random or Circular
