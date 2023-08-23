@@ -19,6 +19,6 @@ Cargo.lock
 /target
 
 
-
+/logs
 data/*.js
 .DS_Store
