@@ -18,7 +18,7 @@ use graph::dcel::spanning_tree::SpanningTree;
 use graph::dcel::vertex::VertexId;
 use graph::dcel_file_writer::JsDataWriter;
 
-use graph::mis_finder::find_mis;
+use graph::mis_finder::{find_mis, find_mis_exhaustive};
 use graph::nice_tree_decomp::NiceTreeDecomposition;
 
 use graph::quick_graph::QuickGraph;
@@ -434,9 +434,10 @@ fn find_max_independent_set(
                 &mut vertex_ids,
             );
             let root = 0;
-            let mut result: Vec<VertexId> = vec![];
             let spanning_tree = graph.spanning_tree(root);
             k = spanning_tree.max_level();
+            let mut result: Vec<VertexId> = find_mis_exhaustive(&graph.adjacency_matrix())
+                .map(|(mis, _)| mis.into_iter().collect::<Vec<_>>())?;
             transfer_reductions(
                 input_reductions,
                 &mut found_reductions,
