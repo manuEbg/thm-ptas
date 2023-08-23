@@ -54,12 +54,12 @@ def run():
 
     k = int(body["k"])
     file = '../data/' + body["file"]
+    scheme = body["scheme"].lower()
 
     OUT_FILE = '/tmp/out.json'
 
-    process = subprocess.Popen(['./thm-ptas', '--k', str(k), 'ptas', file, OUT_FILE],
-                                     stdout=subprocess.PIPE, 
-                                     stderr=subprocess.PIPE)
+    args = ['./thm-ptas', '--k', str(k), scheme, file, OUT_FILE]
+    process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     code = process.poll()
 

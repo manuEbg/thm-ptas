@@ -18,7 +18,7 @@ function NavigationButton(props) {
 const NAVIGATION_EVENTS_TOPIC = 'NAVIGATION_EVENTS_TOPIC';
 
 function Sidebar(props) {
-  const SCHEMES = ['PTAS', 'Exact']
+  const SCHEMES = ['All-With-TD', 'PTAS', 'Exhaustive']
   const GRAPH_TYPES = ['Random', 'Circular']
 
   const [graphFiles, setGraphFiles] = React.useState([]);
@@ -35,6 +35,7 @@ function Sidebar(props) {
   const [genOutName, setGenOutName] = React.useState("new.graph");
 
   const [generating, setIsGenerating] = React.useState(false);
+  const [running, setIsRunning] = React.useState(false);
 
   const fetchGraphFiles = async () => {
     fetch('/graphs', { method: 'GET',
@@ -50,6 +51,12 @@ function Sidebar(props) {
     await fetchGraphFiles();
   }, []);
 
+  const handleRun = async (params) => {
+    setIsRunning(true);
+    await props.handleRun({inputFile: genOutName, K, scheme});
+    setIsRunning(false);
+  }
+
   const handleGen = async (params) => {
     setIsGenerating(true);
     await props.handleGen(params);
@@ -61,7 +68,7 @@ function Sidebar(props) {
     await handleGen(params);
     setInputFile(genOutName);
 
-    await props.handleRun({inputFile: genOutName, K});
+    await handleRun({inputFile: genOutName, K, scheme});
   }
 
   return (
@@ -97,12 +104,12 @@ function Sidebar(props) {
           <div className="form-group row mt-2">
             <label for="K" className="col-sm-2 col-form-label">K</label>
             <div className="col-sm-10">
-              <input value={K} onChange={(event) => { setK(event.target.value) }}type="number" className="form-control" id="K" placeholder="K" />
+              <input value={K} onChange={(event) => { setK(event.target.value) }} type="number" className="form-control" id="K" placeholder="K" />
             </div>
           </div>
         }
 
-        <a href='#' className="btn btn-success w-100 mt-2" onClick={() => { props.handleRun({inputFile, K}) }}>Run</a>
+        <a href='#' className={"btn btn-success w-100 mt-2 " + (running ? "disabled" : "")} onClick={() => { handleRun({inputFile, K, scheme}) }}>Run</a>
         <a href='#' className="btn btn-secondary w-100 mt-2" onClick={() => { props.handleShowDiagnostics() }}>Diagnostics</a>
       </form>
       <hr/>
@@ -797,6 +804,7 @@ class GraphVisualizer extends React.Component {
         body: JSON.stringify({
           k: params.K,
           file: params.inputFile,
+          scheme: params.scheme,
           layout: "",
         })
       });
