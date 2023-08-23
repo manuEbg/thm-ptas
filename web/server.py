@@ -62,7 +62,28 @@ def run():
 
     OUT_FILE = 'out.json'
 
+    twin = body["twin"] == 'true'
+    nodalFold = body["nodalFold"] == 'true'
+    isolatedClique = body["isolatedClique"] == 'true'
+
+    reductionParameters = []
+    if twin:
+        reductionParameters.append('-R')
+        reductionParameters.append('twin')
+
+    if isolatedClique:
+        reductionParameters.append('-R')
+        reductionParameters.append('isolated-clique')
+
+    if nodalFold:
+        reductionParameters.append('-R')
+        reductionParameters.append('nodal-fold')
+
+
     args = [executable, '--k', str(k), scheme, file, OUT_FILE]
+    for r in reductionParameters:
+        args.append(r)
+
     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     code = process.poll()

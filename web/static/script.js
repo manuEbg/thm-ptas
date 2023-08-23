@@ -37,6 +37,10 @@ function Sidebar(props) {
   const [generating, setIsGenerating] = React.useState(false);
   const [running, setIsRunning] = React.useState(false);
 
+  const [nodalFold, setNodalFold] = React.useState(false);
+  const [twin, setTwin] = React.useState(false);
+  const [isolatedClique, setIsolatedClique] = React.useState(false);
+
   const fetchGraphFiles = async () => {
     fetch('/graphs', { method: 'GET',
       headers: { 'Content-Type': 'application/json' },
@@ -67,7 +71,7 @@ function Sidebar(props) {
   const handleGenAndRun = async (params) => {
     await handleGen(params);
     setInputFile(genOutName);
-    await handleRun({inputFile: genOutName, K, scheme});
+    await handleRun({inputFile: genOutName, K, scheme, twin, nodalFold, isolatedClique});
   }
 
   return (
@@ -108,7 +112,24 @@ function Sidebar(props) {
           </div>
         }
 
-        <a href='#' className={"btn btn-success w-100 mt-2 " + (running ? "disabled" : "")} onClick={() => { handleRun({inputFile, K, scheme}) }}>{running ? (<div class="spinner-border" role="status"></div>) : "Run"}</a>
+        <div className="form-group d-flex flex-row mt-2 gap-1">
+          <label for="twin" className="form-check-label">Twin</label>
+          <div>
+            <input type='checkbox' className='form-check-input' checked={twin} onChange={(event) => setTwin(event.target.checked)} />
+          </div>
+
+          <label for="nodalFold" className="form-check-label">Nodal Fold</label>
+          <div>
+            <input type='checkbox' className='form-check-input' checked={nodalFold} onChange={(event) => setNodalFold(event.target.checked)} />
+          </div>
+
+          <label for="isolatedClique" className="form-check-label">Isolated Clique</label>
+          <div>
+            <input type='checkbox' className='form-check-input' checked={isolatedClique} onChange={(event) => setIsolatedClique(event.target.checked)} />
+          </div>
+        </div>
+
+        <a href='#' className={"btn btn-success w-100 mt-2 " + (running ? "disabled" : "")} onClick={() => { handleRun({inputFile, K, scheme, twin, nodalFold, isolatedClique}) }}>{running ? (<div class="spinner-border" role="status"></div>) : "Run"}</a>
         <a href='#' className="btn btn-secondary w-100 mt-2" onClick={() => { props.handleShowDiagnostics() }}>Diagnostics</a>
       </form>
       <hr/>
@@ -331,8 +352,6 @@ class GraphComponent extends React.Component {
     if (Object.keys(data).length === 0) return;
 
     this.opts = JSON.parse(localStorage.getItem(OPTIONS_KEY));
-
-    console.log(this.opts);
 
     this.hasLayout = layout.length > 0;
 
@@ -836,6 +855,9 @@ class GraphVisualizer extends React.Component {
           k: params.K,
           file: params.inputFile,
           scheme: params.scheme,
+          twin: params.twin,
+          nodalFold: params.nodalFold,
+          isolatedClique: params.isolatedClique,
           layout: "",
         })
       });
