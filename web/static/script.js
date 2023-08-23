@@ -190,7 +190,7 @@ function Sidebar(props) {
         </li>
 
         <li className="nav-item mt-2">
-          <a href="#" className="btn btn-primary w-100" onClick={() => { PubSub.publish(NAVIGATION_EVENTS_TOPIC, 'TOGGLE_ADDITIONAL_EDGES') }}>
+          <a href="#" className="btn btn-primary w-100 disabled" onClick={() => { PubSub.publish(NAVIGATION_EVENTS_TOPIC, 'TOGGLE_ADDITIONAL_EDGES') }}>
             Additional Edges
           </a>
         </li>
