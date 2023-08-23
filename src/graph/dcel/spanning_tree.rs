@@ -34,6 +34,7 @@ impl<'a> SpanningTree<'a> {
                 let twin = self.dcel.arc(a).twin();
                 self.contains_arc[a] = true;
                 self.contains_arc[twin] = true;
+                // println!("SpanTree: adding arc {a} and twin {twin}");
                 self.arcs.push(a);
                 self.arcs.push(twin);
                 self.vertex_level[it.vertex] = it.level;
@@ -67,6 +68,15 @@ impl<'a> SpanningTree<'a> {
 
     pub fn vertex_level(&self) -> &[usize] {
         self.vertex_level.as_ref()
+    }
+
+    pub fn on_level(&self, level: usize) -> Vec<VertexId> {
+        self.vertex_level
+            .iter()
+            .enumerate()
+            .filter(|e| *e.1 == level)
+            .map(|e| e.0)
+            .collect()
     }
 
     pub fn max_level(&self) -> usize {

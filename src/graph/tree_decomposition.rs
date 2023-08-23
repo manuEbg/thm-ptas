@@ -4,7 +4,10 @@ use crate::graph::approximated_td::ApproximatedTD;
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use fxhash::FxHashSet;
 
-use super::{iterators::bfs::TreeDecompBfsIter, node_relations::{NodeRelations, NodeParent}};
+use super::{
+    iterators::bfs::TreeDecompBfsIter,
+    node_relations::{NodeParent, NodeRelations},
+};
 
 /// Creates a tree decomposition for the
 /// [arboretum_td](https://docs.rs/arboretum-td/latest/arboretum_td/) library.
