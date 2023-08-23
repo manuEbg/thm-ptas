@@ -58,7 +58,7 @@ def run():
 
     OUT_FILE = '/tmp/out.json'
 
-    args = ['./thm-ptas', '--k', str(k), scheme, file, OUT_FILE]
+    args = ['../target/release/thm-ptas', '--k', str(k), scheme, file, OUT_FILE]
     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     code = process.poll()
@@ -87,5 +87,10 @@ def run():
     }
 
     return jsonify(response)
+
+
+if not os.path.isfile('../target/release/thm-ptas'):
+    print("You need to compile with 'cargo build --release'")
+    exit(1)
 
 app.run(host=HOST, port=PORT)
