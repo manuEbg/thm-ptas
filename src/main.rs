@@ -336,7 +336,7 @@ fn transfer_reductions(
         });
 
     for i in 0..independence_set.len() {
-        independence_set[i] = inverted_ids[&i];
+        independence_set[i] = inverted_ids[&independence_set[i]];
     }
 
     for i in 0..reduce_input.len() {
@@ -409,17 +409,12 @@ fn find_max_independent_set(
                 best_mis
             };
 
-            println!("before: {:?}", result);
-
-            // FIXME: changes result IDs even when no reductions
             transfer_reductions(
                 ptas_config.reduce_input,
                 &mut input_reductions,
                 &mut result,
                 &vertex_ids,
             );
-
-            println!("after: {:?}", result);
 
             result
         }
