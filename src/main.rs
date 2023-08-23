@@ -100,8 +100,8 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-fn write_web_file(filename: &str, dcel: &Dcel) {
-    let mut writer = JsDataWriter::new(filename, dcel);
+fn write_web_file(filename: &str, dcel: &Dcel, result: MISResult) {
+    let mut writer = JsDataWriter::new(filename, dcel, result);
     writer.write_data()
 }
 
@@ -126,10 +126,12 @@ enum Scheme {
 }
 
 #[derive(Debug)]
-struct MISResult {
+pub struct MISResult {
     timings: Vec<(String, Duration)>,
     total_time: Duration,
     result: Vec<VertexId>,
+    k: usize,
+    i: usize,
 }
 
 struct Stopwatch {
@@ -190,8 +192,10 @@ fn mis_with_donut(
     spanning_tree: &SpanningTree,
     ptas_config: &PTASConfig,
     watch: &mut Stopwatch,
-) -> Result<Vec<VertexId>, Box<dyn Error>> {
-    for i in 0..ptas_config.k {
+) -> Result<(usize, Vec<VertexId>), Box<dyn Error>> {
+    let mut best_i = 0;
+    let mut best_mis = vec![];
+    for i in 0..=ptas_config.k {
         println!("Approximation: i: {i}");
         watch.start(format!("Approximation: i={i:?}").as_str());
         // TODO use spanning tree to find donuts
@@ -269,10 +273,16 @@ fn mis_with_donut(
             &graph.adjacency_matrix(),
         )
         .is_empty());
-        // TODO:
+
+        if mis_for_i.len() > best_mis.len() {
+            best_mis.clear();
+            mis_for_i.iter().for_each(|i| best_mis.push(*i));
+            best_i = i;
+        }
+
         watch.stop();
     }
-    Ok(vec![])
+    Ok((best_i, best_mis))
 }
 
 fn reduce_input_graph(
@@ -361,10 +371,14 @@ fn find_max_independent_set(
 
     let graph: Dcel = dcel_builder.build();
 
+    let mut k = 0;
+    let mut best_i = 0;
+
     let result = match scheme {
         Scheme::PTAS {
             config: ptas_config,
         } => {
+            k = ptas_config.k;
             watch.start("Applying approximations");
 
             let mut input_reductions: Reductions = reduce_input_graph(
@@ -389,15 +403,23 @@ fn find_max_independent_set(
             let mut result = if ptas_config.k > spanning_tree.max_level() {
                 mis_for_whole_graph(&graph, &spanning_tree, &mut watch).unwrap()
             } else {
-                mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch).unwrap()
+                let (i, best_mis) =
+                    mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch).unwrap();
+                best_i = i;
+                best_mis
             };
-            println!("{:?}", result);
+
+            println!("before: {:?}", result);
+
+            // FIXME: changes result IDs even when no reductions
             transfer_reductions(
                 ptas_config.reduce_input,
                 &mut input_reductions,
                 &mut result,
                 &vertex_ids,
             );
+
+            println!("after: {:?}", result);
 
             result
         }
@@ -411,7 +433,10 @@ fn find_max_independent_set(
                 &input_reductions,
                 &mut vertex_ids,
             );
+            let root = 0;
             let mut result: Vec<VertexId> = vec![];
+            let spanning_tree = graph.spanning_tree(root);
+            k = spanning_tree.max_level();
             transfer_reductions(
                 input_reductions,
                 &mut found_reductions,
@@ -425,6 +450,7 @@ fn find_max_independent_set(
             let root = 0;
             watch.start("Spanning Tree");
             let spanning_tree = graph.spanning_tree(root);
+            k = spanning_tree.max_level();
             watch.stop();
             mis_for_whole_graph(&graph, &spanning_tree, &mut watch)?
         }
@@ -437,6 +463,8 @@ fn find_max_independent_set(
         timings: watch.timings,
         total_time,
         result,
+        k,
+        i: best_i,
     })
 }
 
@@ -495,6 +523,8 @@ fn main() {
         Err(error) => panic!("Failed to read graph file into DCEL: {:?}", error),
     };
 
+    let mut dcel_b2 = dcel_b.clone();
+
     let mut quick_graph: QuickGraph =
         match read_graph_file_into_quick_graph(args.input.to_str().unwrap()) {
             Ok(result) => result,
@@ -517,7 +547,11 @@ fn main() {
 
     //    //dcel.triangulate();
 
-    write_web_file(&args.output, &dcel_b.build());
+    let dcel2 = &dcel_b2.build();
+    // println!("FACES: {:?}", dcel.faces().len());
+    // println!("FACES 2: {:?}", dcel.faces().len());
+
+    write_web_file(&args.output, &dcel2, mis_result);
     //    // let mut dg = DualGraph::new(&st);
     //    // dg.build();
 

@@ -175,6 +175,12 @@ function Sidebar(props) {
         </li>
 
         <li className="nav-item mt-2">
+          <a href="#" className="btn btn-primary w-100" onClick={() => { PubSub.publish(NAVIGATION_EVENTS_TOPIC, 'TOGGLE_MIS') }}>
+            Toggle Show MIS
+          </a>
+        </li>
+
+        <li className="nav-item mt-2">
           <a href='#' className="btn btn-secondary w-100" onClick={() => { props.handleShowVisualizerOptions() }}>Visualization Options</a>
         </li>
       </ul>
@@ -314,15 +320,17 @@ class GraphComponent extends React.Component {
       case 'TOGGLE_TD': this.toggleTD(); break;
       case 'TOGGLE_ST': this.toggleSpanningTree(); break;
       case 'TOGGLE_ADDITIONAL_EDGES': this.toggleAdditionalEdges(); break;
+        
+      case 'TOGGLE_MIS': this.toggleMIS(); break;
     }
   }
 
   load(data, layout) {
-    if (data == {}) return;
+    if (Object.keys(data).length === 0) return;
 
     this.hasLayout = layout.length > 0;
 
-    const obj = data;
+    const obj = data.dcel;
     this.vertices = obj.vertices.map(v => new Vertex(v));
     this.arcs = obj.arcs.flatMap(a => new Arc(a));
     this.dualgraph = new Object();
@@ -341,6 +349,10 @@ class GraphComponent extends React.Component {
         y: -v.y * LAYOUT_FACTOR,
       }
     })
+
+    this.mis = data.result.mis;
+    this.misElements = this.mis.map(v => "v" + v);
+    this.showingMIS = false;
 
     if (this.hasLayout) {
       this.position_tree_decomposition();
@@ -361,7 +373,7 @@ class GraphComponent extends React.Component {
     this.currentRing = -1
     this.previousRing = -1
 
-    this.donuts = obj.donuts;
+    this.donuts = data.donuts;
     this.donuts.forEach((donut) => {
       donut.arcElements = donut.arcs.map(a => "a" + a)
       donut.vertElements = donut.vertices.map(v => "v" + v)
@@ -410,6 +422,8 @@ class GraphComponent extends React.Component {
   }
 
   draw() {
+    if (this.vertices.length === 0) return;
+
     const self = this;
     this.state.cy = cytoscape({
       container: this.canvas.current,
@@ -442,6 +456,7 @@ class GraphComponent extends React.Component {
         .selector('edge.blue').style(self.edgeStyleObject("#0000ff"))
         .selector('node.blue').style(self.vertexStyleObject("#0000ff"))
         .selector('node.bag').style(this.vertexStyleObject("#00ff00"))
+        .selector('node.yellow').style(this.vertexStyleObject("#ff0"))
         .selector('edge.cyan').style(this.edgeStyleObject("#00ffff"))
         .selector('node.td').style(this.vertexStyleObject("#ff00ff"))
         .selector('edge.td').style(this.edgeStyleObject("#ff00ff", MEDIUM_EDGE))
@@ -534,6 +549,19 @@ class GraphComponent extends React.Component {
       up
     )
     console.log("Highlighting bag " + self.currentBag);
+  }
+
+  toggleMIS() {
+    this.showingMIS = !this.showingMIS;
+    if (this.showingMIS) {
+      this.misElements.forEach((v) => {
+        this.addClassToElement(v, "yellow");
+      })
+    } else {
+      this.misElements.forEach((v) => {
+        this.removeClassFromElement(v, "yellow");
+      })
+    }
   }
 
   highlightBag(idx, self) {
@@ -747,23 +775,23 @@ class GraphVisualizer extends React.Component {
     this.visualizerOptionsModal = React.createRef();
   }
 
-//   componentDidMount() {
-//     const savedOptions = localStorage.getItem(OPTIONS_KEY);
-//     if (savedOptions == null) {
-//       localStorage.setItem(OPTIONS_KEY, JSON.stringify(this.state.visualizerOptions));
-//     } else {
-//       this.setState((prevState) => {
-//         return {
-//           ...prevState,
-//           visualizerOptions: JSON.parse(localStorage.getItem(OPTIONS_KEY)),
-//         };
-//       })
-//     }
-//   }
+  componentDidMount() {
+    const savedOptions = localStorage.getItem(OPTIONS_KEY);
+    if (savedOptions == null) {
+      localStorage.setItem(OPTIONS_KEY, JSON.stringify(this.state.visualizerOptions));
+    } else {
+      this.setState((prevState) => {
+        return {
+          ...prevState,
+          visualizerOptions: JSON.parse(localStorage.getItem(OPTIONS_KEY)),
+        };
+      })
+    }
+  }
 
-//   componentDidUpdate() {
-//     localStorage.setItem(OPTIONS_KEY, JSON.stringify(this.state.visualizerOptions));
-//   }
+  componentDidUpdate() {
+    localStorage.setItem(OPTIONS_KEY, JSON.stringify(this.state.visualizerOptions));
+  }
 
   handleShowDiagnostics() {
     const modal = new bootstrap.Modal(this.diagnosticsModal.current);
@@ -848,6 +876,14 @@ class GraphVisualizer extends React.Component {
                 <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div className="modal-body">
+                <form>
+                  <div className="form-group row">
+                    <label for="inputPath" className="col-sm-2 col-form-label">Edge Thickness</label>
+                    <div className="col-sm-10">
+                      <input className='form-control' type='number' value={this.state.visualizerOptions.THICK_EDGE} />
+                    </div>
+                  </div>
+                </form>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>

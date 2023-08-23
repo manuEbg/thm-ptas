@@ -1,3 +1,5 @@
+use crate::MISResult;
+
 use super::approximated_td::ApproximatedTD;
 use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
@@ -302,6 +304,21 @@ impl<'a> WebFileWriter for ApproximatedTD<'a> {
     }
 }
 
+impl WebFileWriter for MISResult {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        JsObject {
+            item: &JsValues {
+                values: vec![
+                    JsValue::new("mis", &JsArray::new(&self.result)),
+                    JsValue::new("k", &self.k),
+                    JsValue::new("i", &self.i),
+                ],
+            },
+        }
+        .write_to_file(file, id, level)
+    }
+}
+
 impl WebFileWriter for Dcel {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
         let v = self
@@ -329,6 +346,7 @@ impl WebFileWriter for Dcel {
             })
             .collect();
         let faces = self.faces();
+        println!("faces: {:?}", faces.len());
         let arcs_per_faces: Vec<Vec<usize>> =
             faces.iter().map(|face| face.walk_face(self)).collect();
         let verts_per_face: Vec<Vec<usize>> = arcs_per_faces
@@ -345,7 +363,6 @@ impl WebFileWriter for Dcel {
         }
 
         let rings = &self.find_rings().unwrap();
-        let donuts = &self.find_donuts_for_k(2, 0, &st).unwrap();
 
         JsObject {
             item: &JsValues {
@@ -356,7 +373,6 @@ impl WebFileWriter for Dcel {
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &approx_td), // TODO rename JS entry
                     JsValue::new("rings", &JsArray::new(&rings)),
-                    JsValue::new("donuts", &JsArray::new(&donuts)),
                 ],
             },
         }
@@ -367,10 +383,11 @@ impl WebFileWriter for Dcel {
 pub struct JsDataWriter<'a> {
     file: File,
     dcel: &'a Dcel,
+    result: MISResult,
 }
 
 impl<'a> JsDataWriter<'a> {
-    pub fn new(filename: &str, dcel: &'a Dcel) -> Self {
+    pub fn new(filename: &str, dcel: &'a Dcel, result: MISResult) -> Self {
         let file_result = File::create(filename);
 
         let file = match file_result {
@@ -378,10 +395,24 @@ impl<'a> JsDataWriter<'a> {
             Err(error) => panic!("Problem opening the file: {:?}", error),
         };
 
-        JsDataWriter { file, dcel }
+        JsDataWriter { file, dcel, result }
     }
 
     pub fn write_data(&mut self) {
-        self.dcel.write_to_file(&mut self.file, 0, 0).unwrap();
+        let st = self.dcel.spanning_tree(0);
+        let best_donuts = &self
+            .dcel
+            .find_donuts_for_k(self.result.k, self.result.i, &st)
+            .unwrap();
+        let _ = JsObject {
+            item: &JsValues {
+                values: vec![
+                    JsValue::new("dcel", self.dcel),
+                    JsValue::new("result", &self.result),
+                    JsValue::new("donuts", &JsArray::new(&best_donuts)),
+                ],
+            },
+        }
+        .write_to_file(&mut self.file, 0, 0);
     }
 }

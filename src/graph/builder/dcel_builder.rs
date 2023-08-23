@@ -8,7 +8,7 @@ use crate::log_if_enabled;
 
 static LOG: &str = "approxTdOut.txt";
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DcelBuilder {
     vertices: Vec<Vertex>,
     arcs: Vec<Arc>,
