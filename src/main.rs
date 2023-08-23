@@ -404,7 +404,8 @@ fn find_max_independent_set(
             watch.stop();
 
             let mut result = if ptas_config.k > spanning_tree.max_level() {
-                let subdcel = &graph.find_donuts_for_k(usize::MAX - 1, usize::MAX - 1, &spanning_tree)?[0];
+                let subdcel =
+                    &graph.find_donuts_for_k(usize::MAX - 1, usize::MAX - 1, &spanning_tree)?[0];
                 mis_for_whole_graph(&subdcel, &spanning_tree, &mut watch).unwrap()
             } else {
                 let (i, best_mis) =
@@ -451,7 +452,8 @@ fn find_max_independent_set(
             watch.start("Spanning Tree");
             let spanning_tree = graph.spanning_tree(root);
             k = spanning_tree.max_level();
-            let subdcel = &graph.find_donuts_for_k(usize::MAX - 1, usize::MAX - 1, &spanning_tree)?[0];
+            let subdcel =
+                &graph.find_donuts_for_k(usize::MAX - 1, usize::MAX - 1, &spanning_tree)?[0];
             println!("{:?}", subdcel.vertex_mapping);
             println!("{}", subdcel.vertex_mapping.len());
             watch.stop();
@@ -541,6 +543,7 @@ fn main() {
     };
 
     println!("Result: {mis_result:?}");
+    println!("Size of MIS: {:?}", mis_result.result.len());
 
     //    let args: Vec<String> = env::args().collect();
 
