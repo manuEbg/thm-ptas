@@ -167,6 +167,10 @@ function Sidebar(props) {
             Additional Edges
           </a>
         </li>
+
+        <li className="nav-item mt-2">
+          <a href='#' className="btn btn-secondary w-100" onClick={() => { props.handleShowVisualizerOptions() }}>Visualization Options</a>
+        </li>
       </ul>
       <hr/>
 
@@ -308,7 +312,9 @@ class GraphComponent extends React.Component {
   }
 
   load(data, layout) {
-    if (data == {} || layout.length == 0) return;
+    if (data == {}) return;
+
+    this.hasLayout = layout.length > 0;
 
     const obj = data;
     this.vertices = obj.vertices.map(v => new Vertex(v));
@@ -329,7 +335,10 @@ class GraphComponent extends React.Component {
         y: -v.y * LAYOUT_FACTOR,
       }
     })
-    this.position_tree_decomposition();
+
+    if (this.hasLayout) {
+      this.position_tree_decomposition();
+    }
     this.faces.forEach(f => {
       f.id = "f" + f.id;
       f.arcs = f.arcs.map(a => "a" + a);
@@ -428,7 +437,7 @@ class GraphComponent extends React.Component {
         edges: self.get_arcs(),
       },
 
-      layout: { name: 'preset' }
+      layout: { name: ((this.layout.length > 0) ? 'preset' : 'grid') }
     });
   }
 
@@ -708,21 +717,57 @@ class GraphComponent extends React.Component {
 
   render() {
     return (
-      <div ref={this.canvas} style={{background: '#fff', width: "100%"}}>
+      <div ref={this.canvas} style={{background: '#333', width: "100%"}}>
       </div>
     )
   }
 }
 
+const OPTIONS_KEY = 'visualizerOptions';
+
 class GraphVisualizer extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { graph: {}, layout: [], stdout: '', stderr: '' };
+
+    const defaultVisualizerOptions = {
+      THICK_EDGE: 30,
+      MEDIUM_EDGE: 20,
+      FINE_EDGE: 10,
+      NODE_SIZE: 150,
+      FAT_NODE_SIZE: 200,
+      LAYOUT_FACTOR: 4000,
+    }
+
+    this.state = { graph: {}, layout: [], stdout: '', stderr: '', visualizerOptions: defaultVisualizerOptions };
     this.diagnosticsModal = React.createRef();
+    this.visualizerOptionsModal = React.createRef();
   }
 
+//   componentDidMount() {
+//     const savedOptions = localStorage.getItem(OPTIONS_KEY);
+//     if (savedOptions == null) {
+//       localStorage.setItem(OPTIONS_KEY, JSON.stringify(this.state.visualizerOptions));
+//     } else {
+//       this.setState((prevState) => {
+//         return {
+//           ...prevState,
+//           visualizerOptions: JSON.parse(localStorage.getItem(OPTIONS_KEY)),
+//         };
+//       })
+//     }
+//   }
+
+//   componentDidUpdate() {
+//     localStorage.setItem(OPTIONS_KEY, JSON.stringify(this.state.visualizerOptions));
+//   }
+
   handleShowDiagnostics() {
-    var modal = new bootstrap.Modal(this.diagnosticsModal.current);
+    const modal = new bootstrap.Modal(this.diagnosticsModal.current);
+    modal.show();
+  }
+
+  handleShowVisualizerOptions() {
+    const modal = new bootstrap.Modal(this.visualizerOptionsModal.current);
     modal.show();
   }
 
@@ -787,8 +832,25 @@ class GraphVisualizer extends React.Component {
   render() {
     return (
       <div className='d-flex flex-nowrap' style={{height: "100%"}}>
-        <Sidebar handleRun={this.handleRun.bind(this)} handleGen={this.handleGen.bind(this)} handleShowDiagnostics={this.handleShowDiagnostics.bind(this)} />
+        <Sidebar handleRun={this.handleRun.bind(this)} handleGen={this.handleGen.bind(this)} handleShowDiagnostics={this.handleShowDiagnostics.bind(this)} handleShowVisualizerOptions={this.handleShowVisualizerOptions.bind(this)} />
         <GraphComponent graph={this.state.graph} layout={this.state.layout} />
+
+        <div ref={this.visualizerOptionsModal} className="modal fade" tabindex="-1">
+          <div className="modal-dialog">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Visualization Options</h5>
+                <button type="button" className="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div className="modal-body">
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
 
         <div ref={this.diagnosticsModal} className="modal fade" tabindex="-1">
           <div className="modal-dialog">

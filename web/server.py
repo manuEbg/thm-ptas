@@ -72,7 +72,11 @@ def run():
         return error_response, 400
 
     graph = open(OUT_FILE).read()
-    layout = open(file + '.layout.json').read()
+
+    if os.path.isfile(file + '.layout.json'):
+        layout = open(file + '.layout.json').read()
+    else:
+        layout = '[]'
 
     response = {
         'k': k,
