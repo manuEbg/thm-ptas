@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     fs::{File, OpenOptions},
     io::Write,
-    sync::Mutex,
+    sync::Mutex, process::Command,
 };
 
 use lazy_static::lazy_static;
@@ -50,4 +50,18 @@ macro_rules! log_if_enabled {
             crate::logger::LOGGER.lock().unwrap().log_to_file($filepath, &format!($($arg)*));
         }
     };
+}
+
+pub fn log_file(path: &str, preparation: &dyn Fn(), command: Command) {
+
+}
+
+#[macro_export]
+macro_rules! log_file_if_enabled {
+    ($filepath:expr, $f:expr) => {
+        #[cfg(feature = "logging")]
+        {
+
+        }
+    }
 }

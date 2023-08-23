@@ -26,7 +26,7 @@ use graph::{Dcel, DcelBuilder};
 
 use crate::graph::mis_finder::find_connected_vertices;
 use crate::graph::node_relations::NodeRelations;
-use crate::graph::tree_decomposition::td_write_to_dot;
+use crate::graph::tree_decomposition::{td_write_to_dot, td_write_to_pdf};
 
 fn read_graph_file_into_quick_graph(filename: &str) -> Result<QuickGraph, String> {
     return if let Ok(mut lines) = read_lines(filename) {
@@ -208,39 +208,17 @@ fn mis_with_donut(
             }
 
             let decomp = TreeDecomposition::from(&td);
-            let td_rels = NodeRelations::new(&decomp);
-            let td_path = format!("./td_{i}.dot");
-
-            let mut td_out = File::create(td_path.as_str()).unwrap();
-            td_write_to_dot("td", &mut td_out, &decomp, &td_rels).unwrap();
-            Command::new("dot")
-                .args([
-                    "-Tpdf",
-                    td_path.as_str(),
-                    "-o",
-                    format!("./td_{i}.pdf").as_str(),
-                ])
-                .spawn()
-                .expect("dot command did not work.");
-
-            // TODO: generate MIS for this donut and add to list
             let ntd = NiceTreeDecomposition::from(&decomp);
             let ntd_rels = NodeRelations::new(&ntd.td);
             assert!(ntd.validate(&decomp, &ntd_rels));
 
-            let ntd_path = format!("./ntd_{i}.dot");
+            #[cfg(feature = "logging")]
+            {
+                td_write_to_pdf("td", format!("./logs/td_{i}").as_str(), &decomp, &NodeRelations::new(&decomp));
+                td_write_to_pdf("ntd", format!("./logs/ntd_{i}").as_str(), &ntd.td, &ntd_rels);
+            }
 
-            let mut ntd_out = File::create(ntd_path.as_str()).unwrap();
-            td_write_to_dot("ntd", &mut ntd_out, &ntd.td, &ntd_rels).unwrap();
-            Command::new("dot")
-                .args([
-                    "-Tpdf",
-                    ntd_path.as_str(),
-                    "-o",
-                    format!("./ntd_{i}.pdf").as_str(),
-                ])
-                .spawn()
-                .expect("dot command did not work.");
+            // TODO: generate MIS for this donut and add to list
             match find_mis(&graph.adjacency_matrix(), &ntd) {
                 Ok((mis, size)) => {
                     println!("mis: {mis:?}, size: {size}");
@@ -353,6 +331,13 @@ struct CliArguments {
 }
 
 fn main() {
+    #[cfg(feature = "logging")]
+    {
+        // TODO: We should handle the case when the folder
+        // could not be created.
+        let _ = std::fs::create_dir("logs");
+    }
+
     let args = CliArguments::parse();
     println!("{args:?}");
 

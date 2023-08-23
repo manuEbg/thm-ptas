@@ -15,7 +15,7 @@ use crate::log_if_enabled;
 use arc::{Arc, ArcId};
 use face::{Face, FaceId};
 use vertex::{Vertex, VertexId};
-static LOG: &str = "./dcel_out.txt";
+static LOG: &str = "logs/dcel_out.txt";
 
 #[derive(Clone, Debug)]
 pub struct Dcel {
