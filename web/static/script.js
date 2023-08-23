@@ -306,10 +306,10 @@ class GraphComponent extends React.Component {
       case 'PREV_FACE': this.highlightNextFace(false); break;
 
       case 'NEXT_RING': this.highlightNextRing(); break;
-      case 'PREV_RING': this.highlightPrevRing(); break;
+      case 'PREV_RING': this.highlightNextRing(false); break;
 
       case 'NEXT_DONUT': this.highlightNextDonut(); break;
-      case 'PREV_DONUT': this.highlightPrevDonut(); break;
+      case 'PREV_DONUT': this.highlightNextDonut(false); break;
 
       case 'TOGGLE_TD': this.toggleTD(); break;
       case 'TOGGLE_ST': this.toggleSpanningTree(); break;
@@ -431,6 +431,7 @@ class GraphComponent extends React.Component {
         .style(this.edgeStyleObject('#61bffc'))
         .selector('node.highlighted').style(this.vertexStyleObject('#61bffc'))
         .selector('edge.red').style(this.edgeStyleObject("#ff0000"))
+        .selector('edge.blue').style(self.edgeStyleObject("#0000ff"))
         .selector('node.bag').style(this.vertexStyleObject("#00ff00"))
         .selector('edge.cyan').style(this.edgeStyleObject("#00ffff"))
         .selector('node.td').style(this.vertexStyleObject("#ff00ff"))
@@ -445,6 +446,12 @@ class GraphComponent extends React.Component {
 
       layout: { name: ((this.layout.length > 0) ? 'preset' : 'grid') }
     });
+    this.dualgraph.vertices.forEach(v => {
+      this.addClassToElement(v.data.id, "td");
+    })
+    this.dualgraph.arcs.forEach(a => {
+      this.addClassToElement(a.data.id, "td");
+    })
   }
 
   vertexStyleObject(colorCode, important = false) {
@@ -638,87 +645,52 @@ class GraphComponent extends React.Component {
     else self.showTD();
   }
 
-  highlightPrevRing() {
-    this.previousRing = this.currentRing;
-    this.currentRing--;
-    if (this.currentRing < 0) {
-      this.currentRing = this.ringArcs.length - 1;
-    }
-
-    this.highlightCurrentRing();
-  }
-
-  highlightNextRing() {
-    this.previousRing = this.currentRing;
-    this.currentRing++;
-    if (this.currentRing >= this.ringArcs.length) {
-      this.currentRing = 0;
-    }
-
-    this.highlightCurrentRing();
-  }
-
-  highlightCurrentRing() {
-    let self = this;
-
-    if (this.previousRing != -1) {
-      self.ringArcs[this.previousRing].forEach(el => {
-        this.state.cy.getElementById(el).removeClass('red');
-      })
-    }
-
-    self.ringArcs[this.currentRing].forEach(el => {
-      this.state.cy.getElementById(el).addClass('red');
+  highlightRing(idx, self) {
+    self.ringArcs[idx].forEach(a => {
+      console.log(a)
+      self.addClassToElement(a, "blue");
     })
   }
 
-
-  highlightPrevDonut() {
-    this.previousDonut = this.currentDonut;
-    this.currentDonut--;
-    if (this.currentDonut < 0) {
-      this.currentDonut = this.donuts.length - 1;
-    }
-
-    this.highlightCurrentDonut();
-  }
-
-  highlightNextDonut() {
-    this.previousDonut = this.currentDonut;
-    this.currentDonut++;
-    if (this.currentDonut >= this.donuts.length) {
-      this.currentDonut = 0;
-    }
-
-    this.highlightCurrentDonut();
-  }
-
-  highlightCurrentDonut() {
-    let self = this;
-
-    if (this.showTriangulatedDonutArcs) {
-      this.draw();
-    }
-
-    if (this.previousDonut != -1) {
-      self.donuts[this.previousDonut].arcElements.forEach(el => {
-        this.state.cy.getElementById(el).removeClass('red');
-      })
-    }
-
-    self.donuts[this.currentDonut].arcElements.forEach(el => {
-      this.state.cy.getElementById(el).addClass('red');
+  lowlightRing(idx, self) {
+    self.ringArcs[idx].forEach(a => {
+      console.log(a)
+      self.removeClassFromElement(a, "blue");
     })
-
-    for (let i = 0; i < self.donuts[this.currentDonut].triangulated_arcs.length; ++i) {
-      this.state.cy.getElementById("ta-" + i).addClass('red');
-    }
   }
 
-  toggleShowTriangulatedDonutArcs() {
-    this.showTriangulatedDonutArcs = !this.showTriangulatedDonutArcs;
-    this.draw();
-    this.highlightCurrentDonut();
+  highlightNextRing(up = true) {
+    let self = this;
+    self.currentRing = self.highlightNext(
+      self.currentRing,
+      self.ringArcs.length - 1,
+      self.highlightRing,
+      self.lowlightRing,
+      up)
+
+    console.log("Highlighting Ring" + self.currentRing);
+  }
+  highlightNextDonut(up = true) {
+    let self = this;
+    self.currentDonut = self.highlightNext(
+      self.currentDonut,
+      self.donuts.length - 1,
+      self.highlightDonut,
+      self.lowlightDonut,
+      up)
+
+    console.log("Highlighting Ring" + self.currentRing);
+  }
+
+  highlightDonut(idx, self) {
+    self.donuts[idx].arcElements.forEach(el => {
+      self.addClassToElement(el, "red");
+    })
+  }
+  lowlightDonut(idx, self) {
+    self.donuts[idx].arcElements.forEach(el => {
+      self.removeClassFromElement(el, "red");
+    })
   }
 
   render() {
