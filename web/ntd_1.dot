@@ -1,7 +1,0 @@
-graph ntd {
-	B0 [label="B0 {2, 3}"];
-	B1 [label="B1 {2, 3}"];
-	B0 -- B1;
-	B2 [label="B2 {2}"];
-	B1 -- B2;
-}
