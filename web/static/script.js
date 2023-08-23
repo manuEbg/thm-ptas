@@ -296,9 +296,11 @@ class GraphComponent extends React.Component {
     PubSub.subscribe(NAVIGATION_EVENTS_TOPIC, this.handleNavigationEvent.bind(this));
   }
 
-  componentDidUpdate() {
-    this.load(this.props.graph, this.props.layout);
-    this.draw();
+  componentDidUpdate(prevProps, prevState) {
+    if (prevProps.graph !== this.props.graph) {
+      this.load(this.props.graph, this.props.layout);
+      this.draw();
+    }
   }
 
   handleNavigationEvent(msg, data) {
@@ -328,6 +330,10 @@ class GraphComponent extends React.Component {
   load(data, layout) {
     if (Object.keys(data).length === 0) return;
 
+    this.opts = JSON.parse(localStorage.getItem(OPTIONS_KEY));
+
+    console.log(this.opts);
+
     this.hasLayout = layout.length > 0;
 
     const obj = data.dcel;
@@ -345,8 +351,8 @@ class GraphComponent extends React.Component {
 
     this.layout.forEach((v) => {
       this.vertices[v.id].position = {
-        x: v.x * LAYOUT_FACTOR,
-        y: -v.y * LAYOUT_FACTOR,
+        x: v.x * this.opts.LAYOUT_FACTOR,
+        y: -v.y * this.opts.LAYOUT_FACTOR,
       }
     })
 
@@ -435,14 +441,14 @@ class GraphComponent extends React.Component {
         .selector('node')
         .style({
           'content': 'data(id)',
-          'width': NODE_SIZE,
-          'height': NODE_SIZE,
+          'width': this.opts.NODE_SIZE,
+          'height': this.opts.NODE_SIZE,
         })
         .selector('edge')
         .style({
           'curve-style': 'straight',
           'target-arrow-shape': 'triangle',
-          'width': FINE_EDGE,
+          'width': this.opts.FINE_EDGE,
           'line-color': '#ddd',
           'target-arrow-color': '#ddd'
         })
@@ -451,13 +457,13 @@ class GraphComponent extends React.Component {
         .selector('edge.highlighted')
         .style(this.edgeStyleObject('#61bffc'))
         .selector('node.highlighted').style(this.vertexStyleObject('#61bffc'))
-        .selector('edge.red').style(this.edgeStyleObject("#ff0000"))
+        .selector('edge.red').style(this.edgeStyleObject("#ff0000", this.opts.THICK_EDGE))
         .selector('node.red').style(this.vertexStyleObject("#ff0000"))
-        .selector('edge.blue').style(self.edgeStyleObject("#0000ff"))
+        .selector('edge.blue').style(self.edgeStyleObject("#0000ff", this.opts.THICK_EDGE))
         .selector('node.blue').style(self.vertexStyleObject("#0000ff"))
         .selector('node.bag').style(this.vertexStyleObject("#00ff00"))
         .selector('node.yellow').style(this.vertexStyleObject("#ff0"))
-        .selector('edge.cyan').style(this.edgeStyleObject("#00ffff"))
+        .selector('edge.cyan').style(this.edgeStyleObject("#00ffff", this.opts.THICK_EDGE))
         .selector('node.td').style(this.vertexStyleObject("#ff00ff"))
         .selector('edge.td').style(this.edgeStyleObject("#ff00ff", MEDIUM_EDGE))
         .selector('node.td.invisible').style({ 'display': 'none' })
@@ -615,7 +621,7 @@ class GraphComponent extends React.Component {
   }
 
   showAdditionalEdges() {
-    self = this;
+    const self = this;
     self.arcs.forEach(a => {
       if (a.is_added) {
         self.addClassToElement(a.data.id, "green");
@@ -624,7 +630,7 @@ class GraphComponent extends React.Component {
   }
 
   hideAdditionalEdges() {
-    self = this;
+    const self = this;
     self.arcs.forEach(a => {
       if (a.is_added) {
         self.removeClassFromElement(a.data.id, "green");
@@ -633,7 +639,7 @@ class GraphComponent extends React.Component {
   }
 
   toggleAdditionalEdges() {
-    self = this;
+    const self = this;
     self.additionalEdgesHighlighted = !self.additionalEdgesHighlighted;
     if (self.additionalEdgesHighlighted) {
       self.showAdditionalEdges();
@@ -768,7 +774,7 @@ class GraphVisualizer extends React.Component {
       NODE_SIZE: 150,
       FAT_NODE_SIZE: 200,
       LAYOUT_FACTOR: 4000,
-    }
+    };
 
     this.state = { graph: {}, layout: [], stdout: '', stderr: '', visualizerOptions: defaultVisualizerOptions };
     this.diagnosticsModal = React.createRef();
@@ -878,9 +884,35 @@ class GraphVisualizer extends React.Component {
               <div className="modal-body">
                 <form>
                   <div className="form-group row">
-                    <label for="inputPath" className="col-sm-2 col-form-label">Edge Thickness</label>
+                    <label for="inputPath" className="col-sm-2 col-form-label">Layout Scaling</label>
                     <div className="col-sm-10">
-                      <input className='form-control' type='number' value={this.state.visualizerOptions.THICK_EDGE} />
+                      <input className='form-range' type='range' min="1" max="10000" value={this.state.visualizerOptions.LAYOUT_FACTOR} onChange={(event) => this.setState((prevState) => { prevState.visualizerOptions.LAYOUT_FACTOR = event.target.value; return prevState; }) } />
+                      <div class='float-end'>{this.state.visualizerOptions.LAYOUT_FACTOR}</div>
+                    </div>
+                  </div>
+
+                  <div className="form-group row">
+                    <label for="inputPath" className="col-sm-2 col-form-label">Node Size</label>
+                    <div className="col-sm-10">
+                      <input className='form-range' type='range' min="10" max="1000" value={this.state.visualizerOptions.NODE_SIZE} onChange={(event) => this.setState((prevState) => { prevState.visualizerOptions.NODE_SIZE = event.target.value; return prevState; }) } />
+                      <div class='float-end'>{this.state.visualizerOptions.NODE_SIZE}</div>
+                    </div>
+                  </div>
+
+                  <div className="form-group row">
+                    <label for="inputPath" className="col-sm-2 col-form-label">Edge Size</label>
+                    <div className="col-sm-10">
+                      <input className='form-range' type='range' min="10" max="1000" value={this.state.visualizerOptions.FINE_EDGE} onChange={(event) => this.setState((prevState) => { prevState.visualizerOptions.FINE_EDGE = event.target.value; return prevState; }) } />
+                      <div class='float-end'>{this.state.visualizerOptions.FINE_EDGE}</div>
+                    </div>
+                  </div>
+
+
+                  <div className="form-group row">
+                    <label for="inputPath" className="col-sm-2 col-form-label">Thick Edge Size</label>
+                    <div className="col-sm-10">
+                      <input className='form-range' type='range' min="1" max="99" value={this.state.visualizerOptions.THICK_EDGE} onChange={(event) => this.setState((prevState) => { prevState.visualizerOptions.THICK_EDGE = event.target.value; return prevState; }) } />
+                      <div class='float-end'>{this.state.visualizerOptions.THICK_EDGE}</div>
                     </div>
                   </div>
                 </form>

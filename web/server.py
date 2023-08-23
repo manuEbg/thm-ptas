@@ -7,6 +7,10 @@ PORT = 3000
 
 app = Flask(__name__)
 
+executable = '../target/release/thm-ptas'
+if os.name == 'nt':
+    executable = '../target/release/thm-ptas.exe'
+
 @app.route('/', methods=['GET'])
 def index():
     return render_template('index.html')
@@ -56,9 +60,9 @@ def run():
     file = '../data/' + body["file"]
     scheme = body["scheme"].lower()
 
-    OUT_FILE = '/tmp/out.json'
+    OUT_FILE = 'out.json'
 
-    args = ['../target/release/thm-ptas', '--k', str(k), scheme, file, OUT_FILE]
+    args = [executable, '--k', str(k), scheme, file, OUT_FILE]
     process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = process.communicate()
     code = process.poll()
@@ -89,7 +93,7 @@ def run():
     return jsonify(response)
 
 
-if not os.path.isfile('../target/release/thm-ptas'):
+if not os.path.isfile(executable):
     print("You need to compile with 'cargo build --release'")
     exit(1)
 
