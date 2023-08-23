@@ -1,0 +1,3 @@
+graph td {
+	B0 [label="B0 {0, 1}"];
+}

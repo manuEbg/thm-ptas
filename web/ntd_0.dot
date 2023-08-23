@@ -1,0 +1,5 @@
+graph ntd {
+	B0 [label="B0 {0, 1}"];
+	B1 [label="B1 {0}"];
+	B0 -- B1;
+}

@@ -108,7 +108,7 @@ function Sidebar(props) {
           </div>
         }
 
-        <a href='#' className={"btn btn-success w-100 mt-2 " + (running ? "disabled" : "")} onClick={() => { handleRun({inputFile, K, scheme}) }}>Run</a>
+        <a href='#' className={"btn btn-success w-100 mt-2 " + (running ? "disabled" : "")} onClick={() => { handleRun({inputFile, K, scheme}) }}>{running ? (<div class="spinner-border" role="status"></div>) : "Run"}</a>
         <a href='#' className="btn btn-secondary w-100 mt-2" onClick={() => { props.handleShowDiagnostics() }}>Diagnostics</a>
       </form>
       <hr/>
@@ -911,7 +911,7 @@ class GraphVisualizer extends React.Component {
                   <div className="form-group row">
                     <label for="inputPath" className="col-sm-2 col-form-label">Thick Edge Size</label>
                     <div className="col-sm-10">
-                      <input className='form-range' type='range' min="1" max="99" value={this.state.visualizerOptions.THICK_EDGE} onChange={(event) => this.setState((prevState) => { prevState.visualizerOptions.THICK_EDGE = event.target.value; return prevState; }) } />
+                      <input className='form-range' type='range' min="1" max="1000" value={this.state.visualizerOptions.THICK_EDGE} onChange={(event) => this.setState((prevState) => { prevState.visualizerOptions.THICK_EDGE = event.target.value; return prevState; }) } />
                       <div class='float-end'>{this.state.visualizerOptions.THICK_EDGE}</div>
                     </div>
                   </div>
