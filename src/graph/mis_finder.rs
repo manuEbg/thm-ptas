@@ -541,12 +541,12 @@ pub fn find_mis_exhaustive(
     };
 
     let mut max: HashSet<usize> = HashSet::new();
-    let combinations = u32::pow(2, adjaceny_matrix.len() as u32);
+    let combinations = usize::pow(2, adjaceny_matrix.len() as u32);
     for (i, subset) in SubsetIter::new(&FxHashSet::from_iter(0..adjaceny_matrix.len())).enumerate() {
         if i % 100000 == 0 {
             log_if_enabled!(LOG_FILE_PATH,
                 "{i}/{combinations}, {}%",
-                f64::from(i as u32) / f64::from(combinations) * 100.0
+                f64::from(i as u32) / f64::from(combinations as u32) * 100.0
             );
         }
         let subset2 = HashSet::from_iter(subset.into_iter());

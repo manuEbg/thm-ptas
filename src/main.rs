@@ -22,6 +22,7 @@ use graph::mis_finder::{find_mis, find_mis_exhaustive};
 use graph::nice_tree_decomp::NiceTreeDecomposition;
 
 use graph::quick_graph::QuickGraph;
+use graph::sub_dcel::SubDcel;
 use graph::{Dcel, DcelBuilder};
 
 use crate::graph::mis_finder::find_connected_vertices;
@@ -162,19 +163,21 @@ impl Stopwatch {
 }
 
 fn mis_for_whole_graph(
-    graph: &Dcel,
+    graph: &SubDcel,
     spanning_tree: &SpanningTree,
     watch: &mut Stopwatch,
 ) -> Result<Vec<VertexId>, Box<dyn Error>> {
     println!("Solving whole graph");
     watch.start("WholeGraph");
-    let mut builder = TDBuilder::new(spanning_tree);
+    let mut builder = SubTDBuilder::new(&graph, &spanning_tree, 0);
     let td = ApproximatedTD::from(&mut builder);
     let td = TreeDecomposition::from(&td);
     let ntd = NiceTreeDecomposition::from(&td);
+
     // find_mis(&graph.adjacency_matrix(), &ntd).map(|(set, size)| set.into_iter().collect())
-    let result = find_mis(&graph.adjacency_matrix(), &ntd);
+    let result = find_mis(&graph.dcel.adjacency_matrix(), &ntd);
     watch.stop();
+
     match result {
         Ok((mis, size)) => {
             println!("mis: {mis:?}, size: {size}");
@@ -401,7 +404,8 @@ fn find_max_independent_set(
             watch.stop();
 
             let mut result = if ptas_config.k > spanning_tree.max_level() {
-                mis_for_whole_graph(&graph, &spanning_tree, &mut watch).unwrap()
+                let subdcel = &graph.find_donuts_for_k(usize::MAX - 1, usize::MAX - 1, &spanning_tree)?[0];
+                mis_for_whole_graph(&subdcel, &spanning_tree, &mut watch).unwrap()
             } else {
                 let (i, best_mis) =
                     mis_with_donut(&graph, &spanning_tree, &ptas_config, &mut watch).unwrap();
@@ -452,8 +456,11 @@ fn find_max_independent_set(
             watch.start("Spanning Tree");
             let spanning_tree = graph.spanning_tree(root);
             k = spanning_tree.max_level();
+            let subdcel = &graph.find_donuts_for_k(usize::MAX - 1, usize::MAX - 1, &spanning_tree)?[0];
+            println!("{:?}", subdcel.vertex_mapping);
+            println!("{}", subdcel.vertex_mapping.len());
             watch.stop();
-            mis_for_whole_graph(&graph, &spanning_tree, &mut watch)?
+            mis_for_whole_graph(&subdcel, &spanning_tree, &mut watch)?
         }
     };
 
