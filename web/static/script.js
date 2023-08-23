@@ -67,7 +67,7 @@ function Sidebar(props) {
   const handleGenAndRun = async (params) => {
     await handleGen(params);
     setInputFile(genOutName);
-    await handleRun(params);
+    await handleRun({inputFile: genOutName, K, scheme});
   }
 
   return (
