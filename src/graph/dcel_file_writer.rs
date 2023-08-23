@@ -251,8 +251,8 @@ impl WebFileWriter for SubDcel {
 
         JsObject::new(&JsValues::new(vec![
             JsValue::new("arcs", &JsArray::new(&mapped_arcs)),
-            //JsValue::new("triangulated_arcs", &JsArray::new(&triangulated_arcs)),
             JsValue::new("triangulated_arcs", &JsArray::new(&objs)),
+            JsValue::new("vertices", &JsArray::new(&self.vertex_mapping)),
         ]))
         .write_to_file(file, id, level)
     }
@@ -345,18 +345,6 @@ impl WebFileWriter for Dcel {
         }
 
         let rings = &self.find_rings().unwrap();
-        let ring_array = rings
-            .iter()
-            .map(|ring| {
-                ring.sub
-                    .arcs()
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
-
         let donuts = &self.find_donuts_for_k(2, 0, &st).unwrap();
 
         JsObject {
@@ -367,10 +355,7 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &approx_td), // TODO rename JS entry
-                    JsValue::new(
-                        "rings",
-                        &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
-                    ),
+                    JsValue::new("rings", &JsArray::new(&rings)),
                     JsValue::new("donuts", &JsArray::new(&donuts)),
                 ],
             },

@@ -58,6 +58,9 @@ impl SubDcel {
     }
 
     pub fn get_untriangulated_arcs(&self) -> Vec<arc::Arc> {
+        if self.sub.pre_triangulation_arc_count == 0 {
+            return self.sub.arcs.to_vec();
+        }
         return self.sub.arcs[0..self.sub.pre_triangulation_arc_count].to_vec();
     }
 

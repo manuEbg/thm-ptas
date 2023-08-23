@@ -351,13 +351,20 @@ class GraphComponent extends React.Component {
       f.vertices = f.vertices.map(v => "v" + v);
     });
 
-    this.ringArcs = obj.rings.map(r => r.map(a => "a" + a));
+    this.rings = obj.rings;
+    this.rings.forEach((ring) => {
+      ring.arcElements = ring.arcs.map(a => "a" + a)
+      ring.vertElements = ring.vertices.map(v => "v" + v)
+    })
+
+    //this.ringArcs = obj.rings.map(r => r.map(a => "a" + a));
     this.currentRing = -1
     this.previousRing = -1
 
     this.donuts = obj.donuts;
     this.donuts.forEach((donut) => {
       donut.arcElements = donut.arcs.map(a => "a" + a)
+      donut.vertElements = donut.vertices.map(v => "v" + v)
     })
 
     this.currentDonut = -1
@@ -431,7 +438,9 @@ class GraphComponent extends React.Component {
         .style(this.edgeStyleObject('#61bffc'))
         .selector('node.highlighted').style(this.vertexStyleObject('#61bffc'))
         .selector('edge.red').style(this.edgeStyleObject("#ff0000"))
+        .selector('node.red').style(this.vertexStyleObject("#ff0000"))
         .selector('edge.blue').style(self.edgeStyleObject("#0000ff"))
+        .selector('node.blue').style(self.vertexStyleObject("#0000ff"))
         .selector('node.bag').style(this.vertexStyleObject("#00ff00"))
         .selector('edge.cyan').style(this.edgeStyleObject("#00ffff"))
         .selector('node.td').style(this.vertexStyleObject("#ff00ff"))
@@ -646,14 +655,24 @@ class GraphComponent extends React.Component {
   }
 
   highlightRing(idx, self) {
-    self.ringArcs[idx].forEach(a => {
+    self.rings[idx].arcElements.forEach(a => {
+      console.log(a)
+      self.addClassToElement(a, "blue");
+    })
+
+    self.rings[idx].vertElements.forEach(a => {
       console.log(a)
       self.addClassToElement(a, "blue");
     })
   }
 
   lowlightRing(idx, self) {
-    self.ringArcs[idx].forEach(a => {
+    self.rings[idx].arcElements.forEach(a => {
+      console.log(a)
+      self.removeClassFromElement(a, "blue");
+    })
+
+    self.rings[idx].vertElements.forEach(a => {
       console.log(a)
       self.removeClassFromElement(a, "blue");
     })
@@ -663,13 +682,14 @@ class GraphComponent extends React.Component {
     let self = this;
     self.currentRing = self.highlightNext(
       self.currentRing,
-      self.ringArcs.length - 1,
+      self.rings.length - 1,
       self.highlightRing,
       self.lowlightRing,
       up)
 
     console.log("Highlighting Ring" + self.currentRing);
   }
+
   highlightNextDonut(up = true) {
     let self = this;
     self.currentDonut = self.highlightNext(
@@ -686,9 +706,15 @@ class GraphComponent extends React.Component {
     self.donuts[idx].arcElements.forEach(el => {
       self.addClassToElement(el, "red");
     })
+    self.donuts[idx].vertElements.forEach(el => {
+      self.addClassToElement(el, "red");
+    })
   }
   lowlightDonut(idx, self) {
     self.donuts[idx].arcElements.forEach(el => {
+      self.removeClassFromElement(el, "red");
+    })
+    self.donuts[idx].vertElements.forEach(el => {
       self.removeClassFromElement(el, "red");
     })
   }
