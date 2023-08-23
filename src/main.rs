@@ -495,13 +495,11 @@ fn main() {
         Err(error) => panic!("Failed to read graph file into DCEL: {:?}", error),
     };
 
-    //     let mut quick_graph: QuickGraph =
-    //         match read_graph_file_into_quick_graph(args.input.to_str().unwrap()) {
-    //             Ok(result) => result,
-    //             Err(error) => panic!("Failed to read graph file into quick graph: {:?}", error),
-    //         };
-
-    let mut quick_graph = QuickGraph::new(10);
+    let mut quick_graph: QuickGraph =
+        match read_graph_file_into_quick_graph(args.input.to_str().unwrap()) {
+            Ok(result) => result,
+            Err(error) => panic!("Failed to read graph file into quick graph: {:?}", error),
+        };
 
     // write_web_file(&args.output, &dcel);
     let mis_result = match find_max_independent_set(&mut dcel_b, &mut quick_graph, scheme) {
