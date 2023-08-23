@@ -39,6 +39,36 @@ For example:
  python3 ./generate.py --nodes 25 --rings 2 --nprob 0.8 --eprob 0.7 data/exp.graph --type random
 ```
 
-## The Visualization
+## Web Visualizer
+It is possible to use the Rust MIS solver and Generator script in tandem through a nice web interface.
 
-After successfully running the program you can inspect your results by opening `web/index.html` with a browser.
+![screenshot](./screenshot.png)
+
+### Installation
+* Build the Rust executable with `cargo build --release`.
+* Install the Flask Python package with `pip install Flask`
+
+### Running
+Run the `server.py` program in the `web` folder.
+
+* `cd web; python3 ./server.py`
+* Visit `http://localhost:3000/`
+
+### Functions
+* Running: find the MIS on a given graph using PTAS (approximation), Exhaustive (exact solution), "All-With-TD" (exact solution using tree decomposition)
+* Navigation: After running navigate through the graph and examine the results.
+  * Faces: navigate through faces
+  * Bags: navigate through bags
+  * Donuts: navigate through donuts
+  * Rings: navigate through rings
+  * Toggle Tree Decomposition: show and hide the graph's tree decomposition
+  * Additional Edges: show triangulated edges
+  * Toggle Show MIS: highlight the graph's vertices belong to the maximum independent set
+  * Visualization Options: tweak graph visualization
+* Generator: generate new graphs randomly
+  * Type: either Random or Circular
+  * Rings: amount of rings when graph is circular
+  * Nodes: amount of nodes
+  * P(V): probability of a vertex being added
+  * P(E): probability of an edge being added
+  * Output: name of the graph file
