@@ -1,8 +1,5 @@
 use std::io::Write;
-use std::{
-    collections::HashSet,
-    fs::File,
-};
+use std::{collections::HashSet, fs::File};
 
 use bit_set::BitSet;
 use fxhash::FxHashSet;
@@ -23,7 +20,9 @@ use super::{
     node_relations::NodeRelations,
 };
 
-static LOG_FILE_PATH: &str = "mis_log.txt";
+static MIS_LOG_PATH: &str = "logs/mis_log.txt";
+static CONSTR_TABLE_LOG_PATH: &str = "logs/constr_table.txt";
+static TABLE_LOG_PATH: &str = "logs/dyn_table.txt";
 
 /// Represents a maximum independent set size that can either be a positive integer or negative
 /// infinity. In order to avoid arithmetic overflows, the addition and subtraction operators are
@@ -152,22 +151,26 @@ where
         table.add_to_mis(bag_id, set_index, &mut mis);
 
         let (subset, size) = table.get_by_index(bag_id, set_index);
-        log_if_enabled!(LOG_FILE_PATH, "({set_index}): MIS at M[{bag_id}, {subset:?}] = {size}:\t{mis:?}");
+        log_if_enabled!(
+            MIS_LOG_PATH,
+            "({set_index}): MIS at M[{bag_id}, {subset:?}] = {size}:\t{mis:?}"
+        );
 
         let children = &node_relations.children[&bag_id];
-        log_if_enabled!(LOG_FILE_PATH, "{bag_id}'s children: {children:?}");
+        log_if_enabled!(MIS_LOG_PATH, "{bag_id}'s children: {children:?}");
 
         match children.len() {
             // Leaf node: We're finished.
             0 => {
-                log_if_enabled!(LOG_FILE_PATH, "{bag_id} is a leaf node => MIS = {mis:?}");
+                log_if_enabled!(MIS_LOG_PATH, "{bag_id} is a leaf node => MIS = {mis:?}");
                 mis
             }
 
             // Check the child.
             1 => {
                 let child_index = constr_table[bag_id][set_index].0.unwrap();
-                log_if_enabled!(LOG_FILE_PATH,
+                log_if_enabled!(
+                    MIS_LOG_PATH,
                     "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?}",
                     table.get_by_index(bag_id, set_index),
                     children[0],
@@ -189,7 +192,8 @@ where
             2 => {
                 let left = constr_table[bag_id][set_index].0.unwrap();
                 let right = constr_table[bag_id][set_index].1.unwrap();
-                log_if_enabled!(LOG_FILE_PATH,
+                log_if_enabled!(
+                    MIS_LOG_PATH,
                     "{bag_id}'s {set_index} {:?} was constructed by {}'s {} {:?} and {}'s {} {:?}",
                     table.get_by_index(bag_id, set_index),
                     children[0],
@@ -231,11 +235,14 @@ where
 
     // We find all subsets with the largest number in the root entry.
     let root_sets = table.get_max_root_set_indices(root_id);
-    log_if_enabled!(LOG_FILE_PATH, "MIS size according to table: {}", root_sets[0].1);
+    log_if_enabled!(
+        MIS_LOG_PATH,
+        "MIS size according to table: {}",
+        root_sets[0].1
+    );
 
     // We try to reconstruction the independent sets until one is found.
     for (index, size) in root_sets.into_iter() {
-
         let mut result = HashSet::new();
         result = rec(
             table,
@@ -297,7 +304,7 @@ pub fn find_mis(
                     for subset in SubsetIter::new(&bag.vertex_set) {
                         if !subset.contains(&v) {
                             let (i, size) = table.get(child.id, &subset);
-                            log_if_enabled!(LOG_FILE_PATH,
+                            log_if_enabled!(MIS_LOG_PATH,
                                 "{v} notin {subset:?} => M[{}, {subset:?}] = M[{}, {subset:?}] = {size}",
                                 bag.id, child.id
                             );
@@ -308,7 +315,7 @@ pub fn find_mis(
                             let mut clone = subset.clone();
                             clone.remove(&v);
                             let (i, size) = table.get(child.id, &clone);
-                            log_if_enabled!(LOG_FILE_PATH,
+                            log_if_enabled!(MIS_LOG_PATH,
                                 "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
                                 bag.id, child.id
                             );
@@ -317,7 +324,8 @@ pub fn find_mis(
                                 .push(DynTableValueItem::new(subset, size + MisSize::Valid(1)));
                             constr_table[bag.id].push((Some(i), None)); // Reconstruction.
                         } else {
-                            log_if_enabled!(LOG_FILE_PATH,
+                            log_if_enabled!(
+                                MIS_LOG_PATH,
                                 "{subset:?} is not independent => M[{}, S] = -infinity",
                                 bag.id
                             );
@@ -331,9 +339,13 @@ pub fn find_mis(
                     // Forget node.
                     // forall subsets of bag: M[bag, subset] = max { ... }.
 
-                    log_if_enabled!(LOG_FILE_PATH,
+                    log_if_enabled!(
+                        MIS_LOG_PATH,
                         "Forget: B{} -> B{} = {:?} -> {:?}",
-                        &child.id, &bag.id, &child.vertex_set, &bag.vertex_set
+                        &child.id,
+                        &bag.id,
+                        &child.vertex_set,
+                        &bag.vertex_set
                     );
 
                     for subset in SubsetIter::new(&bag.vertex_set) {
@@ -375,7 +387,7 @@ pub fn find_mis(
                     let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
 
-                    log_if_enabled!(LOG_FILE_PATH, "M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len} = {}", bag.id, left_child.id, right_child.id, left_size + right_size - len);
+                    log_if_enabled!(MIS_LOG_PATH, "M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len} = {}", bag.id, left_child.id, right_child.id, left_size + right_size - len);
                     entry
                         .sets
                         .push(DynTableValueItem::new(subset, left_size + right_size - len));
@@ -389,13 +401,24 @@ pub fn find_mis(
         table.0.insert(bag.id.clone(), entry);
     }
 
-    let mut out = File::create("normal_table.txt").unwrap();
-    write!(out, "{}", NtdAndNormalTable { ntd, table: &table });
+    #[cfg(feature = "logging")]
+    {
+        log_if_enabled!(TABLE_LOG_PATH, "-------------\nNormal Table\n-------------");
+        log_if_enabled!(
+            TABLE_LOG_PATH,
+            "{}",
+            NtdAndNormalTable { ntd, table: &table }
+        );
+        dump_construction_table("Normal table", &constr_table, &table, &ntd.relations);
+    }
 
-    let mut constr_out = File::create("normal_constr_table.txt").unwrap();
-    dump_construction_table(constr_out, &constr_table, &table, &ntd.relations);
-
-    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations, &adjaceny_matrix);
+    let result = reconstruct_mis(
+        &table,
+        ntd.td.root.unwrap(),
+        &constr_table,
+        &ntd.relations,
+        &adjaceny_matrix,
+    );
 
     Ok((result.clone(), result.len()))
 }
@@ -444,7 +467,7 @@ pub fn find_mis_fast(
                         let set_index = constr_table[bag.id].len();
                         if !subset.contains(v) {
                             let (child_set_index, size) = table.get(child.id, &subset);
-                            log_if_enabled!(LOG_FILE_PATH,
+                            log_if_enabled!(MIS_LOG_PATH,
                                 "{v} notin {subset:?} => M[{}, {subset:?}] = M[{}, {subset:?}] = {size}",
                                 bag.id, child.id
                             );
@@ -454,14 +477,15 @@ pub fn find_mis_fast(
                             let mut clone = subset.clone();
                             clone.remove(v);
                             let (child_set_index, size) = table.get(child.id, &clone);
-                            log_if_enabled!(LOG_FILE_PATH,
+                            log_if_enabled!(MIS_LOG_PATH,
                                 "{v} in {subset:?} => M[{}, {subset:?}] = M[{}, {clone:?}] + 1 = {size} + 1",
                                 bag.id, child.id
                             );
                             table.put(bag.id, subset, size + MisSize::Valid(1));
                             constr_table[bag.id].push((Some(child_set_index), None));
                         } else {
-                            log_if_enabled!(LOG_FILE_PATH,
+                            log_if_enabled!(
+                                MIS_LOG_PATH,
                                 "{subset:?} is not independent => M[{}, S] = -infinity",
                                 bag.id
                             );
@@ -508,7 +532,7 @@ pub fn find_mis_fast(
                     let (i, left_size) = table.get(left_child.id, &subset);
                     let (j, right_size) = table.get(right_child.id, &subset);
                     let len = MisSize::Valid(subset.len());
-                    log_if_enabled!(LOG_FILE_PATH, "M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
+                    log_if_enabled!(MIS_LOG_PATH, "M[{}, {subset:?}] = M[{}, S] + M[{}, S] - |S| = {left_size} + {right_size} - {len}", bag.id, left_child.id, right_child.id);
                     table.put(bag.id, subset, left_size + right_size - len);
                     constr_table[bag.id].push((Some(i), Some(j))); // Reconstruction.
                 }
@@ -518,13 +542,20 @@ pub fn find_mis_fast(
         }
     }
 
-    let mut table_out = File::create("fast_table.txt").unwrap();
-    write!(table_out, "{}", NtdAndFastTable { ntd, table: &table });
+    #[cfg(feature = "logging")]
+    {
+        log_if_enabled!(TABLE_LOG_PATH, "-------------\nFast Table\n-------------");
+        log_if_enabled!(TABLE_LOG_PATH, "{}", NtdAndFastTable { ntd, table: &table });
+        dump_construction_table("Fast Table", &constr_table, &table, &ntd.relations);
+    }
 
-    let mut constr_out = File::create("fast_constr_table.txt").unwrap();
-    dump_construction_table(constr_out, &constr_table, &table, &ntd.relations);
-
-    let result = reconstruct_mis(&table, ntd.td.root.unwrap(), &constr_table, &ntd.relations, &adjaceny_matrix);
+    let result = reconstruct_mis(
+        &table,
+        ntd.td.root.unwrap(),
+        &constr_table,
+        &ntd.relations,
+        &adjaceny_matrix,
+    );
 
     Ok((result.clone(), result.len()))
 }
@@ -541,12 +572,14 @@ pub fn find_mis_exhaustive(
     };
 
     let mut max: HashSet<usize> = HashSet::new();
-    let combinations = u32::pow(2, adjaceny_matrix.len() as u32);
-    for (i, subset) in SubsetIter::new(&FxHashSet::from_iter(0..adjaceny_matrix.len())).enumerate() {
+    let combinations = usize::pow(2, adjaceny_matrix.len() as u32);
+    for (i, subset) in SubsetIter::new(&FxHashSet::from_iter(0..adjaceny_matrix.len())).enumerate()
+    {
         if i % 100000 == 0 {
-            log_if_enabled!(LOG_FILE_PATH,
+            log_if_enabled!(
+                MIS_LOG_PATH,
                 "{i}/{combinations}, {}%",
-                f64::from(i as u32) / f64::from(combinations) * 100.0
+                f64::from(i as u32) / f64::from(combinations as u32) * 100.0
             );
         }
         let subset2 = HashSet::from_iter(subset.into_iter());
@@ -600,25 +633,26 @@ where
 
 /// Writes the construction table into a given file.
 fn dump_construction_table<Set>(
-    mut file: File,
+    heading: &str,
     constr_table: &ConstructionTable,
     table: &dyn DynTable<Set>,
     node_relations: &NodeRelations,
-) -> std::io::Result<()>
-where
+) where
     Set: Eq + std::fmt::Debug + Clone + Default,
 {
+    log_if_enabled!(CONSTR_TABLE_LOG_PATH, "---------------------------------------\n{heading}\n---------------------------------------");
+
     for (bag_id, preds) in constr_table.iter().enumerate() {
         for (set_id, preds) in preds.iter().enumerate() {
             match preds {
-                (None, None) => Ok(()),
+                (None, None) => {}
 
                 (Some(p), None) => {
                     let child_id = node_relations.children[&bag_id][0];
                     let (subset, size) = table.get_by_index(bag_id, set_id);
                     let (child_subset, child_size) = table.get_by_index(child_id, *p);
-                    writeln!(
-                        file,
+                    log_if_enabled!(
+                        CONSTR_TABLE_LOG_PATH,
                         "{bag_id}'s set {set_id} ({:?}, {}) from child {child_id}'s set {p} ({:?}, {})",
                         subset, size,
                         child_subset, child_size,
@@ -628,8 +662,8 @@ where
                 (Some(l), Some(r)) => {
                     let left_id = node_relations.children[&bag_id][0];
                     let right_id = node_relations.children[&bag_id][1];
-                    writeln!(
-                        file,
+                    log_if_enabled!(
+                        CONSTR_TABLE_LOG_PATH,
                         "{bag_id}'s set {set_id} {:?} from left child {left_id}'s set {l} {:?} and right child {right_id}'s set {r} {:?}",
                         table.get_by_index(bag_id, set_id).0,
                         table.get_by_index(left_id, *l).0,
@@ -641,8 +675,6 @@ where
             };
         }
     }
-
-    Ok(())
 }
 
 /// Finds the connected vertices of a set.

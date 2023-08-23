@@ -1,10 +1,13 @@
-use std::{fs::File, io::Error, io::Write};
+use std::{fs::File, io::Error, io::Write, process::Command};
 
 use crate::graph::approximated_td::ApproximatedTD;
 use arboretum_td::tree_decomposition::TreeDecomposition;
 use fxhash::FxHashSet;
 
-use super::{iterators::bfs::TreeDecompBfsIter, node_relations::{NodeRelations, NodeParent}};
+use super::{
+    iterators::bfs::TreeDecompBfsIter,
+    node_relations::{NodeParent, NodeRelations},
+};
 
 /// Creates a tree decomposition for the
 /// [arboretum_td](https://docs.rs/arboretum-td/latest/arboretum_td/) library.
@@ -65,4 +68,31 @@ pub fn td_write_to_dot(
     }
 
     writeln!(file, "}}")
+}
+
+pub fn td_write_to_pdf(
+    title: &str,
+    path: &str,
+    td: &TreeDecomposition,
+    node_relations: &NodeRelations,
+) {
+    let mut dot_path = String::from(path);
+    dot_path.push_str(".dot");
+    let mut pdf_path = String::from(path);
+    pdf_path.push_str(".pdf");
+
+    let mut td_dot = File::create(dot_path.as_str()).unwrap();
+    td_write_to_dot(title, &mut td_dot, &td, &node_relations).unwrap();
+
+    match Command::new("dot")
+        .args([
+            "-Tpdf",
+            dot_path.as_str(),
+            "-o",
+            pdf_path.as_str(),
+        ])
+        .spawn() {
+            Ok(_) => {},
+            Err(_) => println!("Could not log the TD. Reason: dot is not installed.\nIf you want to use it, you can install it with graphviz."),
+        }
 }

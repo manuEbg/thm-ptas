@@ -113,6 +113,10 @@ def main():
 
     embedding, layout = gen.generate()
 
+    if args.type == 'circular':
+        number_nodes *= args.rings
+        number_nodes += 1
+
     with open(outfile, "w", encoding="utf-8") as f:
         f.write(f"{number_nodes}\n{int(len(embedding.edges()) / 2)}\n")
         for node, dest_nodes in embedding.get_data().items():
@@ -133,8 +137,7 @@ def main():
             'y': y,
         })
 
-    with open('./data/layout.js', 'w') as f:
-        f.write('let layout = ')
+    with open(outfile + '.layout.json', 'w') as f:
         json.dump(layout_json, f)
 
     nx.draw_networkx(embedding, pos=layout, with_labels=True)

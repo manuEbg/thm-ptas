@@ -51,6 +51,10 @@ impl<'a> Iterator for BfsIter<'a> {
             };
 
             for a in self.dcel.vertex(vertex).arcs() {
+                if self.dcel.invalid_arcs[*a] {
+                    println!("BFS: skipping invalid arc{a}");
+                    continue;
+                }
                 let n = self.dcel.arc(*a).dst();
 
                 if self.discovered[n] {

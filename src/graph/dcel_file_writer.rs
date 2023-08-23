@@ -1,10 +1,11 @@
+use crate::MISResult;
+
 use super::approximated_td::ApproximatedTD;
 use super::approximated_td::TDBuilder;
 use super::dcel::spanning_tree::SpanningTree;
 use super::dcel::vertex::VertexId;
-use super::dcel::*;
+use super::sub_dcel::SubDcel;
 use super::Dcel;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::prelude::*;
@@ -68,15 +69,17 @@ struct JsArc {
     src: usize,
     dst: usize,
     is_added: bool,
+    is_invalid: bool,
 }
 
 impl JsArc {
-    fn new(id: usize, src: usize, dst: usize, is_added: bool) -> Self {
+    fn new(id: usize, src: usize, dst: usize, is_added: bool, is_invalid: bool) -> Self {
         Self {
             id,
             src,
             dst,
             is_added,
+            is_invalid,
         }
     }
 }
@@ -195,6 +198,9 @@ impl WebFileWriter for JsFace {
 
 impl WebFileWriter for JsArc {
     fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        if self.is_invalid {
+            return Ok(());
+        }
         self.tab(file, level)?;
         JsObject {
             item: &JsValues {
@@ -247,8 +253,8 @@ impl WebFileWriter for SubDcel {
 
         JsObject::new(&JsValues::new(vec![
             JsValue::new("arcs", &JsArray::new(&mapped_arcs)),
-            //JsValue::new("triangulated_arcs", &JsArray::new(&triangulated_arcs)),
             JsValue::new("triangulated_arcs", &JsArray::new(&objs)),
+            JsValue::new("vertices", &JsArray::new(&self.vertex_mapping)),
         ]))
         .write_to_file(file, id, level)
     }
@@ -279,7 +285,7 @@ impl<'a> WebFileWriter for ApproximatedTD<'a> {
 
             for (v, adj) in dg.adjacent().iter().enumerate() {
                 for u in adj.iter() {
-                    arcs.push(JsArc::new(arc_count, v, *u, false));
+                    arcs.push(JsArc::new(arc_count, v, *u, false, false));
                     arc_count += 1;
                 }
             }
@@ -294,6 +300,21 @@ impl<'a> WebFileWriter for ApproximatedTD<'a> {
             JsValue::new("arcs", &JsArray::new(&build_js_arcs(self))),
             JsValue::new("bags", &JsArray::new(self.bags())),
         ]))
+        .write_to_file(file, id, level)
+    }
+}
+
+impl WebFileWriter for MISResult {
+    fn write_to_file(&self, file: &mut File, id: usize, level: u32) -> std::io::Result<()> {
+        JsObject {
+            item: &JsValues {
+                values: vec![
+                    JsValue::new("mis", &JsArray::new(&self.result)),
+                    JsValue::new("k", &self.k),
+                    JsValue::new("i", &self.i),
+                ],
+            },
+        }
         .write_to_file(file, id, level)
     }
 }
@@ -314,9 +335,18 @@ impl WebFileWriter for Dcel {
             .arcs()
             .iter()
             .enumerate()
-            .map(|(i, a)| JsArc::new(i, a.src(), a.dst(), i >= self.pre_triangulation_arc_count()))
+            .map(|(i, a)| {
+                JsArc::new(
+                    i,
+                    a.src(),
+                    a.dst(),
+                    i >= self.pre_triangulation_arc_count(),
+                    self.invalid_arcs[i],
+                )
+            })
             .collect();
         let faces = self.faces();
+        println!("faces: {:?}", faces.len());
         let arcs_per_faces: Vec<Vec<usize>> =
             faces.iter().map(|face| face.walk_face(self)).collect();
         let verts_per_face: Vec<Vec<usize>> = arcs_per_faces
@@ -333,21 +363,7 @@ impl WebFileWriter for Dcel {
         }
 
         let rings = &self.find_rings().unwrap();
-        let ring_array = rings
-            .iter()
-            .map(|ring| {
-                ring.sub
-                    .arcs()
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| *ring.get_original_arc(i).unwrap())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
 
-        let donuts = &self.find_donuts_for_k(4).unwrap();
-
-        file.write_all(b"let data = ")?;
         JsObject {
             item: &JsValues {
                 values: vec![
@@ -356,11 +372,7 @@ impl WebFileWriter for Dcel {
                     JsValue::new("faces", &JsArray::new(&js_faces)),
                     JsValue::new("spantree", &JsArray::new(&s)),
                     JsValue::new("dualgraph", &approx_td), // TODO rename JS entry
-                    JsValue::new(
-                        "rings",
-                        &JsArray::new(&ring_array.iter().map(|ring| JsArray::new(&ring)).collect()),
-                    ),
-                    JsValue::new("donuts", &JsArray::new(&donuts)),
+                    JsValue::new("rings", &JsArray::new(&rings)),
                 ],
             },
         }
@@ -371,10 +383,11 @@ impl WebFileWriter for Dcel {
 pub struct JsDataWriter<'a> {
     file: File,
     dcel: &'a Dcel,
+    result: MISResult,
 }
 
 impl<'a> JsDataWriter<'a> {
-    pub fn new(filename: &str, dcel: &'a Dcel) -> Self {
+    pub fn new(filename: &str, dcel: &'a Dcel, result: MISResult) -> Self {
         let file_result = File::create(filename);
 
         let file = match file_result {
@@ -382,10 +395,24 @@ impl<'a> JsDataWriter<'a> {
             Err(error) => panic!("Problem opening the file: {:?}", error),
         };
 
-        JsDataWriter { file, dcel }
+        JsDataWriter { file, dcel, result }
     }
 
     pub fn write_data(&mut self) {
-        self.dcel.write_to_file(&mut self.file, 0, 0).unwrap();
+        let st = self.dcel.spanning_tree(0);
+        let best_donuts = &self
+            .dcel
+            .find_donuts_for_k(self.result.k, self.result.i, &st)
+            .unwrap();
+        let _ = JsObject {
+            item: &JsValues {
+                values: vec![
+                    JsValue::new("dcel", self.dcel),
+                    JsValue::new("result", &self.result),
+                    JsValue::new("donuts", &JsArray::new(&best_donuts)),
+                ],
+            },
+        }
+        .write_to_file(&mut self.file, 0, 0);
     }
 }

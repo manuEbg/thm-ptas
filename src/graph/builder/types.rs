@@ -1,5 +1,4 @@
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Arc {
     pub src: usize,
     pub src_port: Option<usize>,
@@ -26,29 +25,24 @@ impl Arc {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Face {
     pub start_arc: usize,
 }
 
 impl Face {
-    pub fn new(start_arc : usize) -> Self {
-        Face{
-            start_arc
-        }
+    pub fn new(start_arc: usize) -> Self {
+        Face { start_arc }
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Vertex {
-    pub arcs: Vec<usize>
+    pub arcs: Vec<usize>,
 }
 
 impl Vertex {
     pub fn new() -> Self {
-        Vertex{
-            arcs: vec![]
-        }
+        Vertex { arcs: vec![] }
     }
 }
-
