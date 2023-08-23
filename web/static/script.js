@@ -22,7 +22,7 @@ function Sidebar(props) {
   const GRAPH_TYPES = ['Random', 'Circular']
 
   const [graphFiles, setGraphFiles] = React.useState([]);
-  const [scheme, setScheme] = React.useState(SCHEMES[0]);
+  const [scheme, setScheme] = React.useState(SCHEMES[1]);
   const [inputFile, setInputFile] = React.useState('');
   const [K, setK] = React.useState("1");
 
