@@ -1,5 +1,11 @@
 # thm-ptas
-This repository is used for our GFSP SS23 Project 
+This repository is used for our GFSP SS23 Project.
+
+The ptas approximation scheme only works correctly on graphs that are generated via the python script with the circular option.
+
+To find independent sets on other graphs you need to use one of the other schemes ( EXHAUSTIVE or ALL-WITH-TD )
+
+If you are interested in how this algorithm works, please have a look at the [wiki](https://github.com/manuEbg/thm-ptas/wiki) or the [presentation](https://github.com/manuEbg/thm-ptas/blob/main/THM%20PTAS-2.pdf). 
 
 ## How to use?
 
