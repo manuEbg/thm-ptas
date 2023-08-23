@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::node_relations::NodeRelations;
 
-static LOG_FILE_PATH: &str = "ntd_out.txt";
+static LOG_FILE_PATH: &str = "logs/ntd_out.txt";
 
 /// Represents a nice tree decomposition.
 pub struct NiceTreeDecomposition {

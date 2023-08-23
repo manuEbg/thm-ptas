@@ -6,7 +6,7 @@ use crate::graph::dcel::vertex::VertexId;
 use crate::graph::reducible::Reducible;
 use crate::log_if_enabled;
 
-static LOG: &str = "approxTdOut.txt";
+static LOG: &str = "logs/approx_td_out.txt";
 
 #[derive(Clone, Debug)]
 pub struct DcelBuilder {

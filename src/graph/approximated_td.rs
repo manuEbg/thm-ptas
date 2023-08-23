@@ -6,7 +6,7 @@ use super::dcel::vertex::VertexId;
 use super::sub_dcel::SubDcel;
 use super::{dcel::face::Face, dcel::spanning_tree::SpanningTree, Dcel};
 use crate::log_if_enabled;
-static SUB_TD_LOG: &str = "approxTdOut.txt";
+static SUB_TD_LOG: &str = "logs/approx_td_out.txt";
 
 type BagId = usize;
 
